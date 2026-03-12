@@ -5,12 +5,13 @@ from __future__ import annotations
 from contextlib import contextmanager
 import os
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional, TYPE_CHECKING
 
 import numpy as np
 import requests
 
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+  from sentence_transformers import SentenceTransformer
 
 
 HUGGINGFACE_ENDPOINT = "https://huggingface.co"
@@ -25,6 +26,10 @@ _DEFAULT_REMOTE_EMBED_API_KEY = "26932a86d772001af60cbd9d2c162bfda3a90e094f797f3
 
 def _log_default(message: str) -> None:
   print(message, flush=True)
+
+
+def is_remote_embedding_enabled() -> bool:
+  return bool(str(_DEFAULT_REMOTE_EMBED_ENDPOINT or "").strip())
 
 
 class RemoteSentenceTransformer:
@@ -299,6 +304,7 @@ def load_sentence_transformer(
           f"（provider={provider_name}，device={device}）"
         )
         with _hf_endpoint(endpoint), _hf_http_backoff(max_retries=hf_backoff_retries):
+          from sentence_transformers import SentenceTransformer
           return SentenceTransformer(model_name, device=device)
       except Exception as e:  # pragma: no cover - 仅异常路径
         last_err = e
