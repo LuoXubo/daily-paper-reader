@@ -25,3 +25,48 @@ subscriptions:
     stage: A
     diff_threshold_pct: 15
   keyword_recall_mode: or
+  intent_profiles:
+    - tag: ROB AI
+      description: 机器人、具身智能、世界模型与强化学习相关论文检索
+      enabled: true
+      keywords:
+        - keyword: embodied AI
+          keyword_cn: 具身智能
+          query: embodied artificial intelligence and agents
+        - keyword: Space Robotics
+          keyword_cn: 太空机器人
+          query: S
+        - keyword: visual navigation
+          keyword_cn: 视觉导航
+          query: v
+        - keyword: reinforcement learning
+          keyword_cn: 强化学习
+          query: deep reinforcement learning algorithms
+        - keyword: World Model
+          keyword_cn: 世界模型
+          query: R
+        - keyword: robotics
+          keyword_cn: 机器人学
+          query: robotics and autonomous systems
+      intent_queries:
+        - query: advancements in embodied AI and world models for robotics
+          query_cn: 具身智能与机器人世界模型的进展
+          enabled: true
+          source: manual
+          note: ''
+        - query: reinforcement learning applications in robotic control and manipulation
+          query_cn: 强化学习在机器人控制与操控中的应用
+          enabled: true
+          source: manual
+          note: ''
+        - query: integrating foundation models with embodied agents
+          query_cn: 基础模型与具身智能体的集成
+          enabled: true
+          source: manual
+          note: ''
+        - query: state of the art in robotic world models and reinforcement learning
+          query_cn: 机器人世界模型与强化学习的前沿技术
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-03-16T05:11:16.128Z'
