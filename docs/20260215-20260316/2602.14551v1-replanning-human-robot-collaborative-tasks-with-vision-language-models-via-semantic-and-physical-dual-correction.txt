@@ -1,0 +1,279 @@
+Title: Replanning Human-Robot Collaborative Tasks with Vision-Language Models via Semantic and Physical Dual-Correction
+
+URL Source: https://arxiv.org/pdf/2602.14551v1
+
+Published Time: Tue, 17 Feb 2026 03:20:52 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+FULL PAPER 
+
+# Replanning Human–Robot Collaborative Tasks with Vision–Language Models via Semantic and Physical Dual–Correction 
+
+Taichi Kato a, Takuya Kiyokawa a* , Namiko Saito a,b , and Kensuke Harada a,c 
+
+> a
+
+Department of Systems Innovation, Graduate School of Engineering Science, The University of Osaka, 1-3 Machikaneyama, Toyonaka, Osaka, Japan; 
+
+> b
+
+Microsoft Research Asia, Shinagawa, Tokyo, Japan; 
+
+> c
+
+Industrial Cyber-physical Systems Research Center, The National Institute of Advanced Industrial Science and Technology (AIST), 2-3-26 Aomi, Koto-ku, Tokyo, Japan. 
+
+ARTICLE HISTORY 
+
+Compiled February 17, 2026 
+
+ABSTRACT 
+
+Human–Robot Collaboration (HRC) plays an important role in assembly tasks by enabling robots to plan and adjust their motions based on interactive, real-time human instructions. However, such instructions are often linguistically ambiguous and underspecified, making it difficult to generate physically feasible and coopera-tive robot behaviors. To address this challenge, many studies have applied Vision– Language Models (VLMs) to interpret high-level instructions and generate corre-sponding actions. Nevertheless, VLM-based approaches still suffer from hallucinated reasoning and an inability to anticipate physical execution failures. To address these challenges, we propose an HRC framework that augments a VLM-based reasoning with a dual-correction mechanism: an internal correction model that verifies logical consistency and task feasibility prior to action execution, and an external correc-tion model that detects and rectifies physical failures through post-execution feed-back. Simulation ablation studies demonstrate that the proposed method improves the success rate compared to baselines without correction models. Our real-world experiments in collaborative assembly tasks supported by object fixation or tool preparation by an upper body humanoid robot further confirm the framework’s ef-fectiveness in enabling interactive replanning across different collaborative tasks in response to human instructions, validating its practical feasibility. 
+
+KEYWORDS 
+
+Replanning, Vision–Language Models, Human–Robot Collaboration 
+
+1. Introduction 
+
+While recent advances in manufacturing industry have advanced rapidly, associated social challenges such as workforce shortages and the demand for flexible production systems have been increasing. To address these issues, a new concept known as In-dustry 5.0 [1] has been proposed. Unlike conventional manufacturing paradigms that focus on machine-centered automation, Industry 5.0 emphasizes human-centered pro-duction activities [2]. Within this paradigm, Human–Robot Collaboration (HRC) is regarded as a key technology for enabling adaptive and interactive assembly tasks. 
+
+> *Corresponding Author: Takuya Kiyokawa. Email: kiyokawa.takuya.es@osaka-u.ac.jp
+> arXiv:2602.14551v1 [cs.RO] 16 Feb 2026
+
+Previous studies on HRC have proposed various collaborative approaches from per-spectives such as motion planning [3], role allocation [4], and safety assurance [5]. They assume predefined workflows or structured commands. In real-world assembly tasks, however, there are many situations in which humans are responsible for processes that robots cannot perform independently, while robots act in a supportive role. In such scenarios, a cooperative relationship is required in which humans take the initiative and robots provide appropriate assistance to complete the task. One of the main challenges in human–robot collaborative assembly is enabling robots to understand human intentions and actions. When humans work together, they often use ambiguous verbal instructions, such as “hold it a little more to the left” or “pass me a larger tool,” to adjust each other’s actions and smoothly coor-dinate the task. Humans naturally resolve such ambiguity through shared context and implicit intention, but enabling robots to do the same remains a fundamental challenge. Many existing systems rely on predefined fixed motions, making real-time fine-grained adjustments in response to human instructions difficult. Recent research has attempted to address this problem using Vision–Language Models (VLMs), which can connect natural language understanding with visual per-ception. While VLMs demonstrate strong semantic reasoning capabilities, directly ap-plying them to collaborative assembly introduces critical limitations. First, VLMs are prone to hallucinated reasoning, selecting actions that appear linguistically plausible but are logically inconsistent with the task constraints. Second, they lack awareness of physical feasibility and therefore cannot anticipate execution failures such as un-stable grasps or environmental interference. In a collaborative setting, such errors are particularly problematic, as inappropriate assistance can interrupt human operation or compromise safety. In this study, to overcome the limitations, we propose a robust replanning frame-work for human–robot collaborative assembly that integrates Vision–Language Mod-els (VLMs) with a dual-correction mechanism. Our approach treats assistive actions (e.g., grasping poses or tool selections) as selectable targets and dynamically modifies them based on natural language instructions. In this framework, verbal instructions are interpreted by a VLM, which selects appropriate action candidates from a set of generated options. This enables the robot to infer human intent and adapt its behavior in real time, even from ambiguous commands. A distinguishing feature of our framework is the integration of the dual-correction mechanism to mitigate the inherent risks of VLMs, such as hallucinations and execu-tion failures. Specifically, the Internal Correction Model functions as a pre-execution verifier, checking the logical consistency between the linguistic instruction and the generated action plan to prevent erroneous selection. Conversely, the External Cor-rection Model serves as a post-execution evaluator, comparing environmental states before and after the action to detect physical failures and trigger necessary replan-ning. By introducing this closed-loop correction, the system can identify the causes of hallucinations or execution failures and perform replanning accordingly, thereby improving the stability of action modification. In our framework, we employ separate VLMs for the internal and external correc-tion models. Target recognition and action success detection require a multimodal interpretation of both linguistic instructions and environmental states. Traditional rule-based methods struggle to account for the infinite variations in natural language and dynamic environmental conditions. By leveraging VLMs trained on large-scale datasets, our correction mechanism achieves semantic-level understanding that gen-eralizes across diverse vocabularies and visual settings. This approach ensures robust 2performance by focusing on the underlying meaning of a task’s success rather than relying on rigid, predefined rules. Furthermore, understanding intent is insufficient without execution capability. Therefore, we seamlessly integrate the VLM-based reasoning with robust 6-DoF grasp generation and trajectory planning algorithms. This allows the system to translate ab-stract semantic instructions into physically executable robot commands, realizing a complete pipeline for interactive assistance in both simulation and real-world environ-ments. The main contributions of this work are summarized as follows: (1) A VLM-based framework for human–robot collaborative assembly that inte-grates understanding of ambiguous natural language instruction and visual per-ception for real-time assistive motion adjustment. (2) The introduction of internal and external correction models that autonomously detect logical errors before execution and physical failures after execution, en-abling robust replanning. (3) The development of an integrated system that combines VLM-based reasoning with diffusion-based grasp generation and trajectory planning, demonstrated through interactive assistance in both simulation and real-world setups. (4) Experimental validation demonstrating the effectiveness and generality of the proposed framework through collaborative assembly tasks, including object fix-ation and tool preparation. 
+
+2. Related Work 
+
+2.1. Collaborative Work Based on Natural Language 
+
+Research on Human–Robot Collaboration (HRC) has been conducted from various perspectives, including task allocation and enhanced communication. Liu et al. [3], alongside foundational works like SayCan [6] and Code as Policies [7], realized collab-orative assembly by combining large language models (LLMs) for interpreting human instructions and decomposing them into task plans. While these approaches focus on discrete task sequences, Liu et al. [8] further proposed a framework that integrates task planning from natural language instructions using LLMs with remote teaching, enabling collaborative work that includes previously unseen motions. Furthermore, to address ambiguity in human commands, recent studies such as KnowNo [9] have explored mechanisms for robots to quantify uncertainty and ask clarifying questions. Other studies have explored interactive error recovery. In the work by Lim et al. [10], humans provide task instructions to a robot, which interprets the instructions using an LLM, generates motions, and executes assembly tasks. When an error occurs, the robot reports the error, and the human provides corrective instructions to enable re-execution. Similarly, TidyBot [11] utilizes LLMs to infer personalized preferences from user feedback to adapt robot behavior. These studies demonstrate the effectiveness of LLMs in handling linguistic feedback and error recovery. However, most of these systems rely on reactive human intervention when failures occur. They do not provide autonomous mechanisms to verify the logical consistency of inferred actions before execution, nor do they explicitly distinguish between semantic reasoning errors and physical execution failures. As a result, robustness in real-time collaborative assembly remains limited. 3Candidate  
+
+> “Action Target” list Selected
+> “Action Target”
+> “Action Target”
+> Selection Model
+> Collaborative Task END YES Re-selecting
+> “Action Target”
+> VLM
+> Internal Correction Model
+> VLM
+> External Correction Model
+> VLM YES NO YES NO NO Selection reason Intention satisfied
+> Instruction prompt START
+
+Figure 1.: Overview of the proposed method. 
+
+2.2. Collaborative Work Using Vision–Language Models 
+
+There are also many studies that incorporate visual information into the reason-ing process. Embodied multimodal models such as PaLM-E [12] and RT-2 [13] have demonstrated end-to-end capabilities from vision–language inputs to robot actions. Mei et al. [14] proposed a method that generates task plans and executable code from natural language instructions using a Vision–Language Model (VLM), and employs an additional VLM to evaluate execution results before and after task execution. The concept of using feedback for closed-loop correction is also explored in Inner Mono-logue [15] and Reflexion [16], which improve reliability by grounding reasoning in environmental feedback. By introducing such correction mechanisms, these systems achieve high task success rates. Black et al. [17] generated control commands directly from natural language instructions and executed robot motions accordingly. In these studies, natural language instructions play a supplementary role, and robots basically operate autonomously. Zhang et al. [18] proposed a framework for collabora-tive assembly using a foundation model that integrates natural language instructions and visual perception. Additionally, VoxPoser [19] and Language-to-Reward [20] uti-lize VLMs to synthesize trajectories or reward functions for motion planning. By combining large language models and vision–language models, these systems perform environmental understanding and task planning, enabling flexible task support. How-ever, the interaction in these frameworks is mainly limited to task generation and completion verification. Furthermore, it does not address motion modification in re-sponse to ambiguous instructions or real-time correction of inferred human intent. 43. Iterative Action Refinement via Semantic–Physical Verification 
+
+3.1. Overview 
+
+This section presents a method for achieving dynamic replanning in human–robot col-laborative assembly tasks based on OpenAI o4-mini 1. The proposed approach provides a general framework applicable to multiple types of assistive actions. To handle these diverse tasks in a unified manner, we refer to the specific subject of the robot’s execu-tion as an action target . Depending on the task context, this abstraction specifically corresponds to the grasping position in object fixation, the support position in trans-portation, the assembly components in replenishment, or the preparatory sub-tasks in action preparation scenarios. Fig. 1 illustrates the overall architecture and process flow. First, the robot generates a set of action target candidates, denoted as O, where oi represents the i-th candidate. These candidates are provided to a Vision–Language Model (VLM) together with the current environmental image xt and the spoken natural language instruction ℓ. Based on these inputs, the system estimates the human intent and selects the optimal target 
+
+otarget for execution. To ensure robustness, the selected output undergoes a dual-correction process. Be-fore execution, the Internal Correction Model evaluates otarget by cross-referencing it with xt and ℓ to check for logical consistency (e.g., directional alignment). If an error is detected, feedback elogic is generated for immediate re-selection. If valid, the robot executes the action. Subsequently, the External Correction Model verifies the result by comparing the pre-execution state xt with the post-execution state xnew . If visual failure is detected, physical feedback ephys is returned. The procedural details are summarized in Algorithm 1. The system maintains a dynamic reasoning context ℓcurrent across iteration steps t. When errors occur, the corresponding feedback ( elogic or ephys ) is appended to ℓcurrent , allowing the VLM to iteratively refine its selection until the task is successfully completed. 
+
+3.2. Internal Correction Model 
+
+The Internal Correction Model functions as a pre-execution semantic filter designed to prevent the execution of erroneous actions. This model validates the VLM’s selected target by cross-referencing it with the current environmental image and the linguis-tic instruction. The validation process consists of two distinct checks. First, format validation ensures that the selected target is strictly contained within the predefined candidate set, thereby filtering out hallucinated responses or invalid formats. Second, consistency validation evaluates the logical alignment between the selected target and the instruction within the context of the image. For instance, if the in-struction directs a movement to the right, the model verifies whether the coordinate of the selected grasp pose is spatially consistent with that direction relative to the current state. If either condition is violated, the model generates descriptive feedback to trigger immediate re-selection. To prevent infinite loops, the system terminates the task as a selection failure if the number of rejections exceeds a predefined threshold. 
+
+> 1https://developers.openai.com/api/docs/models/o4-mini
+
+5Algorithm 1 Replan Collaborative Task  
+
+> 1:
+
+Initialize time t ← 0, env state xt, candidate set O 
+
+> 2:
+
+while True do  
+
+> 3:
+
+ℓ ← GetInstruction() ▷ Wait for human instruction  
+
+> 4:
+
+if ℓ indicates “Task Done” then  
+
+> 5:
+
+break ▷ End collaboration  
+
+> 6:
+
+ℓcurrent ← ℓ ▷ Initialize current reasoning context  
+
+> 7:
+
+while True do ▷ Replanning Loop  
+
+> 8:
+
+otarget ← VLM select (xt, ℓ current , O ) ▷ Select target  
+
+> 9:
+
+if VLM internal (xt, o target , ℓ, O ) fails then ▷ Internal Correction  
+
+> 10:
+
+elogic ← GetReason()  
+
+> 11:
+
+ℓcurrent ← ℓcurrent + elogic ▷ Add feedback to context  
+
+> 12:
+
+continue  
+
+> 13:
+
+Execute action on otarget  
+
+> 14:
+
+xnew ← CaptureImage()  
+
+> 15:
+
+if VLM external (xt, x new , ℓ ) fails then ▷ External Correction  
+
+> 16:
+
+ephys ← GetReason()  
+
+> 17:
+
+ℓcurrent ← ℓcurrent + ephys ▷ Add feedback to context  
+
+> 18:
+
+xt ← xnew  
+
+> 19:
+
+continue  
+
+> 20:
+
+break ▷ Action successful, wait for next instruction 
+
+3.3. External Correction Model 
+
+The External Correction Model serves as a post-execution physical verifier to detect failures caused by external disturbances or control errors. This model receives the pre-execution image, the post-execution image, and the instruction to assess the success of the action. It compares the two images to verify whether the expected state transition, such as a tool being removed from a holder or an object’s pose changing, has effectively occurred. If the visual evidence suggests no significant change or an incorrect state, the model returns feedback explaining the physical discrepancy, allowing the VLM to update its reasoning context for the next iteration. Consistent with the internal correction model, the operation is terminated after three consecutive physical failures. 
+
+4. Experiments 
+
+In the experiments, we evaluated the proposed method through two representative col-laborative tasks: object fixation and tool preparation . While the proposed framework is applicable to various assistive actions, these two tasks were selected to specifically ver-ify the system’s capability in fine-grained spatial adjustment and semantic replanning, respectively. Each task was executed in both simulation and real-world environments to validate the system’s effectiveness and transferability. To comprehensively assess the system, we conducted three types of evaluations: (1) success rate measurement in standard tasks to validate overall performance, (2) abla-tion studies focusing on robustness against consecutive instructions, and (3) validation of the individual correction models using adversarial inputs to verify their detection capabilities. 6(a) Simulation setup (b) Real-world setup 
+
+Figure 2.: Experimental platform used in this study. (a) shows the simulation envi-ronment built with Gazebo and ROS, and (b) shows the real-world setup with the Nextage robot. Section 4.1 describes the experimental environments. Section 4.2 details the tasks and prompt designs. Finally, Section 4.3 reports the results. 
+
+4.1. Experiment Platform 
+
+The experimental platform is illustrated in Fig. 2. We utilized the KAWADA Nextage robot, which features six degrees of freedom in each arm and one degree of freedom in the waist. A Robotiq Hand-E gripper is mounted on the end effector of each arm. The workspace, constructed on an aluminum frame, contains two aluminum frames to be assembled, a shelf for connection components, and a tool stand for an electric screwdriver. Fig. 2 (a) shows the simulation environment, which is implemented using Gazebo, an open-source 3D robot simulator, together with the ROS framework. Fig. 2 (b) depicts the real-world setup, which replicates the simulation environment. In the real-world setup, a 4K vision camera (ORBBEC Femto Mega) is additionally used to capture RGB images, and audio input is acquired via a built-in PC microphone and converted to text using the Whisper model [21]. The proposed system is implemented by integrating three key components: OpenAI o4-mini is utilized as the VLM for high-level reasoning and instruction understanding, GraspGen [22] is employed as the grasp planner to generate robust 6-DoF grasp poses, and MoveIt is used for collision-free trajectory planning and motion control. 
+
+4.2. Tasks and Prompts 
+
+In the object fixation task, the robot assists a human in the L-shaped assembly of two aluminum frames. While the human worker attaches a bracket to connect the frames, the robot stabilizes one of the frames to ensure a steady work environment. In the real-world setup, as the frame may tip over during the robot’s approach or pose 7“Action Target” Selection Model Task: 
+
+> You are an AI assistant for assembly tasks. Given the current object, select a new object candidate according to the human instruction. If feedback is provided, revise the selection by taking the feedback into account.
+> Background information:
+> The following coordinate system definitions take priority over common natural language interpretations. You must strictly follow these sign conventions and must not interpret them inversely. - Front = -z, Back = +z, Left = +x, Right = -x, Up = +y, Down = -y Image and characteristics of the selected object
+> Input description:
+> - Instruction: Human language instruction - Current object: Current tool name - Action Target candidate: List of grasp candidates[(position[x, y, z], orientation[qx, qy, qz, qw]), Tool name, ...] - Environment image of the workspace - Feedback: (may not exist)
+> Chain of thought:
+> First, consider modifications based on the instruction, then select a suitable action target from the action target candidate list.
+> Output format:
+> New objects Reason: ‘Explanation of selection rationale’
+
+Figure 3.: Example prompt structure for the Action Target Selection Model. adjustment, the worker provides temporary support until the grasp is fully secure. During this process, the human provides instructions such as “Move a little more to the left” or “Raise the left a bit higher”. Success is defined as the robot correctly modifying its grasp pose based on these spatial commands without causing collisions. In the tool preparation task, the robot retrieves an electric screwdriver from a stand and hands it over to the worker. The stand holds six screwdrivers, each equipped with a different-sized hex bit for specific bolts. The task begins with an initial command such as “Take a hex driver”. We also evaluated the system’s dynamic replanning capability by providing corrective instructions after the initial selection, such as “Take a bigger one”. Success is defined as the robot’s ability to identify, retrieve, and if necessary, switch to the correct tool according to the linguistic input. As shown in Fig. 3 and Fig. 4, the prompts for the Action Target Selection Model include the task, background, chain of thought, and output format. The internal and external correction models receive task descriptions and images, with the Internal Correction Model also receiving background information. 8Internal Correction Model Task:            
+
+> You are a validation AI that deter-mines whether the grasp candidate se-lected by the Action Target Selection Model is appropriate. If the instruction has been successfully completed, out-put YES. If not, output NO and briefly explain why....
+> Background information:
+> Similar to the Action Target Selection Model.
+> Input description:
+> <figure 1 >This is the current environ-mental information. - Information from Action Target Se-lection Model - Similar to the Action Target Selec-tion Model
+> (a) Internal Correction Model External Correction Model Task:
+> You are the AI for error detection of performed preparatory movement cor-rections. If the operation was com-pleted, output YES. If not, output NO and briefly explain why. Determine whether the specified action is being performed and whether the action is successful.
+> Input description:
+> <figure 1 >< figure 2 >The first image shows the environment before task ex-ecution, and the second image shows the environment after task execution. - Instruction: Human language instruc-tion
+> (b) External Correction Model
+
+Figure 4.: Example prompt structures for internal and external correction models. Table 1.: Success rates in simulation experiments. 
+
+Task Instruction Category Success Rate 
+
+Object Fixation Position adjustment (Left / Right) 20/20 (100%) Tool Preparation Initial selection 10/10 (100%) Tool Preparation Corrective selection (Replanning) 9/10 (90.0%) 
+
+4.3. Results 
+
+4.3.1. Quantitative Analysis 
+
+Table 1 and Table 2 summarize the success rates in simulation and real-world envi-ronments, respectively. In the simulation experiments, the proposed method achieved a 100% success rate (20/20 trials) for position adjustment in the object fixation task. For the tool prepara-tion task, the system demonstrated perfect performance in the initial selection (10/10 trials) and achieved a 90% success rate (9/10 trials) in corrective selection involving replanning. A minor failure occurred in corrective selection due to visual occlusion, where the robot’s own arm occasionally obstructed the camera’s view of the remaining tools, leading to a misinterpretation by the External Correction Model. In the real-world experiments, the object fixation task resulted in a 66.7% success rate (10/15 trials). The challenges in this setup included the depth perception limits of the vision sensor when the robot arm was close to the target aluminum frame. For 9Table 2.: Success rates in real-world experiments. 
+
+Task Instruction Category Success Rate 
+
+Object Fixation Position adjustment 10/15 (66.7%) Tool Preparation Initial selection 8/8 (100%) Tool Preparation Corrective selection (Replanning) 6/8 (75.0%) Table 3.: Ablation study: robustness to consecutive instructions in evaluated simula-tions. 
+
+Metric Full w/o Internal w/o External w/o Both 
+
+Success Rate 7/10 (70%) 5/10 (50%) 4/10 (40%) 2/10 (20%) the tool preparation task, the system achieved a 100% success rate (8/8 trials) in the initial selection. In the corrective selection phase, such as responding to instructions to change the tool size, the success rate was 75% (6/8 trials). These failures were primarily attributed to lighting conditions where the white handle of the driver became indistinguishable from the background, hindering the External Correction Model’s ability to verify the state change. To evaluate robustness against continuous interaction, we conducted an additional ablation study in the simulation fixation task using sequences of five consecutive in-structions. As shown in Table 3, the Full method achieved a success rate of 7/10. Removing the Internal Correction Model dropped the rate to 5/10, and removing the External Correction Model dropped it to 4/10. The progressive degradation demon-strates that the two correction modules are complementary rather than redundant. While each module independently improves robustness, their combination yields a sub-stantially larger performance gain, confirming that semantic verification and physical verification address distinct failure modes in multi-turn interaction. Finally, we validated the intrinsic performance of the correction models using adver-sarial inputs, such as instructing the robot to move left when the visual state showed no movement. Both the internal and external correction models achieved a 100% de-tection rate (10/10 trials each) in these isolated tests, confirming their fundamental capability to detect logical and physical inconsistencies when environmental noise is controlled. 
+
+4.3.2. Qualitative Analysis 
+
+Fig. 5 demonstrates the qualitative results of the fixation task in simulation. As shown in Fig. 5 (a), upon receiving the instruction “Raise the left a bit higher,” the VLM selected an action target corresponding to an upward offset, and the robot correctly adjusted the left arm’s grasping position. Similarly, Fig. 5 (b) shows the robot shifting the right arm in response to “Move a little more to the left.” These cases confirm that the VLM correctly interprets spatial directions relative to the robot’s coordinate frame 10 (a) Left arm adjustment: “Raise the left a bit higher” 
+
+> (b) Right arm adjustment: “Move a little more to the left”
+
+Figure 5.: A successful object fixation task in simulation. The robot adjusts its grasp pose to stabilize an aluminum frame for subsequent manual assembly. Red highlights indicate the target end-effector movements corresponding to the linguistic instruc-tions. and maps them to the appropriate action candidates. Fig. 6 illustrates the dynamic replanning capability in the tool preparation task. Initially, the robot grasped a standard hex driver as instructed (Fig. 6 (a)). However, when provided with the ambiguous corrective instruction “Take a bigger one,” the system successfully inferred the user’s intent by comparing the remaining candidates and switched to a larger Phillips-head driver (Fig. 6 (b)). This transition demonstrates the effectiveness of updating the reasoning context ℓcurrent with previous action history to handle comparative linguistic concepts. Fig. 7 presents the result of the fixation task in the real-world environment. As shown in the figure, the robot successfully performed physical adjustments, demon-strating the transferability of the generated grasps. However, we also observed false negative cases during the experiments. In these instances, the External Correction Model incorrectly triggered a replanning loop due to over-sensitivity to slight lighting variations, despite the robot having reached the correct pose. Finally, Fig. 8 shows the execution of the tool preparation task in the real world. The robot successfully identified the target tool from the stand. During the replanning phase, the system executed a sequence of releasing the current tool and returning to the selection phase to grasp the new target, validating the feasibility in a real-world setting. 
+
+5. Discussion 
+
+5.1. Robustness of the Dual-Correction Mechanism 
+
+Experimental results characterize the robustness and limitations of the proposed framework. The ablation study on consecutive instructions indicates that while single-turn tasks may succeed without correction, multi-turn interactions depend heav-ily on it. In the five-turn object fixation scenario, the success rate decreased from 70% to 40% upon removing the External Correction Model. This is consistent with Huang et al. [15], who showed that closed-loop environmental feedback is essential for grounding LLM reasoning over long horizons. Our results confirm that minor errors, negligible in a single step, accumulate over time; thus, the External Correction Model 11 (a) Initial selection phase 
+
+> (b) Replanning phase with corrective instruction
+
+Figure 6.: Successful execution of the tool preparation task demonstrating dynamic replanning in simulation. The robot selects and hands over a specific hex driver from a tool stand containing six candidates with different bit sizes. Red highlights track the sequence of grasping, corrective instruction receipt ( e.g. , switching to a larger size), and successful replanning. is vital for consistency, as noted in ReplanVLM [14]. Component validation tests and failure analysis reveal that errors stem from per-ceptual limitations and formatting inconsistencies rather than reasoning deficits. In real-world trials, all failures were caused by the External Correction Model incorrectly determining that the end-effector had not moved or the tool had not been grasped, despite successful physical execution. For instance, the model occasionally failed to distinguish the white tool handle from the light background. In the ablation stud-ies, scenarios without the Internal Model frequently resulted in the Action Target Selection Model failing to provide valid candidates or outputting incorrect formats, leading to system halts. Specifically, the system is designed to stop after three con-secutive “NO” outputs from the Internal Model or upon a syntax error by the Action 
+
+Figure 7.: Real-world execution of the object fixation task, corresponding to the sce-nario in Fig. 5 (a). The robot adjusts the grasping pose of an aluminum frame while the human worker provides temporary support to prevent it from tipping during the motion. Red highlights indicate the coordinated adjustment of the end-effector and the frame. 12 Figure 8.: Real-world tool preparation task, corresponding to the replanning sequence in Fig. 6 (b). The robot identifies the correct screwdriver among six candidates and hands it to the human worker. Red highlights denote the target tool selection and the subsequent handover action. Target Selection Model. These results highlight a gap between intrinsic logic and environmental perception, where the VLM’s reliance on 2D vision is vulnerable to lighting and occlusion. As discussed in TidyBot [11], robust perception modules are necessary to bridge this gap. To mitigate these issues, the Action Target Selection Model’s accuracy could be enhanced through fine-tuning on assembly-specific datasets. Additionally, the current verification process updates the environment image after each failure, which can cause the model to lose track of the initial state. Retaining the initial state image alongside the current one may improve the recognition of relative changes. Furthermore, pre-processing steps, such as labeling the end-effector and target objects in the input images, would enhance object recognition and overall success rates. 
+
+5.2. Operational Latency 
+
+In our experimental setup, the total latency from instruction input to execution, including the Selection and Internal Correction models, was approximately 30 seconds. The Selection and Internal Correction stages each required approximately 13 seconds. This similarity in processing time is attributed to the comparable lengths of their respective prompts, input images, and candidate lists. The External Correction Model completed its verification in under 10 seconds, likely due to its simpler input structure consisting only of two images and the linguistic instruction. While these processing times are sufficient for the current assembly tasks, further reduction of latency through prompt engineering or simplification of input data will be required for more time-critical interactions in dynamic environments. 
+
+5.3. Force Adaptation and Proactive Assistance 
+
+Although the proposed framework ensures geometric accuracy, further development is required for force adaptation and proactive assistance. First, the current system is limited to position control, which is insufficient for tasks requiring physical compliance, such as component insertion. Because the robot cannot currently interpret force-related nuances like “hold it tightly,” future work will focus on mapping linguistic adverbs to impedance control parameters. Recent studies, including VoxPoser [19] and Language-to-Reward [20], have shown that VLMs can synthesize 3D value maps or reward functions to define optimal robot behaviors. Extending this to the force domain would allow a VLM to generate rewards prioritizing high stiffness 13 for assembly feasibility or high compliance for safety. This would enable autonomous tuning of impedance parameters, ensuring safer and more compliant assistance. Second, the system’s passive nature remains a limitation. This reactive behavior can impose a high cognitive load on the human worker. By integrating the VLM with long-context memory or task planners, such as KnowNo [9], the robot could infer assembly sequences and anticipate the next action target. Proactive behaviors, such as preparing a tool before an explicit request, would facilitate a more natural human–robot partnership. 
+
+6. Conclusion 
+
+This study presented a robust replanning framework for human–robot collaborative as-sembly by integrating Vision–Language Models (VLMs) with a dual-correction mech-anism. By defining assistive tasks through the abstraction of action targets , we devel-oped a unified pipeline capable of handling diverse collaborative scenarios, including object fixation and tool preparation. The integration of internal and external correc-tion models formed a closed-loop system that autonomously detects logical hallucina-tions and physical execution failures, enabling reliable error recovery through iterative reasoning. Experimental results in both simulation and real-world environments confirmed that the dual-correction mechanism significantly enhances task success rates, partic-ularly in multi-turn interactions where errors tend to accumulate. While the system demonstrated high adaptability to ambiguous linguistic instructions, real-world trials also highlighted the sensitivity of visual verification to lighting and occlusion. Future work will focus on incorporating force adaptation and long-term context awareness to further reduce cognitive load and extend the system’s capability to tasks requiring physical compliance and advanced context awareness. 
+
+Disclosure statement 
+
+No potential conflict of interest was reported by the authors. 
+
+Notes on contributors 
+
+Taichi Kato is currently pursuing the Bachelor’s degree in the School of Engineering Science, the University of Osaka, Toyonaka, Japan. His current research interests include human–robot collaboration with vision–language models. 
+
+Takuya Kiyokawa received the B.E. degree from the National Institute of Tech-nology, Kumamoto College, Japan, and the M.E. degree and the Ph.D. degree in engineering from the Nara Institute of Science and Technology, Japan, in 2018 and 2021, respectively. From 2021 to 2022, he was with The University of Osaka, Japan, as a Specially-Appointed Assistant Professor, and with the Nara Institute of Science and Technology, as a Specially-Appointed Assistant Professor. From 2023 to 2024, he was a Visiting Researcher with the Institute of Robotics and Mechatronics, German Aerospace Center (DLR), Oberpfaffenhofen, Weßling, Germany and since 2023, he has been with The University of Osaka, as an Assistant Professor. His current research interests include robot manipulation and agile reconfigurable robotic systems. 14 Namiko Saito received the B.S., M.S., and Ph.D. degrees in mechanical engineering from Waseda University, Japan, in 2018, 2020, and 2022, respectively. From 2023 to 2024, she was a Research Associate at The University of Edinburgh, affiliated with the Alan Turing Institute, UK. She is currently a Senior Researcher at Microsoft Research Asia – Tokyo, Japan. Her research interests include embodied AI, robot manipulation, multimodal learning, and sensorimotor control. 
+
+Kensuke Harada received the B.Sc., M.Sc., and Ph.D. degrees in mechanical engi-neering from Kyoto University, Kyoto, Japan, in 1992, 1994, and 1997, respectively. From 1997 to 2002, he was a Research Associate with Hiroshima University, Hiroshima, Japan. Since 2002, he has been with the National Institute of Advanced Industrial Science and Technology (AIST). From 2005 to 2006, he was a Visiting Scholar with the Department of Computer Science, Stanford University, Stanford, CA, USA, and the Leader of the Manipulation Research Group, AIST, from 2013 to 2015. He is currently a Professor with the Graduate School of Engineering Science, The Univer-sity of Osaka, Toyonaka, Japan. His research interests include mechanics and control of robot manipulators and robot hands, biped locomotion, and motion planning of robotic systems. 
+
+References 
+
+[1] European Commission. Industry 5.0: Towards a sustainable, human-centric and resilient european industry. Directorate-General for Research and Innovation; 2021. Available from: https://data.europa.eu/doi/10.2777/308407 .[2] Coronado E, Kiyokawa T, Ricardez GAG, et al. Evaluating quality in human-robot inter-action: A systematic search and classification of performance and human-centered factors, measures and metrics towards an industry 5.0. Journal of Manufacturing Systems. 2022; 63:392–410. [3] Liu S, Zhang J, Wang L, et al. Vision ai-based human-robot collaborative assembly driven by autonomous robots. CIRP annals. 2024;73(1):13–16. [4] Wang Z, Kiyokawa T, Yamanobe N, et al. Assembly task allocation for human-robot col-laboration considering stability and assembly complexity. IEEE Access. 2024;12:159821– 159832. [5] Kotake H, Honji S, Wada T, et al. A cooperation control framework based on admittance control and time-varying passive velocity field control for human–robot co-carrying tasks. IEEE Transactions on Automation Science and Engineering. 2025;22:23579–23593. [6] Ahn M, Brohan A, Brown N, et al. Do as i can, not as i say: Grounding language in robotic affordances. In: Proceedings of Conference on Robot Learning; 2022. p. 571–582. [7] Liang J, Huang W, Xia F, et al. Code as policies: Language model programs for embodied control. In: Proceedings of IEEE International Conference on Robotics and Automation (ICRA); 2023. p. 9493–9500. [8] Liu H, Zhu Y, Kato K, et al. Enhancing the llm-based robot manipulation through human-robot collaboration. IEEE Robotics and Automation Letters. 2024;9:6904–6911. [9] Ren AZ, Dixit A, Boduluri A, et al. Robots that ask for help: Uncertainty alignment for large language model planners. In: Proceedings of Conference on Robot Learning; PMLR; 2023. p. 661–681. [10] Lim J, Patel S, Evans A, et al. Enhancing human-robot collaborative assembly in man-ufacturing systems using large language models. In: Proceedings of IEEE International Conference on Automation Science and Engineering (CASE); 2024. p. 2581–2587. [11] Wu J, Antonova R, Kan A, et al. Tidybot: Personalized robot assistance with large language models. In: Proceedings of IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS); 2023. p. 3546–3553. 
+
+15 [12] Driess D, Xia F, Sajjadi MS, et al. Palm-e: An embodied multimodal language model. In: Proceedings of International Conference on Machine Learning; 2023. [13] Brohan A, Brown N, Carbajal J, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. In: Proceedings of Conference on Robot Learning; 2023. p. 2165–2183. [14] Mei A, Zhu GN, Zhang H, et al. Replanvlm: Replanning robotic tasks with visual language models. IEEE Robotics and Automation Letters. 2024;9:10201–10208. [15] Huang W, Abbeel P, Pathak D, et al. Inner monologue: Embodied reasoning through planning with language models. In: Proceedings of Conference on Robot Learning; 2023. p. 1769–1782. [16] Shinn N, Cassano F, Gopinath A, et al. Reflexion: Language agents with verbal rein-forcement learning. In: Proceedings of International Conference on Neural Information Processing System; 2023. p. 8634–8652. [17] Black K, Brown N, Driess D, et al. π0: A vision-language-action flow model for general robot control. In: Proceedings of Robotics: Science and Systems; 2025. [18] Ji Y, Zhang Z, Tang D, et al. Foundation models assist in human–robot collaboration assembly. Scientific Reports. 2024;14(1):24828. [19] Huang W, Wang C, Zhang R, et al. Voxposer: Composable 3d value maps for robotic manipulation with language models. In: Proceedings of Conference on Robot Learning; 2023. p. 540–562. [20] Ma YJ, Liang W, Wang G, et al. Language to rewards for robotic skill synthesis. In: Proceedings of Conference on Robot Learning; 2023. p. 374–394. [21] Radford A, Kim JW, Xu T, et al. Robust speech recognition via large-scale weak su-pervision. In: Proceedings of International Conference on Machine Learning; 2023. p. 28492–28518. [22] Murali A, Sundaralingam B, Chao YW, et al. Graspgen: A diffusion-based framework for 6-dof grasping with on-generator training. arXiv preprint arXiv:250713097. 2025;. 
+
+16

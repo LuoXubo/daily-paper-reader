@@ -1,0 +1,193 @@
+Title: Human-Aware Robot Behaviour in Self-Driving Labs
+
+URL Source: https://arxiv.org/pdf/2603.08420v1
+
+Published Time: Tue, 10 Mar 2026 02:32:47 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+Human-Aware Robot Behaviour in Self-Driving Labs 
+
+# Satheeshkumar Veeramani ∗
+
+Department of Chemistry University of Liverpool United Kingdom satheeshkumar.veeramani@liverpool.ac.uk 
+
+# Anna Kisil ∗
+
+School of Computer Science and Informatics University of Liverpool United Kingdom anna.kisil@liverpool.ac.uk 
+
+# Abigail Bentley 
+
+Department of Chemistry University of Liverpool United Kingdom a.r.bentley@liverpool.ac.uk 
+
+# Hatem Fakhruldeen 
+
+Department of Chemistry University of Liverpool United Kingdom h.fakhruldeen@liverpool.ac.uk 
+
+# Gabriella Pizzuto 
+
+School of Computer Science and Informatics Department of Chemistry University of Liverpool United Kingdom gabriella.pizzuto@liverpool.ac.uk 
+
+# Andrew I. Cooper 
+
+Department of Chemistry University of Liverpool United Kingdom aicooper@liverpool.ac.uk 
+
+## Abstract 
+
+Self-driving laboratories (SDLs) are rapidly transforming research in chemistry and materials science to accelerate new discoveries. Mobile robot chemists (MRCs) play a pivotal role by autonomously navigating the lab to transport samples, effectively connecting syn-thesis, analysis, and characterisation equipment. The instruments within an SDL are typically designed or retrofitted to be accessed by both human and robotic chemists, ensuring operational flexi-bility and integration between manual and automated workflows. In many scenarios, human and robotic chemists may need to use the same equipment simultaneously. Currently, MRCs rely on sim-ple LiDAR-based obstruction detection, which forces the robot to passively wait if a human is present. This lack of situational aware-ness leads to unnecessary delays and inefficient coordination in time-critical automated workflows in human-robot shared labs. To address this, we present an initial study of an embodied, AI-driven perception method that facilitates proactive human-robot interac-tion in shared-access scenarios. Our method features a hierarchical human intention prediction model that allows the robot to distin-guish between preparatory actions (waiting) and transient interac-tions (accessing the instrument). Our results demonstrate that the proposed approach enhances efficiency by enabling proactive hu-man–robot interaction, streamlining coordination, and potentially increasing the efficiency of autonomous scientific labs. 
+
+ACM Reference Format: 
+
+Satheeshkumar Veeramani, Anna Kisil, Abigail Bentley, Hatem Fakhruldeen, Gabriella Pizzuto, and Andrew I. Cooper. 2026. Human-Aware Robot Be-haviour in Self-Driving Labs. In Companion Proceedings of the 21st ACM/IEEE International Conference on Human-Robot Interaction (HRI Companion ’26), March 16–19, 2026, Edinburgh, Scotland, UK. ACM, New York, NY, USA, 5 pages. https://doi.org/10.1145/3776734.3794402                               
+
+> ∗These authors contributed equally to this work.
+> This work is licensed under aCreative Commons Attribution 4.0 International License.
+> HRI Companion ’26, Edinburgh, Scotland, UK
+> ©2026 Copyright held by the owner/author(s). ACM ISBN 979-8-4007-2321-6/2026/03 https://doi.org/10.1145/3776734.3794402
+
+Figure 1:  Shared workspace interaction between a human chemist and a collaborative mobile robot near a standard laboratory fume-hood. 
+
+## 1 Introduction 
+
+In SDLs, robotic chemists and human researchers play key, albeit potentially different, roles in experimental workflows [15 ]. Herein, MRCs are now capable of running autonomous workflows, mainly by transferring samples between various laboratory equipment for tasks such as solid/liquid handling, synthesis (e.g. , Chemspeed plat-forms), and analysis (e.g. , liquid chromatography–mass spectrome-try) [3, 4, 6]. Human chemists, who work in the same environment as robotic chemists, primarily design experiments, prepare and set up the chemicals for the workflow, and oversee the execution of the experiment to mitigate failures and to ensure safety and reliability. To date, MRCs typically receive tasks from a centralised orches-tration software that coordinates workflows using communication frameworks such as ROS [2, 9, 10 ], relying on a local task execution                
+
+> arXiv:2603.08420v1 [cs.RO] 9 Mar 2026 HRI Companion ’26, March 16–19, 2026, Edinburgh, Scotland, UK S.Veeramani, A.Kisil, A. Bentley, H.Fakhruldeen, G.Pizzuto, A.I.Cooper
+
+framework within the robot controller. Despite advancements in SDLs, current MRCs operate without awareness of human intent. This setup fundamentally precludes dynamic interaction and shared decision-making with human chemists. 
+
+This open gap creates a critical opportunity for the human-robot interaction (HRI) community to contribute by designing and imple-menting systems where MRCs can perceive, predict, and respond to human intent, thereby enabling more fluent interaction, safer task sharing, and improved overall workflow efficiency. Existing social navigation frameworks focus primarily on replanning the trajectory to avoid humans and obstacles, which cannot be applied to SDLs due to tighter space constraints. It becomes ever more critical when both human and robotic chemists need to access shared laboratory instruments or move within overlapping work zones [20 ]. Instead, robot chemists should use perception to proactively interact use-fully with human collaborators [14 , 17 ]. Without this ability to anticipate human activity, communicate intent, or adjust their be-haviour accordingly, MRCs risk interrupting ongoing experiments or compromising safety [11 ]. 
+
+To address this gap, we propose an embodied, AI-driven percep-tion, reasoning and interaction method that enables robots to detect human presence, infer human engagement, and initiate proactive communication to reduce unnecessary waiting time and improve workflow fluency in shared laboratory scenarios. The method em-ploys a hierarchical two-stage human detection model that can be coupled with a text-based user interface, supporting adaptive, context-aware navigation and facilitating effective human-robot interaction. 
+
+## 2 Related Work 
+
+In autonomous scientific labs, decision-level fusion of information from modalities has been shown to be effective for various robotic tasks, including task execution and monitoring [7, 8], anomaly de-tection [20 ], self-correction [12 ], and analytical evaluation [16 , 18 ]. In these approaches, individual models provide separate predictions, and the final decision is derived through either majority voting or weighted aggregation of modalities. However, with recent advances in artificial intelligence, large language models (LLMs) have demon-strated the capability to perform data fusion at intermediate levels through multimodal embeddings [21 ]. This approach enhances cross-modal reasoning and context-aware learning while mitigat-ing decision conflicts that typically arise in isolated models [5]. Such context-aware intelligence becomes particularly important when robots need to understand human behaviour in shared envi-ronments. For instance, in social navigation problems, robots rely primarily on real-time person-tracking modules to detect and lo-calise humans with respect to the robot’s position, after which the robot replans its path accordingly [17 ]. However, previous works [14 , 19 ] have shown that contextual information about the scene provides essential social reasoning cues that guide robot ac-tions. This is particularly important in work environments such as laboratories, where both humans and robots simultaneously op-erate within the same shared workspace. Our work extends these ideas to safety-critical laboratory environments by enabling mobile robotic chemists to interpret contextual cues and human intentions, supporting proactive, socially-aware navigation. 
+
+## 3 Method 
+
+This section presents the proposed methodology (Figure  2) designed for MRCs to detect the presence of human chemists within their workspace, understand the context of the scientists’ activity, and take appropriate action. This section also details the proposed ar-chitecture, which consists of two stages: perception and reasoning. In the first stage, multiple sensory modalities continuously mon-itor the workspace to detect the presence and location of human chemists and other equipment. Then, once human presence is de-tected, the second stage focuses on the perceived and estimated data, which is forwarded to a vision–language model (VLM) that in-terprets the context of the interaction and generates an appropriate message to communicate with the human chemist. 
+
+## 3.1  Multimodal Perception Module 
+
+The proposed method is initiated when the robot receives a task request from the central orchestration system. As the robot begins navigating toward its destination, the vision and depth modalities, along with the built-in LiDAR module, simultaneously perceive and analyse its surrounding environment. An object detection sys-tem is employed to detect and classify objects within an image, generating bounding boxes that provide the 2D coordinates of the detected objects. The process operates on frames obtained from avideo stream captured by a camera mounted on the robot base. The stereo depth-sensing module is subsequently used to estimate the third (depth) dimension, enabling 3D localisation of the detected objects. Several object classes are defined within the model to iden-tify and filter relevant entities that contribute to understanding the scene context. The defined classes are human chemists, standard laboratory instruments and fumehoods. After obtaining the labels of the detected classes and their corresponding 3D coordinates with respect to the robot’s reference frame, the distances between them (𝐷 𝑖 𝑗  ) are calculated using equation  1 to assess their spatial proxim-ity and infer contextual relationships between all detected object pairs. 
+
+𝐷 𝑖 𝑗 = p𝑖 −← p𝑗 2 , ∀ 𝑖, 𝑗 ∈ { 1, 2, . . . , 𝑁 }, 𝑖 ≠ 𝑗 .  (1) 
+
+where  p𝑖 = [𝑥 𝑖 , 𝑦 𝑖 , 𝑧 𝑖 ]⊤ represents the 3D position vector of the 
+
+𝑖 -th detected object. 
+
+## 3.2  Vision-Language Reasoning and Interaction 
+
+The VLM module shown in Figure  2 illustrates the standardised prompt used to obtain responses from the VLM. The model is pro-vided with multi-modal inputs, including the original image, class labels and the rules for handling distance information calculated in Equation  1. 𝐷 𝑖 𝑗  is incorporated into the prompts automatically to enable spatial reasoning within the VLM. For example, in the following prompt,  𝐿 𝐻𝑐  denotes the human chemist and  𝐿 𝐹 𝐻  de-notes the fumehood. This prompt is used to predict whether the human chemist is obstructing the robot and/or interacting with the fumehood (i.e., the chemist is currently busy and should not be disturbed). Human-Aware Robot Behaviour in Self-Driving Labs HRI Companion ’26, March 16–19, 2026, Edinburgh, Scotland, UK 
+
+Figure 2:  Proposed method to predict the intention of human chemists in a shared workspace within an SDL.  𝐿  denotes the set of detected labels.  𝑃 𝑖  and  𝑃 𝑗  represent the 3D position vectors of objects  𝑖  and  𝑗 , respectively.  𝐷 𝑖 𝑗  is the Euclidean distance between objects  𝑖  and  𝑗 .
+
+This scene contains the following objects: <L 𝐻𝐶  >and <L 𝐹 𝐻  >. The distances between these objects are: <D 𝑖 𝑗  >. Is the human obstructing the path and/or interacting with the equipment (<L 𝐹 𝐻  >)? Respond with Yes or No. 
+
+Initially, the model returns two binary responses: Yes or No, corresponding to both obstruction and interaction. Based on these predictions, it further evaluates whether the robot should approach the human chemist and generates the appropriate interaction mes-sage. 
+
+Obstruction : Yes; Interaction : Yes; Message : You seem to be using the fumehood. Shall I wait until you are done? 
+
+## 4 Experimental Evaluation 
+
+This section presents the preliminary results of the proposed method. The initial study involving data collection and testing was con-ducted in an autonomous chemistry laboratory [4, 6], where MRCs and human chemists operate within a shared workspace. This envi-ronment provides a realistic and dynamically changing setting to assess the performance and robustness of our human-aware robot behaviour framework. We identified three interaction scenarios in which the potential for workspace overlap is high, and evaluated the robustness of the proposed two-stage multi-modal model. 
+
+## 4.1  Setup and Data Collection 
+
+The experimental setup consists of a KUKA KMR-iiwa (a mobile robotic manipulator) equipped with an Intel RealSense D435i RGB-D camera, mounted on the mobile base. An onboard computer with a 64GB RAM is also mounted on the deck to run the proposed method online. A machine equipped with 13th Gen Intel ® Core TM 
+
+i7-13700KF CPU and an NVIDIA GeForce RTX 4090 GPU was used to fine-tune the models. A total of 3270 sets of data (images and depth data) were collected across three interaction scenarios, where (1) a human chemist using equipment that the robot needs to access, (2) a human chemist obstructing the robot’s path, and (3) multiple humans present in front of the robot, doing various lab activities. The data collection process was fully automated and executed multi-ple times across the three interaction types. For this initial study, the authors of this paper served as participants for the data collection. 
+
+The model used in the vision-language module is the LLaVA-1.5-7b, a multimodal model that has demonstrated strong performance in tasks involving visual understanding and human intent infer-ence [13 ]. First, the collected images were categorised into three classes based on two binary variables: obstruction and interaction. Images represented situations where the human was (1) obstructing the path and interacting with equipment, (2) neither obstructing nor interacting, or (3) obstructing but not interacting. The fourth possible class (interacting without obstructing) was excluded as it is physically impossible for a human to interact with the equipment without obstructing the robot’s path. Following image collection and categorisation, a labelled dataset was created, containing ex-pected model outputs to be used for model fine-tuning. The binary interaction and obstruction labels were added manually, while the HRI Companion ’26, March 16–19, 2026, Edinburgh, Scotland, UK S.Veeramani, A.Kisil, A. Bentley, H.Fakhruldeen, G.Pizzuto, A.I.Cooper 
+
+natural language explanations were generated using GPT-4 [1], prompted to provide concise descriptions of the images. The final dataset was split into 5 subsets, and model training was run 5 times, where each subset was used once for testing and the remaining 4for training. The final model test accuracies presented in Table  1
+
+are the rounded mean and variance of these 5 runs. 
+
+## 4.2  Model Testing and Evaluation 
+
+We evaluate three model configurations: (1) the base model, (2) the fine-tuned model, and (3) the fine-tuned model provided with additional data (i.e. YOLO-derived object labels (𝐿 ), distance mea-surements (𝐷 𝑖 𝑗  ) between the human and the equipment as well as between the human and the robot (when a human is present), and text-based reasoning rules that define distance thresholds indicating when the human is interacting with the equipment or obstructing the robot’s path). The test accuracy is measured by comparing the model’s predicted obstruction and interaction labels against ground truth values. A prediction is considered correct only when both labels match. As shown in Table  1, fine-tuning alone improves per-formance over the baseline by 59%, 74%, and 47% across the three scenarios, respectively. 
+
+Table 1:  Model Performance 
+
+Scenario Modality Model Test Accuracy (%) 
+
+S1 Vision LLaVA-1.5-7b 29 ±3Vision LLaVA-1.5-7b* 88 ±4Vision+Depth LLaVA-1.5-7b* 70 ±8S2 Vision LLaVA-1.5-7b 20 ±2Vision LLaVA-1.5-7b* 94 ±2Vision+Depth LLaVA-1.5-7b* 94 ±2S3 Vision LLaVA-1.5-7b 43 ±2Vision LLaVA-1.5-7b* 90 ±1Vision+Depth LLaVA-1.5-7b* 82 ±2                             
+
+> Notes: S1 –Human obstructing MRC’s access to the equipment (destination); S2 –Human obstruction on the path (near fumehood); S3 –Multi-human obstructions; *denotes models fine-tuned with the collected dataset;
+
+Most failure cases are caused by a lack of sufficient contextual information needed to make accurate inferences in ambiguous situ-ations. As a result, two main problems emerge in all three scenarios. First, the model occasionally struggles to correctly identify the hu-man’s body posture and orientation, leading to incorrect interaction labels. Second, the model assumes the robot’s goal location to be di-rectly ahead (i.e. , in the centre of the image), failing to differentiate between the target equipment and the goal location. Consequently, it generates false-positive obstruction labels when equipment is off-centre and false-negative obstruction labels when the human obstructs the path by standing near the target equipment, rather than directly in front of it. The latter problem could be partially resolved by providing depth-based distance measurements between the chemist, equipment, and robot, allowing the model to assess obstruction and interaction status by comparing observed distances against predefined threshold-based distance rules. However, Table  1
+
+shows that the incorporation of these additional measurements de-creases accuracy by 18% and 8%, for scenarios 1 and 3, respectively. 
+
+Despite the overall decrease in accuracy, the failure scenarios differ between the two experiments. In cases where the observed 
+
+distance measurement clearly indicates obstruction, the model cor-rectly identifies this in experiment 3 (unlike the false negative produced in the identical case during experiment 2), indicating that the distance information is being used by the model. However, incorporating additional information into the prompt increases its complexity, frequently confusing or misleading the model, rather than improving its reasoning across all cases. In these instances, the model either fails to correctly interpret the distance measurements or becomes over-reliant on the distance-based rules, essentially ‘forgetting’ any previous reasoning that produced correct results in experiment 2. Our results show that although additional distance information can resolve ambiguity in specific cases, the method of simply incorporating this information into the prompt lacks sufficient reliability. Therefore, future work will concentrate on ad-dressing this limitation through a retrieval-augmented generation (RAG) approach, whereby additional information (including dis-tance measurements and laboratory topology data) will be supplied to the model in a more reliable way. 
+
+## 5 Conclusion 
+
+The integration of VLMs into MRCs addresses several long-standing challenges in HRI, including perception, reasoning, and communica-tion. This paper presents a two-stage, AI-driven, perception-based framework that detects the presence and interprets the intentions of human chemists during robot navigation tasks in an autonomous chemistry laboratory environment. The evaluation results demon-strate that incorporating additional distance information and rules would help the method to infer the intentions of human scien-tists. However, our results demonstrated that the model requires the real-time topology information for generalising this approach across broader laboratory scenarios. This methodology is expected to improve operational efficiency by minimising idle time, enabling robotic chemists to dynamically reallocate their attention to other productive tasks. The scope of this work is limited to the design of a two-stage model, scenario identification, data collection, and model validation. Future work will focus on implementation, gen-eralisation of the proposed approach to a wider range of laboratory scenarios through adversarial training and RAG, experimental eval-uation, and comprehensive user studies. These efforts will help assess the model’s scalability, robustness, and impact on workflow efficiency in real-world autonomous laboratory environments. 
+
+## Acknowledgments 
+
+This work was supported by the Leverhulme Trust through the Leverhulme Research Centre for Functional Materials Design, the Royal Academy of Engineering under the Research Fellowship Scheme and EPSRC through the AI for chemistry: AIchemy hub (EP/Y028775/1). A.I.C. thanks the Royal Society for a Research Pro-fessorship (RSRP\S2\232003). The authors acknowledge the use of OpenAI’s ChatGPT (DALL-E) for generating some of the illustrative content and visual materials presented in this paper. 
+
+## References                              
+
+> [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Floren-cia Leoni Aleman, Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al .2023. Gpt-4 technical report. arXiv (2023). doi:10.48550/arXiv. 2303.08774
+
+Human-Aware Robot Behaviour in Self-Driving Labs HRI Companion ’26, March 16–19, 2026, Edinburgh, Scotland, UK 
+
+[2]  Angelos Angelopoulos, Cem Baykal, Jade Kandel, Matthew Verber, James F. Ca-hoon, and Ron Alterovitz. 2025. The Experiment Orchestration System (EOS): Comprehensive Foundation for Laboratory Automation. In  2025 IEEE Interna-tional Conference on Robotics and Automation (ICRA) . 15900–15906.  doi:10.1109/ ICRA55743.2025.11128578 
+
+[3]  Emma Brass, Satheeshkumar Veeramani, Zhengxue Zhou, Hatem Fakhruldeen, J Sebastian Manzano, Rob Clowes, Isil Akpinar, Miriam Ward, John Ward, and Andrew Cooper. 2025. A Mobile Robotic Process Chemist.  ChemRxiv  (2025). 
+
+doi:10.26434/chemrxiv-2025-bsfvz 
+
+[4]  Benjamin Burger, Phillip M Maffettone, Vladimir V Gusev, Catherine M Aitchison, Yang Bai, Xiaoyan Wang, Xiaobo Li, Ben M Alston, Buyi Li, Rob Clowes, et al . 2020. A mobile robotic chemist.  Nature  583, 7815 (2020), 237–241.  doi:10.1038/s41586-020-2442-2 
+
+[5]  Andrew Cooper, Zhengxue Zhou, Satheeshkumar Veeramani, Francisco Galeano, and Hatem Fakhruldeen. 2025. LIRA: Localization, Inspection, and Reasoning Module for Autonomous Workflows in Self-Driving Labs.  Research Square  (2025). 
+
+doi:10.21203/rs.3.rs-6148048/v1 
+
+[6]  Tianwei Dai, Sriram Vijayakrishnan, Filip T Szczypiński, Jean-François Ayme, Ehsan Simaei, Thomas Fellowes, Rob Clowes, Lyubomir Kotopanov, Caitlin EShields, Zhengxue Zhou, et al . 2024. Autonomous mobile robots for exploratory synthetic chemistry.  Nature  (2024), 1–8.  doi:10.1038/s41586-024-08173-7 
+
+[7]  Kourosh Darvish, Marta Skreta, Yuchi Zhao, Naruki Yoshikawa, Sagnik Som, Miroslav Bogdanovic, Yang Cao, Han Hao, Haoping Xu, Alán Aspuru-Guzik, Animesh Garg, and Florian Shkurti. 2025. ORGANA: A robotic assistant for automated chemistry experimentation and characterization.  Matter  8, 2 (2025), 101897.  doi:10.1016/j.matt.2024.10.015 
+
+[8]  Hatem Fakhruldeen, Arvind Raveendran Nambiar, Satheeshkumar Veeramani, Bonilkumar Vijaykumar Tailor, Hadi Beyzaee Juneghani, Gabriella Pizzuto, and Andrew Ian Cooper. 2025. Multimodal Behaviour Trees for Robotic Labora-tory Task Automation. In  2025 IEEE International Conference on Robotics and Automation (ICRA) . 15872–15878.  doi:10.1109/ICRA55743.2025.11128408 
+
+[9]  Hatem Fakhruldeen, Gabriella Pizzuto, Jakub Glowacki, and Andrew Ian Cooper. 2022. Archemist: Autonomous robotic chemistry system architecture. In  2022 International Conference on Robotics and Automation (ICRA) . IEEE, 6013–6019. 
+
+doi:10.1109/ICRA46639.2022.9811996 
+
+[10]  Chandima Fernando, Hailey Marcello, Jakub Wlodek, John Sinsheimer, Daniel Olds, Stuart I Campbell, and Phillip M Maffettone. 2025. Robotic integration for end-stations at scientific user facilities.  Digital Discovery  4, 4 (2025), 1083–1091. 
+
+doi:10.1039/D5DD00036J 
+
+[11]  Marta Lagomarsino, Elena Merlo, Andrea Pupa, Timo Birr, Franziska Krebs, Cris-tian Secchi, Tamim Asfour, and Arash Ajoudani. 2025. Intuitive Programming, Adaptive Task Planning, and Dynamic Role Allocation in Human–Robot Collab-oration.  Annual Review of Control, Robotics, and Autonomous Systems  9 (2025). 
+
+doi:10.1146/annurev-control-022624-013624 
+
+[12]  Chenxuan Li, Jiaming Liu, Guanqun Wang, Xiaoqi Li, Sixiang Chen, Liang Heng, Chuyan Xiong, Jiaxin Ge, Renrui Zhang, Kaichen Zhou, et al . 2024. A Self-Correcting Vision-Language-Action Model for Fast and Slow System Manipula-tion.  arXiv  (2024).  doi:10.48550/arXiv.2405.17418 
+
+[13]  Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. 2023. Visual In-struction Tuning. In  Advances in Neural Information Processing Systems , A. Oh, T. Naumann, A. Globerson, K. Saenko, M. Hardt, and S. Levine (Eds.), Vol. 36. Curran Associates, Inc., 34892–34916. 
+
+[14]  Siddarth Narasimhan, Aaron Hao Tan, Daniel Choi, and Goldie Nejat. 2025. OLiVia-Nav: An Online Lifelong Vision Language Approach for Mobile Robot So-cial Navigation. In  2025 IEEE International Conference on Robotics and Automation (ICRA) . 9130–9137.  doi:10.1109/ICRA55743.2025.11128004 
+
+[15]  Negin Orouji, Jeffrey A Bennett, Richard B Canty, Long Qi, Shijing Sun, Paulami Majumdar, Chong Liu, Núria López, Neil M Schweitzer, John R Kitchin, et al .2025. Autonomous catalysis research with human–AI–robot collaboration.  Nature Catalysis  (2025), 1–11.  doi:10.1038/s41929-025-01430-6 
+
+[16]  Gabriella Pizzuto, Jacopo De Berardinis, Louis Longley, Hatem Fakhruldeen, and Andrew I. Cooper. 2022. SOLIS: Autonomous Solubility Screening using Deep Neural Networks. In  2022 International Joint Conference on Neural Networks (IJCNN) . 1–7.  doi:10.1109/IJCNN55064.2022.9892533 
+
+[17]  Akira Shiba, Marina Obata, Nathan Kau, Zoltan Beck, Rishi Shah, Michael Sudano, and Sabrina Lee. 2025. Look Further: Socially-Compliant Navigation System in Residential Buildings. In  2025 20th ACM/IEEE International Conference on Human-Robot Interaction (HRI) . 272–282.  doi:10.1109/HRI61500.2025.10973828 
+
+[18]  Parisa Shiri, Veronica Lai, Tara Zepel, Daniel Griffin, Jonathan Reifman, Sean Clark, Shad Grunert, Lars P.E. Yunker, Sebastian Steiner, Henry Situ, Fan Yang, Paloma L. Prieto, and Jason E. Hein. 2021. Automated solubility screening platform using computer vision.  iScience  24, 3 (2021), 102176.  doi:10.1016/j.isci. 2021.102176 
+
+[19]  Daeun Song, Jing Liang, Amirreza Payandeh, Amir Hossain Raj, Xuesu Xiao, and Dinesh Manocha. 2025. VLM-Social-Nav: Socially Aware Robot Navigation Through Scoring Using Vision-Language Models.  IEEE Robotics and Automation Letters  10, 1 (2025), 508–515.  doi:10.1109/LRA.2024.3511409 
+
+[20]  Satheeshkumar Veeramani, Zhengxue Zhou, Francisco Munguia-Galeano, Hatem Fakhruldeen, Thomas Roddelkopf, Mohammed Faeik Ruzaij Al-Okby, Kerstin Thurow, and Andrew Ian Cooper. 2025. PREVENT: Proactive Risk Evaluation and Vigilant Execution of Tasks for Mobile Robotic Chemists using Multi-Modal Behavior Trees.  arXiv  (2025).  doi:10.48550/arXiv.2510.21438 
+
+[21]  Shukang Yin, Chaoyou Fu, Sirui Zhao, Ke Li, Xing Sun, Tong Xu, and Enhong Chen. 2024. A survey on multimodal large language models.  National Science Review  11, 12 (2024).  doi:10.1093/nsr/nwae403 
+
+Received 2025-12-08; accepted 2026-01-12

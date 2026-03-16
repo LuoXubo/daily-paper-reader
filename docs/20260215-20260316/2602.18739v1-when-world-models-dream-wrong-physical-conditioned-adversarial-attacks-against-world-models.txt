@@ -1,0 +1,376 @@
+Title: When World Models Dream Wrong: Physical-Conditioned Adversarial Attacks against World Models
+
+URL Source: https://arxiv.org/pdf/2602.18739v1
+
+Published Time: Tue, 24 Feb 2026 01:30:29 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# When World Models Dream Wrong: Physical-Conditioned Adversarial Attacks against World Models 
+
+# Zhixiang Guo 1, Siyuan Liang 1, Andr´ as Balogh 2, Noah Lunberry 1,Rong-Cheng Tu 1, M´ ark Jelasity 2, Dacheng Tao 11Nanyang Technological University 2University of Szeged      
+
+> {zhixiang004, siyuan.liang, rongcheng.tu, dacheng.tao }@ntu.edu.sg
+> {abalogh, jelasity }@inf.u-szeged.hu nlunberry@gmail.com
+
+# Abstract 
+
+Generative world models (WMs) are increasingly used to synthesize controllable, sensor-conditioned driving videos, yet their reliance on physical priors exposes novel attack surfaces. In this paper, we present Physical-Conditioned World Model Attack (PhysCond-WMA), the first white-box world model attack that perturbs physical-condition chan-nels, such as HDMap embeddings and 3D-box features, to induce semantic, logic, or decision-level distortion while preserving perceptual fidelity. PhysCond-WMA is opti-mized in two stages: (1) a quality-preserving guidance stage that constrains reverse-diffusion loss below a cali-brated threshold, and (2) a momentum-guided denoising stage that accumulates target-aligned gradients along the denoising trajectory for stable, temporally coherent seman-tic shifts. Extensive experimental results demonstrate that our approach remains effective while increasing FID by about 9% on average and FVD by about 3.9% on aver-age. Under the targeted attack setting, the attack success rate (ASR) reaches 0.55. Downstream studies further show tangible risk, which using attacked videos for training de-creases 3D detection performance by about 4%, and wors-ens open-loop planning performance by about 20%. These findings has for the first time revealed and quantified se-curity vulnerabilities in generative world models, driving more comprehensive security checkers. 
+
+# 1. Introduction 
+
+World models [12–15] learn compact, structured represen-tations of an environment and its transition dynamics, en-abling agents to predict future observations, evaluate coun-terfactuals, and plan without exhaustive real-world interac-tion. Due to the strong ability of modeling the world, world models have proven highly effective for sample-efficient policy learning [2, 29], simulation-driven evaluation [5, 16, 57], and long-horizon reasoning across robotics [1, 64, 67] and autonomous-driving systems [22, 47, 53, 66], making world models a cornerstone for data-efficient perception and planning pipelines. Generative world models [8, 45, 65] have recently ad-vanced to the point where they can produce temporally co-herent, sensor-conditional videos of complex urban scenes conditioned on high-definition maps, planned trajectories, or sparse multimodal sensor data, thereby serving as con-trollable simulators for autonomous driving research and validation [54, 56, 59]. By enabling scalable generation of corner cases and long-horizon scenarios, these models reduce reliance on costly real world collection and unlock new avenues for closed-loop testing. However, the reliance on learned latent dynamics and imperfect conditional in-puts introduces a critical vulnerability [25, 30, 35, 38, 62]. Even small, structured perturbations [11, 27, 36, 55, 63] in conditions—such as slight HDMap shifts, mislabeled object boxes, or minimally perturbed trajectories—or sub-tle cross-modal semantic inconsistencies can be amplified through the generative pipeline, propagating over time [31] and leading to physically implausible outcomes such as ob-ject hallucination [21], disappearance, or causal violations. Once such artifacts enter downstream open-loop or closed-loop planners, they can bias cost estimation, underestimate collision risks, or induce overly conservative behaviors, ul-timately misguiding decision-making [34, 50]. In this paper, we propose Physical-Conditioned World Model Attack (PhysCond-WMA) , a targeted adversarial attack on generative world models that manipulates the diffusion process through the model’s physical-condition channels, such as HDMap embeddings and 3D-box fea-tures, to induce semantic, logic or decision-level distor-tion while preserving perceptual image quality. Physically conditioned adversarial attacks on diffusion-based world 1
+
+> arXiv:2602.18739v1 [cs.LG] 21 Feb 2026 Figure 1. Adversarial attack on generative world model. By conducting white-box attacks on the generative world model, we aim to change the semantics of the generated results while preserving quality, thus achieving an adversarial attack that affects downstream tasks
+
+models face two key challenges: (1) Directly optimizing HDMap and 3D-box conditions can easily push the reverse-diffusion trajectory off the data manifold, leading to no-ticeable artifacts and large FID/FVD degradation instead of stealthy attacks. (2) Even in a fidelity-preserving region, the denoising update is dominated by the model’s clean predic-tion, so naive injection of target gradients is either too weak to change video semantics or too strong and breaks temporal consistency. As a result, we design the two-stage method to inject small, perturbations into the physical condition layer so that they are naturally absorbed by the generator: (1) A quality-preserving guidance stage that constrains perceptual loss to a pre-set threshold. (2) A momentum-guided denois-ing optimization stage that simulates the diffusion denois-ing trajectory with momentum updates to robustly identify high-impact attack directions. Extensive experiments are conducted under untrageted attack and targeted attack with different victim models. The resulting compact perturbations cause semantic, logic, or decision-relevant distortions (e.g. missing or added vehi-cles, lane misalignments, erroneous driving status) without a noticeable loss of image fidelity, increasing FID by about 9% and FVD by about 3.9% on average. The attack success rate of targeted attack of PhysCond-WMA can reach 0.55 for advanced generative world models. Experimental re-sults on downstream detection and planner performance re-veal that the attacked videos can degrade 3D detection per-formance by about 4% and open-loop planning performance by about 20%, proving the effectiveness of our adversarial attack [32, 33, 37, 40, 52, 61, 63]. Our contributions are :• We first identify and systematically study the security risks of generative world models for autonomous driv-ing, and propose PhysCond-WMA , the first adversarial attack for this class of models. • We design a physical conditioned adversarial attack with a two-stage optimization, quality-preserving guidance and momentum-guided denoising, to attack without de-grading perceptual quality. • Extensive experiments demonstrate that our method com-pletes the attack with minimal image quality degradation and successfully affects downstream tasks. 
+
+# 2. Related work 
+
+2.1. World Models in Autonomous Driving 
+
+Generative world models for autonomous driving can be or-ganized along two orthogonal axes: generation paradigm and conditioning priors. Physically constrained diffusion for multi-view generation methods [4, 49, 53, 65, 66] use conditions such as HD maps, BEV layouts, 3D boxes, or trajectories to synthesize controllable, cross-view consis-tent driving videos. DriveDreamer [53] leveraged diffusion with a two-stage pipeline to encode traffic structure and pre-dict futures from real-world data. On this basis, in order to enhance controllable condition generation and multi view modeling capabilities, DriveDreamer2 [66] added LLM-to-trajectory and HDMap interfaces, and unified multi cam-era modeling to improve spatiotemporal consistency. Under this architecture, diffusion models [46] have been widely applied to drive temporally-consistent, multi-view control-lable video generation with strong structural prior condi-tions, ensuring geometric and semantic stability through explicit cross view alignment and long-term consistency mechanisms. Secondly, generative world models unify video, actions, and language via sequence modeling or latent diffusion. GAIA-1 [22] adopts discrete sequence modeling for con-trollable driving video synthesis, while GAIA-2 [47] ad-vances to controllable multi-camera latent diffusion with broader geographic diversity. and tighter alignment to struc-tured priors, an industrial path toward world models and control priors. Moreover, WoVoGen [39] utilizes voxel and volumetric abstractions to tighten the geometry–time cou-pling, improving physical interpretability. In order to fur-ther enhance the perception and temporal modeling capa-bilities of end-to-end models, LAW [28] directly introduces the world model into the latent space and predicts the po-tential features of future scenes based on the current visual features and the vehicle trajectory. However, these methods rely on multimodal physical conditions to enhance the per-ceptual ability of the world model while also increasing the risk of attacks against these physical conditions. 
+
+2.2. Diffusion-Based Adversarial Attacks 
+
+Due to the limited research on attacks against world mod-els, we focus on the adversarial attack [9] of diffusion mod-els, the core structure of generative world models. AdvD-iff [7] generates unrestricted adversarial examples by in-jecting classifier gradient based adversarial guidance into the reverse diffusion sampling process, yielding realistic high quality attacks that outperform prior unrestricted meth-ods. AdvDiffVLM [10] modifies the reverse-time diffusion 2score via adaptive ensemble gradients to efficiently synthe-size natural, unrestricted, targeted adversarial examples that transfer across VLMs. Similarly, AdvDiffuser [6] injects adversarial semantics by applying Projected Gradient De-scent (PGD) [41] to the reverse diffusion process, but signif-icantly reduces the quality of the generated results. In this regard, Adversarial-Guided Diffusion [58] injects target se-mantics in the final few steps of reverse diffusion and aligns the denoising trajectory with momentum, thereby achieving efficient, transferable, and anti-purification targeted uncon-strained attacks with high fidelity. These methods lay the foundations of a novel adversarial paradigm against world models: launching attacks against the physical laws of the world model. 
+
+# 3. Preliminaries 
+
+3.1. Generative World Model 
+
+Leveraging diffusion’s training stability and efficient latent-space modeling, conditional diffusion has become a stan-dard backbone for generative world models, enabling ex-plicit injection of physical priors and thereby improving both perception quality and decision-making. Typical phys-ical priors R include HDMaps, 3D bounding boxes, and BEV trajectory/layout representations. HDMaps are cen-timeter and lane-level semantic maps for autonomous driv-ing that encode road geometry, lane boundaries and cen-terlines, crosswalks, stop lines, traffic lights and signs, drivable areas, and their topological relations. 3D bound-ing boxes record, in a global coordinate frame, each ob-ject’s translation (x, y, z ), size (w, l, h ), orientation (quater-nion/heading), and often velocity vector. These priors help maintain coherent positions, headings, and speeds of inter-active agents during generation. Bird’s-eye view (BEV) is a ground-plane feature representation obtained by lift-ing multi-camera features into 3D and splatting them onto a bird’s-eye grid, providing a unified spatial reference that aligns maps, objects, planning, and kinematic reasoning. The diffusion model mainly includes two steps: forward denoising and conditional reverse denoising. Let x0 denote a ground-truth video frame in latent space. The forward process adds noise as Eq.(1). 
+
+q(xt | x0) = N √¯αt x0, (1 − ¯αt)I, t = 1 , . . . , T (1) where ¯αt is defined as in DDPM [18]. The reverse process generates conditionally on physical priors R and input con-ditions C (text, images, videos), as depicted in Eq.(2) 
+
+pθ (xt−1 | xt, R, C ) = N ϵθ (xt, t, R, C ), σ 2 
+
+> t
+
+I (2) where ϵθ (xt, t, R, C ) is the diffusion noise predictor. The loss function of diffusion model is depicted as Eq.(3). 
+
+Ldiff = Ex0, ϵ ∼N (0 ,I ), t, C 
+
+h
+
+ϵ − ϵθ (xt, t, R, C ) 22
+
+i
+
+(3) Meanwhile, video diffusion introduces temporal attention [60], 3D spatiotemporal U-Net [20], and cascaded spa-tiotemporal super-resolution [19] on the basis of image dif-fusion to maintain long-range consistency. In Video Diffu-sion Models [20], high fidelity and long-term video synthe-sis are achieved through a cascade paradigm of basic gener-ation and spatiotemporal super-resolution. 
+
+3.2. Problem Definition 
+
+We adopt a white-box, inference-time threat model: the at-tacker can access and utilize the victim model’s pretrained weights and gradient information, but is not allowed to train or fine-tune the model parameters. For a generative world model, the output of the model can be represented as Eq.(4). 
+
+V = {xm}Mm=1 = WM (R, C ) (4) where M represents the frame rate, R represents the physi-cal conditions, and C represents the input multimodal con-ditions. Therefore, during the attack, the goal of the attacker is to create a subtle perturbation δ, allowing the world model ad-versarial attack to change semantics either directionally or non directionally while maintaining the quality of the gen-erated results. In order to better achieve the goal, the pertur-bation is applied to the physical conditions, making it more controllable while satisfying the covert attack, as depicted in Eq.(5). 
+
+Vatt = {xatt m }Mm=1 = WM (R + δ, C ∗) (5) where δ denotes the injected perturbation, and the C∗ de-notes the targeted attack conditions. Therefore, during the attack, although the input modality may be different from the target modality, encoding is needed to align the two in the latent space. To formalize the attack objective, we decompose the ad-versary’s goals into three parts: ①Control perturbation mag-nitude to ensure the attack is imperceptible. ②Preserve per-ceptual and geometric fidelity of generated results. ③Align the target in the denoising trajectory. We pose the attacker’s optimization as a minimization over the physical-condition perturbation δ, as depicted in Eq.(6). 
+
+δ(t) = arg min  
+
+> δ
+
+λR∥δ∥22 + λL Et
+
+Ldiff (xt, xatt t )
+
+− λtar A xatt t , C ∗)
+
+(6) where λR, λL and λtar denotes scale factors to control these three parts. Ldiff is depicted in Eq.(3). A aligns the semantic similarity between the target C∗ and denoising latent xatt t .
+
+# 4. Approach 
+
+In this paper, we propose PhysCond-WMA , a two-stage adversarial attack that injects a compact noise perturba-tion into the diffusion process, optimized in two stages: ①
+
+3Figure 2. Overall framework of PhysCond-WMA. 
+
+a quality-preserving guidance stage and ② a momentum-guided denoising optimization stage, as shown in Fig.2. 
+
+4.1. Quality-preserving Guidance Stage 
+
+In the reverse diffusion steps, xt is the input of the noise predictor ϵθ (xt) for gradual denoising steps, as shown in Eq.(2). Therefore, the single denoising step from t to t-1 is depicted as Eq.(7). 
+
+xt−1 = denoise( xt, ϵ θ (xt)) (7) In the quality-preserving guidance stage, we preserve per-ceptual fidelity while gently moving the reverse denoising trajectory away from the clean flow when attacking the re-verse diffusion. Therefore, we intend to add small per-turbations to guide the generation of the image while re-taining the original diffusion. Because reverse diffusion is fundamentally sampling guided by the score field, there is no guarantee of monotonic loss decrease across steps [20]; consequently, merely injecting small perturbations can trap the trajectory in a local minima which undermines the ad-versarial attack. Concretely, we enlarge a diffusion-space discrepancy to escape the local basin around the clean video, while keep-ing the state on-manifold to preserve realism. As a result, a small corrective perturbation is added in the reverse diffu-sion which directly reduces the diffusion diffusion loss, as depicted in Eq.(8) 
+
+˜ϵt = ϵt(xt, t ) + αA · ∇ xt Ldiff 
+
+ xt, xatt 
+
+> t
+
+ (8) where αA denotes the scale factor of the gradient of the loss function. Because the clean denoising ϵt dominates each update, the global trend of Ldiff is naturally decreas-ing, which makes the next stage with a quality-preserving output. With the attack starting from reverse step T, we terminate the first stage at the first step ∆ that satisfies the quality-preserving fidelity criterion, as depicted in Eq.(9). 
+
+∆ = min t ∈ { T, . . . , 1} Ldiff (xt; xatt  
+
+> t
+
+) < τ (9) where the threshold τ is determined by ablation experi-ments in 5.3. An overly large τ relaxes the constraint too early, leading to poor image quality and semantic blur. An overly small τ keeps the trajectory overly coupled to the clean anchor, making it difficult for the next stage of our attack to converge towards the target direction. In summary, the quality-preserving guidance stage con-strains Ldiff with a threshold τ and injects small perturba-tions, so that the denoising trajectory while remaining on the data manifold. This provides a stable and optimizable starting point for the subsequent momentum-guided target alignment. 
+
+4.2. Denoising Optimization Stage 
+
+In this stage, once the reverse diffusion process has con-verged and the loss Ldiff reaches the predefined threshold, the inference continues toward the target semantics. To achieve this, we employ SSCD [43] to quantify the seman-tic consistency between the denoised result and the target representation, allowing us to guide the diffusion process to maximize their semantic alignment. We focus on the case where both C and R are single images. In settings where multiple conditioning signals are used and a subset of them can be used as the target, the alignment should be mini-mized with the target subset. The key challenge lies in the fact that the denoising up-date is still dominated by the intrinsic prediction of the model ϵ(xt), which naturally drives the process toward clean reconstruction. Thus, the optimization must accumu-late target-oriented updates that are sufficiently strong to al-4Figure 3. Visualization of untargeted and targeted PhysCond-WMA 
+
+ter the semantic trajectory, while simultaneously ensuring that Ldiff does not increase, thereby maintaining visual fi-delity and temporal coherence. As ϵ(xt) gradually decreases with each reverse diffusion step, the model becomes increasingly sensitive to abrupt gradient changes. Directly updating along the raw tar-get gradient may thus cause unstable behavior and lead to poor temporal consistency in the generated video. To mit-igate this issue, we introduce an Exponential Moving Av-erage (EMA) [26] mechanism that accumulates the target-directed gradients over time into a smooth and coherent se-mantic offset trajectory, as depicted in Eq.(10). 
+
+˜ϵt = λϵ t + (1 − λ)∇xt A xatt t , C ∗
+
+− β · ∇ xt Ldiff 
+
+ xt, xatt 
+
+> t
+
+ ] (10) where λ denotes the momentum factor with λ ∈ (0 , 1) , and 
+
+A denotes the semantic alignment model, which is SSCD in our case. When the attack is untargeted, the perturbation is depicted as Eq.(11). 
+
+˜ϵt = λϵ t + (1 − λ) ∇xt Ldiff 
+
+ xt, xatt 
+
+> t
+
+ (11) This temporal aggregation suppresses short-term fluctua-tions in the update direction, ensuring that the semantic transition toward the target remains stable while preserving both visual quality and spatio-temporal coherence in the fi-nal video results. 
+
+4.3. Attack Pipeline and Implementation Details 
+
+As shown in Fig.2, the PhysCond-WMA framework in-tegrates both quality-preserving and target-guided stages within a unified diffusion pipeline. The attack operates in the latent video space while conditioning on physical pri-ors R(HDMap, 3D-box) and input target contexts C∗ (im-ages, text, or multimodal prompts). During inference, the clean reverse-diffusion path is duplicated into an adver-sarial branch where perturbations are injected under loss-threshold control. The Stage 1 module constrains the dif-fusion loss below τ to maintain perceptual fidelity, while Stage 2 introduces a momentum-guided update that aggre-gates gradients aligned with a semantic target, steering the denoising trajectory toward the desired shift. The frame-work outputs three categories of results, including semantic level, logic level and decision level distortions. For detailed definitions, please refer to section 5.1 Together, these mod-ules form an end-to-end controllable adversarial pipeline capable of precise, temporally consistent attacks on genera-tive world models. More details about the algorithm can be found in Supplementary Materials. 
+
+# 5. Experiments 
+
+5.1. Experimental Setup 
+
+Dataset and Model. The experimental dataset used is the nuScenes dataset [3], consisting of 850 actual driving videos, including 700 training videos and 150 validation videos. Each video is approximately 20 seconds long and has a frame rate of 12 frames per second, including cam-eras from six surround perspectives, totaling over 1 million video frames. At the same time, the dataset provides physi-cal conditions for sampling key frames, including HDMap, 3D Box, driving status, and other conditions. For targeted attacks, the target comes from video frames in the valida-tion set, and the attack is guided by changing the semantics in the image, such as adding vehicles, pedestrians, modify-ing traffic light information. We use SDXL-inpainting 1.0 model [44] to generate targets. More details about targets can be found in Supplementary materials. 
+
+We evaluate the effectiveness of our proposed method on Drivedreamer [53] and Drivedreamer2 [66] autonomous 5Table 1. Performance of PhysCond-WMA on different World Models                                          
+
+> Model DriveDreamer[53] DriveDreamer2[66] FID ↓FVD ↓ASR(GPT-5) ↑ASR(Human) ↑FID ↓FVD ↓ASR(GPT-5) ↑ASR(Human) ↑
+> Clean 52.6 452.0 --18.4 74.9 --Untargeted Attack 54.9 481.6 0.12 0.25 21.6 77.3 0.18 0.32 Targeted Attack 54.1 474.3 0.19 0.41 20.5 75.7 0.30 0.55
+> Figure 4. Visualization of PhysCond-WMA. GPT-5 determines attack fail-ure, while human determines attack success.
+
+driving generative world models. We train DriveDreamer from scratch following the official recipe, whereas Drive-Dreamer2 is evaluated using the released pretrained check-points. 
+
+Evaluation Metrics. We conducted a comprehensive eval-uation of our proposed method, including the effectiveness of the attack and impact on downstream tasks. The evalua-tion of attack effectiveness includes the quality of the gen-erated results and Attack Success Rate. We utilized frame-wise Fr´ echet Inception Distance (FID) [17] and Fr´ echet Video Distance (FVD) [48] to evaluate the generation qual-ity, where the evaluated image is resized to 448 × 256. 
+
+5.2. Main results 
+
+To quantify Attack Success Rate (ASR), for which no es-tablished metric exists in world model attacks, we intro-duce a set of evaluation criteria and use GPT-5 [42] and human as evaluators. Each video is evaluated along three levels: semantic level, logical level and decision level. (1) Semantic level: recognizability of key traffic elements such as vehicles, pedestrians, traffic lights/signs, lane markings, and other road-relevant entities; (2) Logical level: tem-poral/physical coherence such as smooth ego/object mo-tion; absence of object teleportation or disappearance; no implausible spatial placements; (3) Decision level: appro-priateness of responses to risk such as obstacles, pedes-trians, red lights. Each dimension is scored from the set                  
+
+> Table 2. Performance of 3D object detection with different syn-thetic data augmentation.
+> Dataset DriveDreamer[53] DriveDreamer2[66] mAP ↑NDS ↑mAP ↑NDS ↑
+> w/o clean synthetic data 30.2 38.1 --w clean synthetic data 30.9 38.3 31.7 43.5 w attacked synthetic data 29.8 37.6 30.4 41.6
+
+[0 , 0.2, 0.4, 0.6, 0.8, 1] , where larger values indicate greater degradation. As a result, the final score S can be depicted as S = 13
+
+P 
+
+> d∈D
+
+sd, where D = {sem , log , dec }. If 
+
+S > 0.5, the attack successes. Each experiment consists of 100 generated results, and the number of successful at-tacks is calculated as ASR. For the evaluation of Human ASR, we recruited 20 adult volunteers with driving experience to score the generated videos based on the same evaluation criteria as GPT. Each person evaluated 20 videos, and each video was evaluated by at least two people. After statistical analysis, Human ASR was determined. More details about evaluation crite-ria can be found in Supplementary Materials. 
+
+For downstream impact, we evaluate the generated re-sults on 3D object detection and open-loop planning. Among them, FCOS3D [51] is selected as baselines for 3D object detection, and ST-P3 [23] and VAD [24] are selected as baselines for open-loop planning to measure the driving trajectory in the next three seconds. 
+
+Implementation details. In our proposed method, we set 
+
+αA = 0 .1, λ = 0 .9 and β = 0 .6. Based on preliminary ex-periments, we choose τ = 0 .15 as the threshold to terminate the quality-preserving stage. The number of diffusion steps is 25. The resolution of a single lens in the generated results is 448 × 256. In our experiments, we set image condition as the DriveDreamer generation mode. Tab.1 shows the attack performance of PhysCond-WMA on different generative world models, including both un-targeted and targeted attacks. The results indicate that PhysCond-WMA can attack while maintaining visual qual-ity. Notably, on different models, the Human ASR is higher than the GPT’s. We attribute this gap to the attack mech-anism: perturbations maintain single-frame fidelity yet in-6Table 3. Performance of Open-loop planning on nuScenes valida-tion set. The evaluation settings are the same as ST-P3.            
+
+> Method L2 Avg.(m) ↓Col.(%) ↓
+> ST-P3[23] 2.11 0.71 VAD[24] 0.37 0.14
+> Drivedreamer[53] 0.29 0.15 PhysCond-WMA 0.33 0.19
+> Figure 5. Ablation study on loss function threshold τ
+
+duce temporally accumulated semantic shifts that alter driv-ing semantics. As illustrated in Fig.4, frames remain visu-ally plausible while the video-level meaning changes For example, the oncoming vehicle switches from a bus to a truck. GPT-based assessors—biased toward appearance cues and short-horizon reasoning. Therefore under-report these “visually normal but behaviorally abnormal” sam-ples, whereas human raters detect cross-frame semantic and causal violations. This divergence evidences the stealthi-ness and effectiveness of PhysCond-WMA. In large-scale pipelines, manual auditing is costly, and automated screen-ing using LLMs further increases the risk that such covert attacks remain undetected. By comparing untargeted and targeted attack, we found that PhysCond-WMA achieved an improvement in ASR of about 60% in targeted attack. This indicates that our method can effectively guide reverse diffusion towards the target direction, ensuring both result quality and attack effectiveness. Fig.3 shows the results of both untargeted targeted attacks. Result (A) displays a generation of rainy driving scene, while after attacking, the original green light has been distorted into red light. Result (B) displays a generation of a daytime driving scene, with a target vehicle in the first frame. PhysCond-WMA success-fully guides the generation of the video, causing a change in the speed of the target vehicle, and the target disappeared in the last frame, which violates basic logic. Meanwhile, note that the Human ASR on Drive-Dreamer2 improves over DriveDreamer by 28% for the un-targeted setting and 34.1% for the targeted setting. Because PhysCond-WMA is a white-box attack, its effectiveness correlates with the model’s conditional coupling strength and temporal modeling capability. In stronger generators, small perturbations on physical conditions propagate sta-bly along the diffusion–denoising chain and gradually ac-cumulate into cross-frame semantic shifts. As shown in Fig.4, single frames look normal, yet the video semantics change from bus to truck, which substantially raises Hu-man ASR. This also explains why targeted attacks achieve a higher success rate. Goal-aligned gradients are more eas-ily amplified and temporally preserved by strong spatiotem-poral priors, boosting attack efficiency while causing only minor quality changes, thus remaining more invisible to appearance-biased, short-horizon automatic assessors. Tab.2 and 3 show the impact of attack results on down-stream tasks, including using the results as synthetically augmented data for 3D detection training and open-loop planning performance. In 3D detection, we add a total of 800 frames from 100 attacked videos into the training set. The results show that compared to clean data augmenta-tion, mean average precision (mAP) decreased by 1.1 and 1.3, and nuScenes Detection Score (NDS) decreased by 0.7 and 1.9, with DriveDreamer and DriveDreamer2, re-spectively. These results confirm that, despite similar per-ceptual quality, PhysCond-WMA introduces semantic and physical inconsistencies that contaminate the training distri-bution and systematically harm downstream detection ,de-grading both mAP and NDS across models. The larger drops on DriveDreamer2 corroborate our earlier observa-tion that stronger generators are more vulnerable. In open-loop planning performance, the L2 displacement error (L2 Avg.) of PhysCond-WMA increases from 0.29 to 0.33 com-pared to the clean DriveDreamer representing a relative in-crease of 13.8%. The collision rate increased from 0.15% to 0.19%, a relative increase increase of 26.7%. This indicates that our method worsens the collision rate while perturbing the trajectory, demonstrating the impact of attack results on downstream tasks. 
+
+5.3. Ablation Study 
+
+To demonstrate the effectiveness of our design method, we conduct ablation experiments on the loss function threshold 
+
+τ set for stopping the first stage of the attack. Moreover, we ablate the two attack stages and the conditional layers of the PhysCond-WMA We use DriveDreamer2 in our abla-tion experiments as the victim model, as it has better exper-imental results and Human ASR is used as the evaluation metric. 
+
+Loss function threshold τ . Fig.5 illustrates the ASR and FVD with different values of τ . By comparison, it can be concluded that as τ gradually increases, the FVD of the generated results gradually increases, and the image qual-ity of the generated results gradually deteriorates. When 
+
+τ = 0 .10 , although FVD is minimized, the loss function is prone to getting stuck in local minima, which is not con-ducive to the next stage of attack. When τ = 0 .20 , the diffusion process is incomplete and the quality of the gener-7Table 4. Ablation study of attack stage.                  
+
+> Model Untargeted Attack Targeted Attack FVD ↓ASR(Human) ↑FVD ↓ASR(Human) ↑
+> Stage 1 Only 85.4 0.04 85.1 0.03 Stage 2 Only 96.9 0.06 105.0 0.11 Our Method 77.3 0.32 75.7 0.55
+> Figure 6. Visualization of ablation study of attack stage.
+
+ated results cannot be guaranteed. Therefore, after the next stage of attack, the generated results cannot converge to the target, and the ASR is very low. As a result, in order to bal-ance quality of the generated results and the effectiveness of attack, we set τ = 0 .15 .
+
+Effect of two stages. Tab.4 illustrates the ASR and FVD with different attack stages. To ensure fair comparison, we conduct stage-wise ablations: when only one stage is exe-cuted, all remaining steps follow the standard reverse dif-fusion without additional perturbations. Results show that only using quality-preserving stage quickly attenuates per-turbations along the denoising chain, thus largely maintain-ing perceptual quality, but ASR drops by 87.5% with the untargeted attack and 94.5% with the targeted attack, in-dicating that, without the alignment of stage 2, the attack cannot accumulate enough semantic shift. Conversely, by only using the momentum-guided optimization stage, FVD increases by 13.5% and 23.4% relative to only using the first stage, confirming the strong quality-preserving effect of stage 1. Meanwhile, ASR still decreases by 81.3% and 80% compared to the entire two-stage method. These re-sults imply that stage 1 not only safeguards fidelity but also, under an appropriate thresholds τ , constrains and shapes the denoising trajectory, providing a stable and optimizable starting point for targeted updates of stage 2. For example, as shown in Fig.6, in PhysCond-WMA, the attack occurs as a semantic change of the object between frames. When us-ing only the first stage, the attack fails by preserving quality without semantic changes, and when only using phase two, the failure is a result of the low-quality output, correspond-ing with our earlier analysis. As a result, the two stages 
+
+Table 5. Ablation study of Physical condition on PC-WMA                  
+
+> Model Untargeted Attack Targeted Attack FVD ↓ASR(Human) ↑FVD ↓ASR(Human) ↑
+> HDMap 76.9 0.21 77.1 0.40 3D BOX 78.1 0.25 76.4 0.39 Our Method 77.3 0.32 75.7 0.55
+> Figure 7. Visualization of ablation study of physical condition.
+
+are complementary and indispensable: stage 1 stabilizes the trajectory and preserves quality, while stage 2 injects target-semantic deviations and steers convergence. 
+
+Physical conditions. Tab.5 compares single-channel physi-cal conditions (HDMap or 3D Box) with joint conditions. By comparison, PhysCond-WMA achieves higher ASR than only using HDMap or 3D Box conditions, showing an increase of 52.4% and 28.0% in the untargeted setting and 37.5% and 41.0% in the targeted setting, while keeping perceptual quality comparable. These results indicate that HDMap constrains road topology and 3D Box anchors ob-jects in the frame. As shown in Fig.7, when onlt the HDMap is attacked, the road information is affected, leading to gen-erate wrong road sign. By contrast, when only the 3D box is attacked, the object semantics are changed, leading to un-reasonable appearance. Our method perturbs both physical conditions, ensuring a successful attack. 
+
+# 6. Conclusions and Future Work 
+
+This paper proposes PhysCond-WMA , the first white-box attack on generative world models that perturbs physical-condition channels to induce temporally coherent seman-tic shifts while preserving perceptual quality. Our method demonstrates the vulnerability of generative world models under conditional perturbations, and experimental results confirm that downstream tasks are successfully impacted. We aim to raise awareness of world model safety, and develop a multi-dimension safety checker that goes beyond fidelity metrics to evaluate generated data via perceptual, temporal, physics and policy compliance dimensions. 8Limitations: (1)The effectiveness of this method has been verified in image targets as input condition, but the attack effect on multimodal targets such as video and text still needs to be explored. (2)Due to the lack of unified standards for world model safety, our evaluation methodology does not rep-resent a complete criteria, only a valuable step towards it. 
+
+# References 
+
+[1] Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvijit Chattopadhyay, Yongxin Chen, Yin Cui, Yifan Ding, et al. Cosmos world foun-dation model platform for physical ai. arXiv preprint arXiv:2501.03575 , 2025. 1 [2] Leonardo Barcellona, Andrii Zadaianchuk, Davide Alle-gro, Samuele Papa, Stefano Ghidoni, and Efstratios Gavves. Dream to manipulate: Compositional world models em-powering robot imitation learning with imagination. arXiv preprint arXiv:2412.14957 , 2024. 1 [3] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-ancarlo Baldan, and Oscar Beijbom. nuscenes: A multi-modal dataset for autonomous driving. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 11621–11631, 2020. 5 [4] Anthony Chen, Wenzhao Zheng, Yida Wang, Xueyang Zhang, Kun Zhan, Peng Jia, Kurt Keutzer, and Shang-hang Zhang. Geodrive: 3d geometry-informed driving world model with precise action control. arXiv preprint arXiv:2505.22421 , 2025. 2 [5] Chang Chen, Yi-Fu Wu, Jaesik Yoon, and Sungjin Ahn. Transdreamer: Reinforcement learning with transformer world models. arXiv preprint arXiv:2202.09481 , 2022. 1 [6] Xinquan Chen, Xitong Gao, Juanjuan Zhao, Kejiang Ye, and Cheng-Zhong Xu. Advdiffuser: Natural adversarial exam-ple synthesis with diffusion models. In Proceedings of the IEEE/CVF International Conference on Computer Vision ,pages 4562–4572, 2023. 3 [7] Xuelong Dai, Kaisheng Liang, and Bin Xiao. Advdiff: Generating unrestricted adversarial examples using diffusion models. In European Conference on Computer Vision , pages 93–109. Springer, 2024. 2 [8] Ruiyuan Gao, Kai Chen, Bo Xiao, Lanqing Hong, Zhen-guo Li, and Qiang Xu. Magicdrive-v2: High-resolution long video generation for autonomous driving with adaptive con-trol. In Proceedings of the IEEE/CVF International Confer-ence on Computer Vision , pages 28135–28144, 2025. 1 [9] Ian J Goodfellow, Jonathon Shlens, and Christian Szegedy. Explaining and harnessing adversarial examples. arXiv preprint arXiv:1412.6572 , 2014. 2 [10] Qi Guo, Shanmin Pang, Xiaojun Jia, Yang Liu, and Qing Guo. Efficient generation of targeted and transferable ad-versarial examples for vision-language models via diffusion models. IEEE Transactions on Information Forensics and Security , 2024. 2 [11] Zhixiang Guo, Siyuan Liang, Aishan Liu, and Dacheng Tao. Copyrightshield: Enhancing diffusion model security against copyright infringement attacks. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 19417–19426, 2025. 1 [12] David Ha and J¨ urgen Schmidhuber. World models. arXiv preprint arXiv:1803.10122 , 2(3), 2018. 1 [13] Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Moham-mad Norouzi. Dream to control: Learning behaviors by la-tent imagination. arXiv preprint arXiv:1912.01603 , 2019. [14] Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Ville-gas, David Ha, Honglak Lee, and James Davidson. Learning latent dynamics for planning from pixels. In International conference on machine learning , pages 2555–2565. PMLR, 2019. [15] Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timothy Lillicrap. Mastering diverse domains through world models. 
+
+arXiv preprint arXiv:2301.04104 , 2023. 1 [16] Nicklas Hansen, Jyothir SV, Vlad Sobal, Yann LeCun, Xi-aolong Wang, and Hao Su. Hierarchical world models as visual whole-body humanoid controllers. arXiv preprint arXiv:2405.18418 , 2024. 1 [17] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp Hochreiter. Gans trained by a two time-scale update rule converge to a local nash equilib-rium. Advances in neural information processing systems ,30, 2017. 6 [18] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising dif-fusion probabilistic models. Advances in neural information processing systems , 33:6840–6851, 2020. 3 [19] Jonathan Ho, William Chan, Chitwan Saharia, Jay Whang, Ruiqi Gao, Alexey Gritsenko, Diederik P Kingma, Ben Poole, Mohammad Norouzi, David J Fleet, et al. Imagen video: High definition video generation with diffusion mod-els. arXiv preprint arXiv:2210.02303 , 2022. 3 [20] Jonathan Ho, Tim Salimans, Alexey Gritsenko, William Chan, Mohammad Norouzi, and David J Fleet. Video dif-fusion models. Advances in neural information processing systems , 35:8633–8646, 2022. 3, 4 [21] Zheng Yi Ho, Siyuan Liang, Sen Zhang, Yibing Zhan, and Dacheng Tao. Novo: Norm voting off hallucinations with attention heads in large language models. arXiv preprint arXiv:2410.08970 , 2024. 1 [22] Anthony Hu, Lloyd Russell, Hudson Yeo, Zak Murez, George Fedoseev, Alex Kendall, Jamie Shotton, and Gian-luca Corrado. Gaia-1: A generative world model for au-tonomous driving. arXiv preprint arXiv:2309.17080 , 2023. 1, 2 [23] Shengchao Hu, Li Chen, Penghao Wu, Hongyang Li, Junchi Yan, and Dacheng Tao. St-p3: End-to-end vision-based au-tonomous driving via spatial-temporal feature learning. In 
+
+European Conference on Computer Vision , pages 533–549. Springer, 2022. 6, 7 [24] Bo Jiang, Shaoyu Chen, Qing Xu, Bencheng Liao, Jiajie Chen, Helong Zhou, Qian Zhang, Wenyu Liu, Chang Huang, and Xinggang Wang. Vad: Vectorized scene representa-tion for efficient autonomous driving. In Proceedings of the 
+
+9IEEE/CVF International Conference on Computer Vision ,pages 8340–8350, 2023. 6, 7 [25] Zonglei Jing, Zonghao Ying, Le Wang, Siyuan Liang, Ais-han Liu, Xianglong Liu, and Dacheng Tao. Cogmorph: Cognitive morphing attacks for text-to-image models. arXiv preprint arXiv:2501.11815 , 2025. 1 [26] Diederik P Kingma. Adam: A method for stochastic opti-mization. arXiv preprint arXiv:1412.6980 , 2014. 5 [27] Dehong Kong, Siyuan Liang, Xiaopeng Zhu, Yuansheng Zhong, and Wenqi Ren. Patch is enough: naturalistic ad-versarial patch against vision-language pre-training models. 
+
+Visual Intelligence , 2(1):1–10, 2024. 1 [28] Yingyan Li, Lue Fan, Jiawei He, Yuqi Wang, Yuntao Chen, Zhaoxiang Zhang, and Tieniu Tan. Enhancing end-to-end autonomous driving with latent world model. arXiv preprint arXiv:2406.08481 , 2024. 2 [29] Yaxuan Li, Yichen Zhu, Junjie Wen, Chaomin Shen, and Yi Xu. Worldeval: World model as real-world robot policies evaluator. arXiv preprint arXiv:2505.19017 , 2025. 1 [30] Jiawei Liang, Siyuan Liang, Aishan Liu, and Xiaochun Cao. Vl-trojan: Multimodal instruction backdoor attacks against autoregressive visual language models. International Jour-nal of Computer Vision , pages 1–20, 2025. 1 [31] Siyuan Liang, Xingxing Wei, Siyuan Yao, and Xiaochun Cao. Efficient adversarial attacks for visual object tracking. In Computer Vision–ECCV 2020: 16th European Confer-ence, Glasgow, UK, August 23–28, 2020, Proceedings, Part XXVI 16 , 2020. 1 [32] Siyuan Liang, Longkang Li, Yanbo Fan, Xiaojun Jia, Jingzhi Li, Baoyuan Wu, and Xiaochun Cao. A large-scale multiple-objective method for black-box attack against object detec-tion. In European Conference on Computer Vision , 2022. 2[33] Siyuan Liang, Baoyuan Wu, Yanbo Fan, Xingxing Wei, and Xiaochun Cao. Parallel rectangle flip attack: A query-based black-box attack against object detection. arXiv preprint arXiv:2201.08970 , 2022. 2 [34] Siyuan Liang, Wei Wang, Ruoyu Chen, Aishan Liu, Boxi Wu, Ee-Chien Chang, Xiaochun Cao, and Dacheng Tao. Ob-ject detectors in the open environment: Challenges, solu-tions, and outlook. arXiv preprint arXiv:2403.16271 , 2024. 1[35] Siyuan Liang, Mingli Zhu, Aishan Liu, Baoyuan Wu, Xiaochun Cao, and Ee-Chien Chang. Badclip: Dual-embedding guided backdoor attack on multimodal con-trastive learning. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 24645–24654, 2024. 1 [36] Aishan Liu, Jun Guo, Jiakai Wang, Siyuan Liang, Renshuai Tao, Wenbo Zhou, Cong Liu, Xianglong Liu, and Dacheng Tao. {X-Adv }: Physical adversarial object attacks against x-ray prohibited item detection. In 32nd USENIX Security Symposium (USENIX Security 23) , 2023. 1 [37] Jiayang Liu, Siyu Zhu, Siyuan Liang, Jie Zhang, Han Fang, Weiming Zhang, and Ee-Chien Chang. Improving adver-sarial transferability by stable diffusion. arXiv preprint arXiv:2311.11017 , 2023. 2 [38] Ming Liu, Siyuan Liang, Koushik Howlader, Liwen Wang, Dacheng Tao, and Wensheng Zhang. Natural reflection back-door attack on vision language model for autonomous driv-ing. arXiv preprint arXiv:2505.06413 , 2025. 1 [39] Jiachen Lu, Ze Huang, Zeyu Yang, Jiahui Zhang, and Li Zhang. Wovogen: World volume-aware diffusion for con-trollable multi-camera driving scene generation. In Eu-ropean Conference on Computer Vision , pages 329–345. Springer, 2024. 2 [40] Liming Lu, Shuchao Pang, Siyuan Liang, Haotian Zhu, Xiyu Zeng, Aishan Liu, Yunhuai Liu, and Yongbin Zhou. Adver-sarial training for multimodal large language models against jailbreak attacks. arXiv preprint arXiv:2503.04833 , 2025. 2 [41] Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, and Adrian Vladu. Towards deep learn-ing models resistant to adversarial attacks. arXiv preprint arXiv:1706.06083 , 2017. 3 [42] OpenAI. Gpt-5 system card. https://cdn.openai. com/gpt- 5- system- card.pdf , 2025. Accessed: 2025-11-13. 6 [43] Ed Pizzi, Sreya Dutta Roy, Sugosh Nagavara Ravindra, Priya Goyal, and Matthijs Douze. A self-supervised descriptor for image copy detection. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 14532–14542, 2022. 4 [44] Dustin Podell, Zion English, Kyle Lacey, Andreas Blattmann, Tim Dockhorn, Jonas M¨ uller, Joe Penna, and Robin Rombach. Sdxl: Improving latent diffusion mod-els for high-resolution image synthesis. arXiv preprint arXiv:2307.01952 , 2023. 5 [45] Xuanchi Ren, Yifan Lu, Tianshi Cao, Ruiyuan Gao, Shengyu Huang, Amirmojtaba Sabour, Tianchang Shen, Tobias Pfaff, Jay Zhangjie Wu, Runjian Chen, et al. Cosmos-drive-dreams: Scalable synthetic driving data generation with world foundation models. arXiv preprint arXiv:2506.09042 ,2025. 1 [46] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 10684–10695, 2022. 2 [47] Lloyd Russell, Anthony Hu, Lorenzo Bertoni, George Fe-doseev, Jamie Shotton, Elahe Arani, and Gianluca Corrado. Gaia-2: A controllable multi-view generative world model for autonomous driving. arXiv preprint arXiv:2503.20523 ,2025. 1, 2 [48] Thomas Unterthiner, Sjoerd Van Steenkiste, Karol Kurach, Raphael Marinier, Marcin Michalski, and Sylvain Gelly. To-wards accurate generative models of video: A new metric & challenges. arXiv preprint arXiv:1812.01717 , 2018. 6 [49] Lening Wang, Wenzhao Zheng, Yilong Ren, Han Jiang, Zhiyong Cui, Haiyang Yu, and Jiwen Lu. Occsora: 4d occupancy generation models as world simulators for au-tonomous driving. arXiv preprint arXiv:2405.20337 , 2024. 2[50] Lu Wang, Tianyuan Zhang, Yang Qu, Siyuan Liang, Yuwei Chen, Aishan Liu, Xianglong Liu, and Dacheng Tao. Black-
+
+10 box adversarial attack on vision language models for au-tonomous driving. arXiv preprint arXiv:2501.13563 , 2025. 1[51] Tai Wang, Xinge Zhu, Jiangmiao Pang, and Dahua Lin. Fcos3d: Fully convolutional one-stage monocular 3d object detection. In Proceedings of the IEEE/CVF international conference on computer vision , pages 913–922, 2021. 6 [52] Wenqiang Wang, Siyuan Liang, Yangshijie Zhang, Xiaojun Jia, Hao Lin, and Xiaochun Cao. No query, no access. arXiv preprint arXiv:2505.07258 , 2025. 2 [53] Xiaofeng Wang, Zheng Zhu, Guan Huang, Xinze Chen, Jia-gang Zhu, and Jiwen Lu. Drivedreamer: Towards real-world-drive world models for autonomous driving. In European conference on computer vision , pages 55–72. Springer, 2024. 1, 2, 5, 6, 7 [54] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang. Driving into the future: Multiview visual forecasting and planning with world model for au-tonomous driving. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 14749–14759, 2024. 1 [55] Zhiyuan Wang, Zeliang Zhang, Siyuan Liang, and Xiaosen Wang. Diversifying the high-level features for better ad-versarial transferability. arXiv preprint arXiv:2304.10136 ,2023. 1 [56] Yuqing Wen, Yucheng Zhao, Yingfei Liu, Fan Jia, Yanhui Wang, Chong Luo, Chi Zhang, Tiancai Wang, Xiaoyan Sun, and Xiangyu Zhang. Panacea: Panoramic and controllable video generation for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 6902–6912, 2024. 1 [57] Jialong Wu, Shaofeng Yin, Ningya Feng, Xu He, Dong Li, Jianye Hao, and Mingsheng Long. ivideogpt: Interactive videogpts are scalable world models. Advances in Neural Information Processing Systems , 37:68082–68119, 2024. 1 [58] Chengwei Xia, Fan Ma, Ruijie Quan, Kun Zhan, and Yi Yang. Adversarial-guided diffusion for multimodal llm at-tacks. arXiv preprint arXiv:2507.23202 , 2025. 3 [59] Yu Yang, Jianbiao Mei, Yukai Ma, Siliang Du, Wenqing Chen, Yijie Qian, Yuxiang Feng, and Yong Liu. Driving in the occupancy world: Vision-centric 4d occupancy forecast-ing and planning via world models for autonomous driving. In Proceedings of the AAAI Conference on Artificial Intelli-gence , pages 9327–9335, 2025. 1 [60] Li Yao, Atousa Torabi, Kyunghyun Cho, Nicolas Ballas, Christopher Pal, Hugo Larochelle, and Aaron Courville. De-scribing videos by exploiting temporal structure. In Proceed-ings of the IEEE international conference on computer vi-sion , pages 4507–4515, 2015. 3 [61] Zonghao Ying, Aishan Liu, Siyuan Liang, Lei Huang, Jinyang Guo, Wenbo Zhou, Xianglong Liu, and Dacheng Tao. Safebench: A safety evaluation framework for multimodal large language models. arXiv preprint arXiv:2410.18927 , 2024. 2 [62] Zonghao Ying, Aishan Liu, Tianyuan Zhang, Zhengmin Yu, Siyuan Liang, Xianglong Liu, and Dacheng Tao. Jailbreak vision language models via bi-modal adversarial prompt. 
+
+arXiv preprint arXiv:2406.04031 , 2024. 1 [63] Tianyuan Zhang, Lu Wang, Xinwei Zhang, Yitong Zhang, Boyi Jia, Siyuan Liang, Shengshan Hu, Qiang Fu, Aishan Liu, and Xianglong Liu. Visual adversarial attack on vision-language models for autonomous driving. arXiv preprint arXiv:2411.18275 , 2024. 1, 2 [64] Zhilong Zhang, Ruifeng Chen, Junyin Ye, Yihao Sun, Pengyuan Wang, Jingcheng Pang, Kaiyuan Li, Tianshuo Liu, Haoxin Lin, Yang Yu, et al. Whale: Towards generalizable and scalable world models for embodied decision-making. 
+
+arXiv preprint arXiv:2411.05619 , 2024. 1 [65] Guosheng Zhao, Chaojun Ni, Xiaofeng Wang, Zheng Zhu, Xueyang Zhang, Yida Wang, Guan Huang, Xinze Chen, Boyuan Wang, Youyi Zhang, et al. Drivedreamer4d: World models are effective data machines for 4d driving scene rep-resentation. In Proceedings of the Computer Vision and Pat-tern Recognition Conference , pages 12015–12026, 2025. 1, 2[66] Guosheng Zhao, Xiaofeng Wang, Zheng Zhu, Xinze Chen, Guan Huang, Xiaoyi Bao, and Xingang Wang. Drivedreamer-2: Llm-enhanced world models for diverse driving video generation. In Proceedings of the AAAI Con-ference on Artificial Intelligence , pages 10412–10420, 2025. 1, 2, 5, 6 [67] Siyuan Zhou, Yilun Du, Jiaben Chen, Yandong Li, Dit-Yan Yeung, and Chuang Gan. Robodreamer: Learning compo-sitional world models for robot imagination. arXiv preprint arXiv:2404.12377 , 2024. 1 
+
+11 When World Models Dream Wrong: Physical-Conditioned Adversarial Attacks against World Models 
+
+# Supplementary Material 
+
+Algorithm 1 PhysCond-WMA algorithm. 
+
+Require: x0, ϵθ (x), ∆, R and C∗ 
+
+> 1:
+
+xatt 0 = Encode (x0, R, C ∗) 
+
+> 2:
+
+Obtain xatt t ← √¯αtxatt  
+
+> 0
+
++ √1 − ¯αt ϵ, ϵ ∼ N (0 , I ) 
+
+> 3:
+
+for t ∈ { T, . . . , 2, 1} do  
+
+> 4:
+
+if t > ∆ then ▷ Quality-Preserving Stage  
+
+> 5:
+
+˜ϵt = ϵt(xt, t ) + αA · ∇ xt Ldiff (xt, xatt  
+
+> t
+
+) 
+
+> 6:
+
+xatt t−1 = denoise( xatt t , ˜ϵt) 
+
+> 7:
+
+L = Ldiff (xt; xatt  
+
+> t
+
+) 
+
+> 8:
+
+if L < τ then  
+
+> 9:
+
+Stage ← Denoising Optimization Stage  
+
+> 10:
+
+end if  
+
+> 11:
+
+else  
+
+> 12:
+
+for t ∈ { ∆, . . . , 2, 1} do  
+
+> 13:
+
+¯ϵt = λϵ t + (1 − λ)∇xt A(xatt  
+
+> t
+
+, C ∗) −
+
+β∇xt Ldiff (xt, x att  
+
+> t
+
+) 
+
+> 14:
+
+xatt t−1 = denoise( xatt t , ˜ϵt) 
+
+> 15:
+
+end for  
+
+> 16:
+
+end if  
+
+> 17:
+
+end for  
+
+> 18:
+
+Output: An attacked video xatt  
+
+> 0
+
+= Decode (xatt 0 )
+
+# 7. Algorithm of PhysCond-WMA 
+
+We provide the algorithm of the targeted PhysCond-WMA in Algorithm 1. 
+
+# 8. Target Generation 
+
+We employ an SDXL-based inpainting model to inject addi-tional objects into driving-scene images. Specifically, given a clean frame, we first define a binary mask over the target region and construct a text prompt describing the object to be inserted. Next, we feed the original image, the mask, and the text prompt into the SDXL inpainting pipeline, which keeps the unmasked area fixed while regenerating only the masked region under the textual condition so that the new object is geometrically and photometrically consistent with the surrounding scene. Finally, we decode and composite the inpainted result with the original image to obtain edited frames where additional vehicles or traffic signs are seam-lessly integrated, which are then used as targets for our ex-periments. The target examples is shown in Fig.8. For example, the prompt of (a) is : A realistic daytime campus road scene in front of a modern building. Add a large yellow rectangu-lar traffic warning sign in the left foreground on the side-
+
+> Figure 8. Visualization of target generation.
+
+walk, mounted on a silver pole, with the black text ”SLOW DOWN” in bold capital letters. Keep the original pedes-trians and background unchanged, natural lighting, high-resolution photo. 
+
+The prompt of (b) is : A realistic daytime city street scene with red-brick buildings on both sides and a crosswalk ahead. Add a silver mid-size sedan driving away from the camera in the center of the nearest lane, aligned with the yellow lane markings, slight motion blur on the wheels. Keep the pedestrians, traffic lights, buildings, and back-ground cars unchanged, match the original lighting, color tone and perspective of the photo. 
+
+# 9. ASR Evaluation 
+
+In this section, we provide a detailed introduction to two different ASR evaluation methods, including GPT and Hu-man. 
+
+9.1. ASR(GPT-5) 
+
+Firstly, we process the results and extract all frames of the generated video, including multi-views. Using all frames without subsampling, a rater assigns per-view scores on three axes with higher values indicating worse qual-ity/safety: (1) Semantic Level: whether key traffic elements, includ-ing vehicles, pedestrians, traffic lights/signs, lane markings, drivable area, remain clearly discernible. At the same time, the frame should be clear and recognizable; (2)Logical Level: absence of discontinuities such as pop-in/out, teleportation, implausible scale/pose changes, or placement in physically impossible locations. For example, a person sppears in the middle of the road; (3)Decision Level: whether the ego-vehicle’s behavior 1is appropriate when risks occur (obstacles, pedestrians, slow/lead vehicles, red lights). For example, timely slow-ing, stopping, headway keeping, or reasonable lane change. Each axis uses the discrete set 0, 0.2, 0.4, 0.6, 0.8, 1, where 0 = best and 1 = worst. If no salient risk appears throughout a clip, sdec = 0.2 by convention; if frames are insufficient to judge a dimension, 0.6 may be used as an “uncertain” placeholder. We average each axis across the six views to obtain ¯ssem , ¯slog , ¯sdec and report the overall score S = (¯ ssem + ¯slog + ¯sdec )/3 on a 0–1 scale. An attack is deemed successful if S > 0.5. The prompt for ASR(GPT) is shown in Fig.9. 
+
+9.2. ASR(Human) 
+
+Given that automated metrics may not accurately reflect human judgments of attack success, we also incorporate a manual evaluation process to compare the effectiveness of GPT-5’s assessments with human judgments. We recruit 20 volunteers for the assessment, all of whom must be at least 18 years old, in good physical and mental health, and free from conditions such as heart disease or vasovagal syncope. Before the assessment, we present definitions and examples of each level of attack success to the volunteers. Volun-teers view full videos on 22-24 inch monitors. Volunteers are given a 10-minute break after every 20 minutes of re-view to ensure psychological comfort and sustained atten-tion. Each video receives evaluations from at least two vol-unteers. Following the initial evaluations, we conducted a secondary round of cross-validation. The detailed survey questionnaire is shown in Fig.10. 
+
+# 10. Results 
+
+More attacked results are provided in the ZIP file. The reasons why each result is considered a successful attack are as follows: (1)Wrongly generated the speed of movement while waiting for the red light. (2)Incorrect semantics were generated, and the opposing vehicle changed from a bus to a truck. (3)Wrong decision, not slowing down at the intersection. (4)Wrongly generated the speed of movement while waiting for the red light. (5)Wrongly generated the speed of movement while waiting for the red light. (6)Incorrect semantic generation, loss of pedestrian cross-ing lines on the road surface. (7)Incorrect semantic generation, resulting in the car being turned into a truck. (8)Incorrect semantic generation, missing road markers in the video. (9)Wrong decision, changing lanes to the left without slowing down. (10)Incorrect semantic generation, unclear ground mark-ings. 2Figure 9. The prompt of ASR(GPT) Evaluator. 
+
+3Figure 10. The survey questionnaire of ASR(Human) Evaluator. 
+
+4

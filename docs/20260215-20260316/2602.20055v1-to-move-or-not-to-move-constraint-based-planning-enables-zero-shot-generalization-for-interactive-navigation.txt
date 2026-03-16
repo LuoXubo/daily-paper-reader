@@ -1,0 +1,575 @@
+Title: To Move or Not to Move: Constraint-based Planning Enables Zero-Shot Generalization for Interactive Navigation
+
+URL Source: https://arxiv.org/pdf/2602.20055v1
+
+Published Time: Tue, 24 Feb 2026 03:17:07 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# To Move or Not to Move: Constraint-based Planning Enables Zero-Shot Generalization for Interactive Navigation 
+
+# Apoorva Vashisth Purdue University USA 
+
+vashista@purdue.edu 
+
+# Manav Kulshrestha Purdue University USA 
+
+mkulshre@purdue.edu 
+
+# Pranav Bakshi IIT Kharagpur India 
+
+pb@gmail.com 
+
+# Damon Conover DEVCOM Army Research Lab USA 
+
+damon.m.conover.civ@army.mil 
+
+# Guillaume Sartoretti ∗
+
+# National University of Singapore Singapore 
+
+guillaume.sartoretti@nus.edu.sg 
+
+# Aniket Bera ∗
+
+# Purdue University USA 
+
+ab@cs.purdue.edu “Bring RedBottle to Desk2” 
+
+Initial Scene    
+
+> 1234
+
+Plan Execution 
+
+Figure 1. Demonstration of our approach deployed on the Boston Dynamics Spot robot. The left image shows the region of the environment that is the robot’s operating area for the current task, initially unknown. The robot first observes the scene and determines presence of task-relevant objects (Bottle and Desk in this case). Based on the observations and the current task progress, the robot determines the best course of action (“Bring RedBottle to Desk2”). Here, based on the current episode progress ( 4 out of total 20 tasks completed) and cost-benefit analysis (moving potential clutter vs directly completing the task), it decides to first optimize the environment by moving clutter (the paper towel roll) and storing it at a carefully chosen spot out of the way (the black box). The robot is then able to place the red bottle on the desk. 
+
+# Abstract 
+
+Visual navigation typically assumes the existence of at least one obstacle-free path between start and goal, which must be discovered/planned by the robot. However, in real-world scenarios, such as home environments and ware-houses, clutter can block all routes. Targeted at such cases, we introduce the Lifelong Interactive Navigation problem, where a mobile robot with manipulation abilities can move clutter to forge its own path to complete sequential object-placement tasks – each involving placing an given object (eg. Alarm clock, Pillow) onto a target object (eg. Dining table, Desk, Bed). To address this lifelong setting – where effects of environment changes accumulate and have long-term effects – we propose an LLM-driven, constraint-based planning framework with active perception. Our framework allows the LLM to reason over a structured scene graph of discovered objects and obstacles, deciding which object to 
+
+> *These authors jointly supervised this work.
+
+move, where to place it, and where to look next to discover task-relevant information. This coupling of reasoning and active perception allows the agent to explore the regions ex-pected to contribute to task completion rather than exhaus-tively mapping the environment. A standard motion planner then executes the corresponding navigate–pick–place, or detour sequence, ensuring reliable low-level control. Eval-uated in physics-enabled ProcTHOR-10k simulator, our ap-proach outperforms non-learning and learning-based base-lines. We further demonstrate our approach qualitatively on real-world hardware 1.
+
+# 1. Introduction 
+
+Visual navigation has achieved remarkable progress in re-cent years via advances in embodied simulation [9], gen-erative models [1, 36], and deep learning [15, 22]. How-ever, most navigation systems assume that there exists at 
+
+> 1We will release our code and dataset upon acceptance.
+> arXiv:2602.20055v1 [cs.RO] 23 Feb 2026
+
+least one obstacle-free path between start and goal loca-tions. This assumption holds in idealized cases, but may not hold in real-world scenarios such as homes and ware-houses, where clutter, furniture, and everyday objects can obstruct all routes to the goal. In such settings, navigation alone is insufficient and robots must take agency over their environment rather than merely reacting to it. With mod-ern mobile manipulators increasingly equipped with arms, grippers, and perception modules, they are no longer just sensors on wheels but embodied agents capable of reshap-ing their surroundings to achieve their goals. In these cases, an agent must do more than navigate: it must reconfigure its environment to make progress. Existing visual navigation frameworks are typically brit-tle under such conditions. Reactive planners [5, 13] often detour around occlusions, while learned policies [16, 28] fail to generalize to new environments. Interactive naviga-tion methods [30, 35] have begun to address this gap, but are commonly defined for a single task at a time, often pre-arranged such that interaction is the only solution, and as-sume full observability of the environment. In contrast, real robots face sequential streams of tasks in the same dynamic space, where each decision (to move or not to move an ob-ject) carries lasting consequences for future goals. In this work, we introduce the Lifelong Interactive Nav-igation problem, where a mobile manipulator receives a se-quence of navigation-and-manipulation objectives in an un-known environment, each requiring placement of a given object (eg. Basketball, Alarm Clock) onto a target object (eg. Bed, Arm Chair). This requires the agent to continu-ously reason about where to explore, which obstacles to re-move, which to bypass, and future impact of these choices. Crucially, planning and perception are tightly coupled: the agent not only plans about how to act but also where to look next to reveal task-relevant objects. While moving obstacles could open up previously unavailable routes at a nontrivial manipulation cost, detouring may save effort while restrict-ing future mobility. Success thus depends not only on short-term feasibility but also on long-horizon, perception-aware reasoning over the evolving environment. Large language models can reason over structured and semantic inputs, with their strengths demonstrated in ab-stract reasoning rather than in producing fine-grained con-trol sequences. Our key insight is to invert the typical in-terface between language models and embodied agents: we recast the LLM’s role from action sequence generator to a constraint reasoner, operating over the structure of the envi-ronment. Our structured scene graph, continuously updated with perceptual feedback to include new objects, rooms, and spatial relationships, serves as the LLM’s input repre-sentation. The frozen LLM then treats each blocking object as a decision point and determines whether to intervene – i.e., whether moving the obstacle will substantially expand navigable space given the movement cost – or if it can be safely detoured around without significant impact on long-term performance. By re-framing planning as constraint resolution problem, we transform long-horizon reasoning from chaining low-level steps into making a small number of strategic, semantically grounded decisions. This shift en-ables zero-shot LLM planning, without task-specific fine-tuning, while tightly coupling perception and reasoning. Building on this constraint-driven formulation, we eval-uate our framework in the ProcTHOR-10k [4] simulator, which offers visually rich, physics-enabled conditions. Our task suite is augmented with cluttered object configurations across environments consisting of up to ten rooms. Each episode involves sequential tasks (e.g., bringing object X to receptacle Y), where the robot receives each new task only after completing the previous one. The robot has no prior knowledge of future tasks – if it fails to complete a task, the episode terminates immediately, and it does not receive any subsequent tasks. Hence, later in the episode, success depends not only on efficient exploration but also on strate-gic environment modification, as earlier decisions (such as whether to move or detour around obstacles) can signifi-cantly influence accessibility to regions containing the tar-get objects, and later progress. By evaluating our system in this online task sequence framework, we test the real-world applicability of our approach, which must adapt in real time without knowledge of future goals. The key contributions of our work include: • Lifelong Interactive Navigation: Extending prior interac-tive navigation problem to long-horizon, sequential tasks in unknown environments. • Constraint-based planning framework: Shifting the deci-sion space from low-level actions to high-level environ-mental constraints, enabling zero-shot long-horizon rea-soning by large language models. • Our method achieves the highest Long-term Efficiency Score (LES), improving over the strongest non-learned baseline by 20 − 50% , and outperforming prior interac-tive navigation methods by 3−6× in larger environments. 
+
+# 2. Related Work 
+
+Embodied and Visual Navigation . Visual navigation has been extensively studied as mapping observations to actions under the implicit assumption of existence of at least one obstacle-free path between start and goal. Early works and benchmarks such as Cognitive Mapping and Planning [7], Target-driven Navigation [40], AI2-THOR [9], Gibson [33], Habitat [19, 26], and ProcTHOR [4] have driven progress toward robust policies in visually rich, partially observed environments. Subsequent methods improve exploration and representation via generative models, memory, and structured scene reasoning [1, 10, 12, 21, 36–38], and tackle image-goal, language-driven, and multi-object navigation [6, 14, 25, 29, 34, 39]. However, these methods treat the environment as static and ultimately traversable: agents search more efficiently, predict unseen regions, exploit priors over layouts, or decompose the task, but if all geometric routes to the goal are blocked by clutter, they can only attempt detours or fail. In contrast, our problem setting explicitly targets cluttered, potentially non-traversable environments, enabling a mobile manipulator to reason about “whether, where and which” obstacles to move, reconfiguring the environment to restore or improve connectivity for long-horizon task sequences. 
+
+Interactive Navigation & Navigation Among Movable Obstacles (NAMO) . A parallel line of work studies Nav-igation Among Movable Obstacles, where an agent may re-locate objects to reach a blocked goal. Classical NAMO and rearrangement planners search over joint spaces of robot motion and obstacle configurations [2, 3, 11, 17, 18, 23, 24, 32], but assume full knowledge of geometry and dynamics, small number of obstacles, and short horizons, while opti-mizing reaching a single goal rather than reasoning about persistent environmental changes or future tasks. Interac-tive navigation approaches bring these ideas into embodied setting: Interactive Gibson [33] provides benchmarks for in-teraction in clutter; InterNav [35] and CaMP [30] learn how to move blocking objects based on visual input. Interactive-FAR [8], IN-Sight [20], ADIN [31], SPIN [27], and related systems for legged manipulators or human-in-the-loop as-sistance explore fast heuristics, affordances, or uncertainty-aware querying for interactive routing. However, these systems remain fundamentally reactive: their objective is to locally circumvent or temporarily push aside visible obstacles rather than reason about how envi-ronment modifications influence future accessibility. They are typically designed per-episode and per-task, often in cluttered scenes constructed to necessitate one-off interac-tions. Once the sole task is achieved, the episode ends and the environment resets, eliminating any need to con-sider the long-term consequences of manipulation. As a result, these methods focus on short-horizon obstacle re-moval rather than persistent environment restructuring. In contrast, our Lifelong Interactive Navigation framework op-erates in a sequential, no-reset setting where each decision carries lasting impact. The agent must determine not only “which” obstacles to move but also “where” to place them and “when” to refrain from interaction, reasoning over both spatial constraints and perceptual uncertainty to maximize long-term connectivity and task efficiency in a single evolv-ing environment. 
+
+# 3. Our Approach 
+
+Overview. We target the Lifelong Interactive Navigation setting introduced in Sec. 1, where a mobile manipulator receives a sequence of navigation-and-manipulation tasks in an initially unknown, cluttered environment. The central challenge is that not all tasks are reachable by pure navi-gation: some obstacles must be moved, some rooms must be explored, and each intervention can affect future tasks. To handle this, we decouple strategic long-horizon choices from tactical low-level control. At time t, the agent maintains a partial environment state Et = ( Ot, Rt), where Ot is the set of discovered ob-jects/rooms and Rt encodes their blocking and reachability relations. Our large language model (LLM) operates on a structured textual serialization of Et and reasons about how to resolve the current environmental constraints – deciding, for example, which obstacle to relocate, where to place it, or which room to investigate next. These high-level constraint resolutions are then converted by a low-level planner into concrete navigation and manipulation ac-tions. Hence, we recast the LLM as a constraint reasoner over the environment: it determines “what to change in the world” rather than “how to move the robot step by step”. 
+
+Perception and structured scene construction. In this work, we assume that the general floor plan is known, but that room contents are unknown at first. We define a grid-graph G = ( N, E ) that denotes the currently traversable re-gion of the world. Here, nodes N correspond to the cells that the robot can occupy and edges E connect adjacent free cells, forming the basis for all path and connectivity computations. The environment is discovered incremen-tally through obtained RGB-D observations. After each view, the perception module detects visible objects and free space, and updates the grid-graph G with new traversable nodes, and a structured scene representation that also main-tains the set of known yet unexplored rooms. Although the total number of rooms and their topological adjacencies are known from the underlying floorplan, the contents of each room and the traversability of the connecting passages must be inferred through exploration. We represent the world state at time t as a directed graph 
+
+Et = ( Ot, Rt), where nodes correspond to discovered ob-jects or rooms, and edges encode blocking relations be-tween them (e.g., an object obstructs the shortest path to another). Formally, for oi, o j ∈ O t,
+
+Cij =
+
+(
+
+1, if oi blocks the shortest path to oj ,
+
+0, otherwise. (1) We utilize the grid graph G to describe the impact of an obstacle object on the navigability of the region. Let 
+
+n(oi) ∈ N denote the node occupied by oi. We compute Bring Pillow to ArmChair    
+
+> Perception
+> Large
+> Language
+> Model "Book1 -> Desk,
+> Bowl1 -> ArmChair2
+> Book2 -> Desk,
+> Pillow -> ArmChair2"
+> "Pillow blocks Book2 blocks Bowl1, Book1 blocks ArmChair2, detour cost > clearing shortest path, early in episode..."
+> "Explore Bedroom to find ArmChair2 and Pillow"
+> "Bedroom likely to contain ArmChair and Pillow"
+> Low Level Planner
+> Desk
+> ArmChair
+> Pillow
+> Bowl1
+> Book2 Book1
+> Scene Graph of the Observed Environment
+> Environment
+> Observations Executable Actions High-level Plan
+
+Figure 2. Overview of our constraint-based planning framework for interactive navigation. At each timestep, our agent receives observa-tions from the environment, which are utilized by our perception module to update the scene graph. Our scene graph contains the observed objects of the environment as nodes and the blocking relation among them as edges. Each node has its own attributes, which provide ad-ditional navigability and manipulability context to the LLM. The LLM then decides whether to explore the environment further to collect additional information or to attempt to complete the given task based on the scene graph content and the environment constraints. 
+
+the (normalized) betweenness centrality of n(oi):
+
+bc( n(oi)) = 1
+
+Z
+
+X
+
+> s̸=t∈Ns̸=n(oi)̸=t
+
+|σst (n(oi)) ||σst | ,
+
+where |σst | is the cardinality of the set of shortest paths 
+
+σst between any node s and any node t where s̸ = t,
+
+|σst (n(oi)) | is the cardinality of the subset of the short-est paths that pass through n(oi), σst (n(oi)) , and Z is a normalization constant. This measures how many short-est paths depend on the node occupied by oi, and thus how many paths would potentially become available if oi were removed. In our representation Et, each object node oi ∈ O t is augmented with attributes that capture both geometric and topological context for decision-making: (i) the cost of traversing the shortest path to the object, if it exists; (ii) the set of discovered objects that block this path, represented via Cij = 1; (iii) the betweenness centrality bc( n(oi)) 
+
+of the grid cell occupied by the object in the grid graph 
+
+G = ( N, E ), measuring its influence on global connectiv-ity; (iv) the cost of an alternative path that avoids all current blockers, if it exists. All path computations are performed on G, where only nodes and edges corresponding to currently observed free space are treated as traversable; unknown regions are never assumed passable until they are discovered. Unseen rooms are maintained as frontier nodes, serving as exploration candidates. After each executed action, Et is updated to incorporate newly discovered objects, newly navigable rooms, revised exploration status, and obstacles that have been successfully removed. 
+
+LLM as a constraint-based planner. Given this text de-scription of the scene graph, we use a frozen LLM to select the next high-level step. Intuitively, every blocking object is a decision point: should this object be relocated now, and if so, where, or can it be bypassed without significantly harm-ing long-term performance? We formalize this as a cost-benefit selection over blocking objects. For a candidate obstacle oi, we define a removal cost that accounts for both the effort of manipulating the object and the effort of relocating it to a valid drop zone. To ensure they can be appropriately compared, both navigation and manipulation costs are estimated in terms of time: 
+
+cost( oi, r t, z j ) = d(rt, o i) + 2 × e(oi) + d(oi, z j ),
+
+where d : N ×N → R+ describes the time taken to traverse the geodesic distance between two nodes. Hence, d(rt, o i)
+
+is the cost of navigating from the robot’s current position to the obstacle, e(oi) summarizes the manipulation effort for object oi (time required to pick and place an object due to its physical attributes such as size and weight), and d(oi, z j )
+
+is the cost of navigating the path from the obstacle’s po-sition to a feasible drop zone zj . The values of d(rt, o i)
+
+and d(oi, z j ) are estimated from the paths on the grid graph 
+
+G. In our experiments, we use a static manipulation cost 
+
+e(oi) = 5 .00 (seconds) (counted twice for pick-and-place actions). This setting reflects our empirical observation that a pick/place cycle – including approach, alignment, grasp execution, verification, and safety pauses – dominates base travel time, and therefore the cost function should gener-ally favor clearing tasks via short navigation movements over initiating unnecessary manipulations. The LLM rea-sons jointly over candidate pairs (oi, z j ), evaluating both the effort required to clear the object and the suitability of each drop zone (whether it is accessible, obstacles on the path, their attributes and their valid drop zones, etc.). We also present an ablation that varies the value of e to mea-sure the sensitivity of our approach to this hyperparameter. Conceptually, the planner is approximating the rule 
+
+o⋆, z ⋆ = arg min  
+
+> oi∈O t, z j∈Z t
+
+ cost( oi, r t, z j ) − bc( n(oi)) , (2) and issues a Pick-and-Place action sequence for o⋆ when this trade-off is favorable. This formulation lets the LLM reason not only about which obstacle to move, but also where to place it, balancing manipulation cost, travel dis-tance, and long-term navigability. When no obstacle offers a sufficient gain, the planner first queries the current grid graph G to determine whether an alternate, collision-free path to the goal exists. If such a detour exists, the agent proceeds with a standard navigation sequence using the low-level planner, completing the task without manipulating any obstacles. If a detour does not exist, the planner attempts to move the minimum number of obstacles that would restore connectivity to achieve the task. if the goal objects have not been discovered, the plan-ner initiates a task-directed. In this stage, the agent reasons over the set of known but unexplored (or partially explored) rooms and selects the next room to visit based on its se-mantic relevance to the current task. Specifically, given a task such as “bring vase to dining table”, the planner priori-tizes rooms whose semantic types make them more likely to contain the missing entities (e.g., Living Room or Kitchen over Bathroom or Bedroom). Once the relevant objects have been discovered, the planner evaluates the connectiv-ity between them. The planner identifies which obstacles block the paths and using the obstacle attribute, their drop zone attributes, manipulation costs, and number of remain-ing tasks, decides which obstacle to move and where. While Eq. (2) defines a quantitative heuristic that balances manipulation cost with connectivity gain, it alone cannot capture the higher-order relational and semantic dependencies present in the environment. For example, deciding whether to move an obstacle depends on several factors such as remaining future tasks, long-term cost of detouring around the obstacle (if not moved), immediate cost of moving, and contextual constraints such as avail-able drop zones and unexplored regions. Hence, in our framework, the LLM operates as a constraint reasoner, combining these quantitative estimates with commonsense and task-level reasoning to generate interpretable, semanti-cally grounded plans that generalize beyond the scope of a fixed heuristic. 
+
+Low-level planning and closed-loop execution. The ex-ecution of the LLM’s output plan is delegated to a stan-dard motion stack that outputs a sequence of executable ac-tions [a0 
+
+> t
+
+, a 1 
+
+> t
+
+, a 2 
+
+> t
+
+, · · · ]. For navigation, we run a Dijkstra-based planner over the currently discovered and reachable subgraph to obtain collision-free paths to the target ob-jects, obstacle objects, rooms, or drop zones. For manip-ulation, we treat pick-place as a reliable primitive provided by the underlying robot control stack, and assume that des-ignated objects have sufficient free space for placement. This separation of concerns lets the LLM focus on long-horizon, semantically meaningful choices about which con-straints to resolve (which object to move, where to relocate it, and when to explore), while the low-level planner ensures reliable navigation and manipulation control in cluttered, physics-enabled environments under our assumptions. 
+
+# 4. Experiments 
+
+4.1. Setup 
+
+Dataset. We first constructed a new dataset of cluttered in-door floors by instantiating ProcTHOR-10 k simulator with procedurally generated clutter. We generate 10 k episodes with 20 tasks each, following the Lifelong Interactive Navigation setup described in Sec. 1. For our test set, we randomly draw 100 environments equally distributed among the number of rooms 1 − 10 . Following previous works [30], we group the environments by floorplan complexity and report the results in three categories: 1 − 3,
+
+4 − 6, and 7 − 10 . To generate realistic clutter in the environment, we occlude a percentage of traversable nodes (based on floorplan area) in the grid graph G = ( N, E ) of an environment without obstacles, where the probability of a node n ∈ N being selected for occlusion is proportional to its betweenness centrality bc( n). This biases obstacle placement toward structurally critical regions such as hallways, bottlenecks, and intersections, without determin-istically blocking all high-centrality nodes. Please refer to Appendix A for dataset visualization. 
+
+Evaluation Metrics. Our framework jointly optimizes three complementary objectives: (i) the success rate SR = 
+
+> 1
+> Nepisodes
+
+PNepisodes   
+
+> k=1
+> N(k)
+> success
+> N(k)
+> goals
+
+, reflecting the agent’s ability to com-plete assigned tasks (where N (k) 
+
+> success
+
+and N (k) 
+
+> goals
+
+denote the number of successfully completed and total assigned goals in episode k, respectively.); (ii) the time efficiency, mea-sured by the number of timesteps required to finish each episode TS = 1
+
+> Nepisodes
+
+PNepisodes  
+
+> k=1
+
+Tk, (where Tk is the total number of timesteps in episode k); and (iii) the long-term environmental efficiency for navigation, which quantifies Methods 1 − 3 rooms 4 − 6 rooms 7 − 10 rooms                                                                                        
+
+> SR ↑PoC ↓TS ↓LES ↑SR ↑PoC ↓TS ↓LES ↑SR ↑PoC ↓TS ↓LES ↑
+> InterNav 16 .67 1.96 842 .00 0.0764 6.00 2.13 4700 .70 0.0037 3.00 3.34 6089 .91 0.0024
+> Always Detour 90 .45 1.96 665 .64 0.3788 83 .18 2.15 1115 .27 0.1644 64 .09 3.43 1381 .61 0.0661
+> Always Interact 100 .00 1.14 1108 .88 0.4082 100 .01.13 2416 .67 0.1707 100 .00 1.36 3974 .88 0.0943
+> Clean + S/P 100 .00 1.00 1200 .48 0.4297 100 .00 1.00 2622 .94 0.1714 100 .00 1.00 5169 .58 0.0841
+> Ours (unk) 88 .94 1.48 1339 .36 0.2753 81 .67 1.81 3211 .20 0.0598 62 .27 2.79 4497 .80 0.0344
+> Ours (known) 94 .55 1.50 1044 .55 0.3322 97 .73 1.25 1911 .97 0.1945 100 .00 1.23 2435 .48 0.1574
+> Table 1. Comparison of our approach with baselines across different floorplans. ↑indicates higher value is better for the metric, ↓indicates lower value is better for the considered metric. Bold indicates the best performance of the metric, while underline indicates second-best performance. Bold and underline is the best performance for the primary evaluation metric LES.
+
+how the agent’s actions improve or degrade future navi-gability of the environment. As explained in Appendix B, we describe the last term using the ratio of the cumulative shortest-path lengths in the current cluttered environment to those in an obstacle-free configuration, termed as Price of Clutter - PoC =    
+
+> P
+> s,t ∈Vdobs (s,t )
+> P
+> s,t ∈Vdfree (s,t )
+
+, where dobs (s, t ) is the shortest-path distance between nodes s and t in the cluttered environment, and dfree (s, t ) is the corresponding distance in the obstacle-free floorplan. While SR captures immediate task performance and TS measures execution speed, long-term optimization empha-sizes maintaining a structured, uncluttered environment that facilitates subsequent tasks. To consolidate these competing objectives into a single measure, we introduce the globally normalized composite metric termed Long-term Efficiency Score (LES) which explicitly models the trade-off between short-term success (SR), temporal efficiency (TS), and sus-tainable environment restructuring (PoC): LES = SR / max( SR )(TS / min( TS )) × (PoC / min( PoC )) . (3) A high LES indicates that a policy not only succeeds at the current task efficiently but also preserves or enhances the environment for future interactions. In this way, LES provides a holistic evaluation of an agent’s balance between immediate task completion, execution speed, and long-term environmental foresight. A high SR increases LES, while large TS or PoC reduce it, preventing any method from appearing artificially superior by favoring either short-term speed at the expense of completeness or exhaustive search at the expense of efficiency. We describe our metric LES in more detail in Appendix C. 
+
+4.2. Baseline Comparison 
+
+We compare our method against three heuristic baselines and one learning-based method, using identical goal se-quences and obstacle placements. Since the four baselines assume ground-truth knowledge of the environment, we ex-pose this information to one of our variants and thus report metrics for two versions of our approach - Ours(unk), which has no a priori knowledge of the world and must explore the environment, and Ours (known), which has ground-truth knowledge of the world. Our baselines are -• InterNav (learning-based) [35]: A policy trained end-to-end for interactive navigation. • Always Detour : Never interacts with an obstacle and at-tempts to complete tasks using pure navigation. • Always Interact : On encountering a blocking object along the shortest path to the goal, move the obstacle to the nearest valid drop zone. • Clean + S/P : First removes all obstacles in the environ-ment by relocating them to their nearest drop zones, then completes all tasks along (now available) shortest paths. Tab. 1 summarizes the performance of the considered ap-proaches. We report SR, TS, PoC, and LES across all floor-plans. Across all rooms, ‘InterNav’ [35] performs worst as it has been designed for single-episode, short-horizon, lo-cal obstacle-clearing in small, cluttered rooms. When de-ployed in our multi-room, long-horizon environment with sequential manipulation tasks where success in future tasks is heavily dependant on past actions, it breaks down. In small layouts ( 1 − 3 rooms), the exhaustive strategies ‘Al-ways Interact’ and ‘Clean + S/P’ obtain slightly higher LES than ours: with few rooms and short horizons, aggressive cleanup is not heavily penalized. However, as complexity increases ( 4 − 6 and 7 − 10 rooms), our method consistently achieves the highest LES, while the baselines deteriorate. ‘Always Interact’ and ‘Clean + S/P’ maintain high SR and low PoC, but suffer drastic growth in TS, resulting in low efficiency. Always Detour attains short TS but suffers for never resolving constraints with poor PoC and degraded SR. In contrast, our approach maintains strong SR with substan-tially lower TS than exhaustive cleanup and markedly better PoC than non-interactive detouring, indicating selective ma-nipulation of structurally important obstacles. The gap be-tween our two variants (known/unknown) reflects the intrin-sic penalty of partial observability, where the agent must ac-tively explore to infer the environment’s structure, incurring additional time costs and occasionally making suboptimal Manipulation Effort 1 − 3 rooms 4 − 6 rooms 7 − 10 rooms                                                                                                                                                                  
+
+> SR ↑PoC ↓IE PL (m) ↓SR ↑PoC ↓IE PL (m) ↓SR ↑PoC ↓IE PL (m) ↓
+> e= 1 92 .58 1.44 42 .21 302 .73 83 .79 1.46 41 .09 646 .35 65 .45 2.65 36 .09 999 .48
+> e= 5 85 .30 1.48 36 .31 295 .04 79 .55 1.81 38 .48 825 .78 69 .09 2.79 32 .09 1057 .96
+> e= 10 92 .42 1.53 23 .27 301 .07 80 .45 1.62 39 .76 809 .92 60 .61 2.94 25 .48 1211 .33
+> e= 15 91 .21 1.59 15 .33 287 .38 80 .91 1.87 21 .88 822 .90 63 .39 3.00 20 .89 1037 .37
+> e= 20 92 .88 1.62 9.58 259 .63 78 .48 1.90 21 .36 715 .82 60 .30 2.95 18 .58 1078 .59
+> Table 2. Effect of varying manipulation effort eon the behavior of our constraint-based LLM planner. ↑indicates higher value is better, ↓
+> indicates lower value is better. Bold indicates the best performance of the metric while underline indicates second-best performance.
+> History Length 1−3rooms 4−6rooms 7−10 rooms
+> SR ↑PoC ↓TS ↓LES ↑SR ↑PoC ↓TS ↓LES ↑SR ↑PoC ↓TS ↓LES ↑
+> h= 1 89 .85 1.44 1793 .97 0.3634 78 .94 1.67 3516 .03 0.0929 55 .00 2.71 5641 .48 0.0288
+> h= 3 88 .18 1.49 1492 .15 0.3818 71 .36 1.73 2926 .48 0.1153 64 .59 2.78 3334 .70 0.0427
+> h= 6 91 .88 1.52 1444 .21 0.3990 77 .12 1.80 3175 .39 0.0942 57 .43 2.91 3996 .73 0.0411
+> h= 9 92 .88 1.52 1403 .88 0.4025 75 .40 1.45 2634 .03 0.1418 53 .24 2.79 1228 .72 0.0426
+> Table 3. Effect of varying historical context length hon the behavior of our approach. ↑indicates higher value is better for the metric,
+> ↓indicates lower value is better for the considered metric. Bold indicates the best performance of the metric while underline indicates second-best performance. Bold and underline is best performance for the primary evaluation metric LES.
+
+manipulation choices due to incomplete information. This effect compounds with scene complexity, as larger floor-plans require disproportionately more exploration to reveal critical bottlenecks. Hence, our constraint-based planner emerges as the most effective strategy for lifelong interac-tive navigation. We provide the implementation details for our baselines in Appendix D, and additional performance analyses in Appendix E. 
+
+4.3. Analyses 
+
+a. Effect of Manipulation Cost: To examine the behav-ior of our planner as the cost of manipulating objects e in-creases, we systematically vary the per-object manipulation cost e ∈ [1 , 5, 10 , 15 , 20] and measure SR, PoC, and to-tal distance traversed by the robot (PL) across the test set (Tab. 2). We report an additional metric of Interaction En-counters (IE) that describes the percentage of obstacles the agent chose to move during the episode. As the value of e
+
+increases, IE decreases sharply across all settings, approxi-mately 4× between e = 1 and e = 20 , demonstrating that the agent actively avoids unnecessary manipulation when it is costly to do so. Correspondingly, PoC rises, indicat-ing that the planner tolerates higher clutter levels instead of restoring full connectivity at excessive expense. Despite this trade-off, SR remains largely stable, showing that the LLM-driven reasoning identifies and removes only critical obstacles essential for task completion. Path length (PL) also either remains bounded or slightly decreases, suggest-ing that when manipulation is de-incentivized, the agent ef-fectively compensates by discovering alternate routes rather than interacting with high-cost obstacles. Overall, our re-sults confirm that our constraint-based planner internalizes manipulation cost and dynamically strategizes by favoring selective, high-impact interactions over exhaustive environ-ment cleanup, without significant degradation in SR. 
+
+b. History Length: We analyze how the amount of prior context h affects performance using LES as the primary metric (Tab. 3). In 1 − 3 rooms, LES increases monoton-ically with h (from 0.363 at h = 1 to 0.403 at h = 9 ), reflecting slightly higher SR and markedly lower TS as the planner reuses past decisions and avoids redundant explo-ration/manipulation. In 4 − 6 rooms, LES improves sub-stantially with longer histories (peaking at 0.142 for h = 9 ). Although SR fluctuates, both TS and PoC benefit from bet-ter global consistency – longer context helps the LLM recall earlier constraints and target fewer, more central obstacles. In 7 − 10 rooms, h = 3 and h = 9 yield the top LES values and are essentially tied; the gain at h = 9 is contributed by a dramatic reduction in TS (while maintaining comparable SR and PoC), indicating that extended context accelerates progress once the agent has accumulated a rich constraint history. Overall, longer histories improve or match the best LES across all floorplans, as additional context sharpens constraint reasoning: the planner avoids revisiting explored frontiers, concentrates interactions on high-impact bottle-necks, and reduces detours—thereby balancing success, ex-ecution time, and long-term environment optimality. 
+
+c. Effect of Language Model Choice: We further eval-uate the impact of different large language models within our framework in Tab. 4. Across all environment com-plexities, Gemini achieves the highest LES, reflecting an LLM Name 1 − 3 rooms 4 − 6 rooms 7 − 10 rooms                                                                                                                     
+
+> SR ↑PoC ↓TS ↓LES ↑SR ↑PoC ↓TS ↓LES ↑SR ↑PoC ↓TS ↓LES ↑
+> Gemini 87 .12 1.79 2094 .79 0.2179 84 .09 1.67 3545 .79 0.0946 71 .06 2.73 4768 .48 0.0409
+> GPT-5 92 .27 1.44 1732 .55 0.3771 59 .05 1.70 4037 .52 0.0849 49 .39 2.87 4107 .61 0.0350
+> Deepseek 76 .21 1.63 1549 .21 0.3243 51 .52 1.82 2506 .70 0.0767 38 .03 2.94 3305 .52 0.0289
+> Table 4. Performance of different large language models in our framework. ↑indicates higher value is better for the metric, ↓indicates lower value is better for the considered metric. Bold indicates the best performance of the metric, while underline indicates the second-best performance. Bold and underline is best performance for the primary evaluation metric LES.
+> Obstacle Density 1−3rooms 4−6rooms 7−10 rooms
+> SR ↑PoC ↓IE TS ↓SR ↑PoC ↓IE TS ↓SR ↑PoC ↓IE TS ↓
+> d= 0 .586 .52 1.31 39 .24 1678 .06 80 .91 1.26 47 .79 3351 .85 65 .00 2.50 47 .39 4748 .91
+> d= 1 .088 .94 1.48 39 .41 1339 .36 81 .67 1.81 39 .79 3211 .20 62 .27 2.79 32 .70 4497 .80
+> d= 2 .081 .88 3.19 16 .06 1592 .34 55 .15 3.67 27 .39 3135 .45 48 .79 4.55 23 .21 4773 .21
+> Table 5. Performance of our approach as the obstacle density varies across floorplans. ↑indicates higher value is better for the metric,
+> ↓indicates lower value is better for the considered metric. Bold indicates the best performance of the metric while underline indicates second-best performance.
+
+effective balance between success rate, environment opti-mality, and execution efficiency. GPT-5 performs com-petitively in smaller scenes but deteriorates as environ-ment complexity increases, primarily due to its tendency to over-prioritize local obstacle relations while under-utilizing global connectivity cues in the serialized scene graph. DeepSeek (deepseek-reasoner) exhibits the weakest per-formance, frequently misinterpreting structured environ-ment serializations and producing sub-optimal manipula-tion choices. These results highlight that model behavior, rather than raw language capability, strongly influences em-bodied task performance as models with compact, grounded reasoning abilities better exploit our formulation’s struc-tural inductive biases. 
+
+d. Obstacle Density: We further assessed robustness as the obstacle density d increases from 0.5 (sparse) to 2.0
+
+(dense), keeping task configurations fixed (Tab. 5). Overall performance declines with higher d, as reduced free space and frequent occlusions hinder long-horizon planning. In smaller layouts ( 1 − 3 rooms), SR drops moderately ( 86 .5
+
+to 81 .9% ), while PoC more than doubles ( 1.31 to 3.19 ), indicating diminished environment optimality. TS shows non-monotonic behavior as dense clutter sometimes short-ens exploration but also causes premature failures. This trend intensifies in larger environments, where SR degrades sharply and PoC rises 2× to 3×, reflecting that, while the agent must detour or manipulate more often, it struggles to restore global connectivity. The decline in interaction en-counters (IE) (from > 40% to < 30% ) suggests increased conservative approach: as clutter grows, the agent avoids manipulations with low expected payoff. Together, these re-sults highlight that higher obstacle density compounds per-ception and reasoning difficulty, limiting the agent’s ability to maintain long-term environmental optimality. 
+
+4.4. Hardware Experiments 
+
+We validate sim-to-real transfer by deploying our frame-work on a Boston Dynamics Spot equipped with the Spot Arm manipulator as shown in Fig. 1. Our perception re-lies exclusively on the front fisheye cameras; the Spot Arm wrist camera is used only during manipulation for grasp ac-quisition and placement verification. The onboard state es-timator provides metric localization, while stereo depth and category-level segmentations populate and update the struc-tured scene graph in real time. Experiments are conducted in an indoor environment of a three-room setting with to-tal navigable area of ≈ 50 .0 m3. We evaluate the simi-lar tasks as in simulation, restricted to items within Spot’s gripper envelope. During operation, the scene graph is in-crementally updated from fisheye RGB-D observations, en-abling the planner to interleave exploration with targeted rearrangement when local bottlenecks are detected. This setup enforces the core assumptions of our setting - lifelong, partially observed, cluttered environments - while requiring no task-specific fine-tuning or hardware-specific prompts. Qualitatively, we observe that the system exhibits the same behavior as in simulation: selective removal of highly cen-tral obstacles, preference for short detours when beneficial, and robust execution of retrieve-and-place objectives under real sensing and actuation noise. We provide the implemen-tation details of our approach on hardware in Appendix H. 5. Conclusion 
+
+Our approach redefines the role of large language mod-els in embodied decision-making. Specifically, we recast the role of LLMs as constraint reasoners rather than se-quence generators. Our method leverages structured scene graphs and cost–benefit abstractions to choose which en-vironmental constraints to resolve, such as which obsta-cles to relocate where, or which regions to explore, based on their long-term impact on performance. Through ex-tensive experiments, we showcase that our formulation en-ables zero-shot, long-horizon planning in unknown envi-ronments, achieving competitive task success with substan-tially fewer manipulations and lower cumulative cost com-pared to fully informed baselines. Finally, we validate the feasibility of our method on a Boston Dynamics Spot robot equipped with a depth camera and manipulator arm, demon-strating effective active perception and environment restruc-turing. 
+
+# References 
+
+[1] Amir Bar, Gaoyue Zhou, Danny Tran, Trevor Darrell, and Yann LeCun. Navigation world models. 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 15791–15801, 2024. 1, 2 [2] Thomas Chadzelek, Jens Eckstein, and Elmar Sch¨ omer. Heuristic motion planning with movable obstacles. In Cana-dian Conference on Computational Geometry , 1996. 3 [3] Pang C. Chen and Yong Koo Hwang. Practical path plan-ning among movable obstacles. Proceedings. 1991 IEEE In-ternational Conference on Robotics and Automation , pages 444–449 vol.1, 1991. 3 [4] Matt Deitke, Eli VanderBilt, Alvaro Herrasti, Luca Weihs, Jordi Salvador, Kiana Ehsani, Winson Han, Eric Kolve, Ali Farhadi, Aniruddha Kembhavi, and Roozbeh Mottaghi. Procthor: Large-scale embodied ai using procedural genera-tion. ArXiv , abs/2206.06994, 2022. 2 [5] Dieter Fox, Wolfram Burgard, and Sebastian Thrun. The dynamic window approach to collision avoidance. IEEE Robotics Autom. Mag. , 4:23–33, 1997. 2 [6] Samir Yitzhak Gadre, Mitchell Wortsman, Gabriel Ilharco, Ludwig Schmidt, and Shuran Song. Cows on pasture: Base-lines and benchmarks for language-driven zero-shot object navigation. 2023 IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition (CVPR) , pages 23171–23181, 2022. 3 [7] Saurabh Gupta, Varun Tolani, James Davidson, Sergey Levine, Rahul Sukthankar, and Jitendra Malik. Cognitive mapping and planning for visual navigation. International Journal of Computer Vision , 128:1311 – 1330, 2017. 2 [8] Botao He, Guofei Chen, Wenshan Wang, Ji Zhang, Cor-nelia Fermuller, and Yiannis Aloimonos. Interactive-far:interactive, fast and adaptable routing for navigation among movable obstacles in complex unknown environ-ments. 2024 IEEE/RSJ International Conference on Intel-ligent Robots and Systems (IROS) , pages 5402–5409, 2024. 3[9] Eric Kolve, Roozbeh Mottaghi, Winson Han, Eli VanderBilt, Luca Weihs, Alvaro Herrasti, Matt Deitke, Kiana Ehsani, Daniel Gordon, Yuke Zhu, Aniruddha Kembhavi, Abhi-nav Kumar Gupta, and Ali Farhadi. Ai2-thor: An interactive 3d environment for visual ai. ArXiv , abs/1712.05474, 2017. 1, 2 [10] Obin Kwon, Nuri Kim, Yunho Choi, Hwiyeon Yoo, Jeongho Park, and Songhwai Oh. Visual graph memory with unsuper-vised representation for visual navigation. 2021 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 15870–15879, 2021. 2 [11] Martin Levihn, Jonathan Scholz, and Mike Stilman. Hier-archical decision theoretic planning for navigation among movable obstacles. In Workshop on the Algorithmic Foun-dations of Robotics , 2012. 3 [12] Hongxin Li, Zeyu Wang, Xu Yang, Yu-Ren Yang, Shuqi Mei, and Zhaoxiang Zhang. Memonav: Working memory model for visual navigation. 2024 IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) , pages 17913– 17922, 2024. 2 [13] Maxim Likhachev and Dave Ferguson. Planning long dy-namically feasible maneuvers for autonomous vehicles. The International Journal of Robotics Research , 28:933 – 945, 2008. 2 [14] Pierre Marza, La¨ etitia Matignon, Olivier Simonin, and Christian Wolf. Multi-object navigation with dynamically learned neural implicit representations. 2023 IEEE/CVF In-ternational Conference on Computer Vision (ICCV) , pages 10970–10981, 2022. 3 [15] Mat´ ıas Mattamala, Jonas Frey, Piotr Libera, Nived Chebrolu, Georg Martius, Cesar Cadena, Marco Hutter, and Maurice F. Fallon. Wild visual navigation: fast traversability learn-ing via pre-trained models and online self-supervision. Au-tonomous Robots , 49, 2024. 1 [16] Arsalan Mousavian, Alexander Toshev, Marek Fiser, Jana Kosecka, and James Davidson. Visual representations for se-mantic target driven navigation. 2019 International Confer-ence on Robotics and Automation (ICRA) , pages 8846–8852, 2018. 2 [17] Dennis Nieuwenhuisen, A.F. van der Stappen, and Mark H. Overmars. An effective framework for path planning amidst movable obstacles. In Workshop on the Algorithmic Founda-tions of Robotics , 2006. 3 [18] Kei Okada, Atsushi Haneda, Hiroyuki Nakai, Masayuki Inaba, and Hirochika Inoue. Environment manipulation planner for humanoid robots using task graph that gener-ates action sequence. 2004 IEEE/RSJ International Confer-ence on Intelligent Robots and Systems (IROS) (IEEE Cat. No.04CH37566) , 2:1174–1179 vol.2, 2004. 3 [19] Manolis Savva, Abhishek Kadian, Oleksandr Maksymets, Yili Zhao, Erik Wijmans, Bhavana Jain, Julian Straub, Jia Liu, Vladlen Koltun, Jitendra Malik, Devi Parikh, and Dhruv Batra. Habitat: A platform for embodied ai research. 2019 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 9338–9346, 2019. 2 [20] Philipp Schoch, Fan Yang, Yuntao Ma, Stefan Leuteneg-ger, Marco Hutter, and Quentin Leboutet. In-sight: Interac-tive navigation through sight. 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 7794–7800, 2024. 3 [21] Kunal Pratap Singh, Jordi Salvador, Luca Weihs, and Aniruddha Kembhavi. Scene graph contrastive learning for embodied navigation. 2023 IEEE/CVF International Confer-ence on Computer Vision (ICCV) , pages 10850–10860, 2023. 2[22] Xinshuai Song, Weixing Chen, Yang Liu, Weikai Chen, Guanbin Li, and Liang Lin. Towards long-horizon vision-language navigation: Platform, benchmark and method. 
+
+2025 IEEE/CVF Conference on Computer Vision and Pat-tern Recognition (CVPR) , pages 12078–12088, 2024. 1 [23] Mike Stilman and James Kuffner. Planning among movable obstacles with artificial constraints. The International Jour-nal of Robotics Research , 27(11-12):1295–1307, 2008. 3 [24] Mike Stilman and James J. Kuffner. Navigation among movable obstacles: real-time reasoning in complex envi-ronments. 4th IEEE/RAS International Conference on Hu-manoid Robots, 2004. , 1:322–341 Vol. 1, 2004. 3 [25] Xinyu Sun, Peihao Chen, Jugang Fan, Thomas H. Li, Jian Chen, and Mingkui Tan. Fgprompt: Fine-grained goal prompting for image-goal navigation. ArXiv ,abs/2310.07473, 2023. 3 [26] Andrew Szot, Alexander Clegg, Eric Undersander, Erik Wi-jmans, Yili Zhao, John Turner, Noah Maestre, Mustafa Mukadam, Devendra Singh Chaplot, Oleksandr Maksymets, Aaron Gokaslan, Vladim´ ır Vondru vs ., Sameer Dharur, Franziska Meier, Wojciech Galuba, Angel X. Chang, Zsolt Kira, Vladlen Koltun, Jitendra Malik, Manolis Savva, and Dhruv Batra. Habitat 2.0: Training home assistants to rear-range their habitat. ArXiv , abs/2106.14405, 2021. 2 [27] Shagun Uppal, Ananye Agarwal, Haoyu Xiong, Kenneth Shaw, and Deepak Pathak. Spin: Simultaneous perception, interaction and navigation. 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 18133–18142, 2024. 3 [28] Hanqing Wang, Wenguan Wang, Wei Liang, Steven CH Hoi, Jianbing Shen, and Luc Van Gool. Active perception for visual-language navigation. International Journal of Com-puter Vision , 131(3):607–625, 2023. 2 [29] Hongchen Wang, Peiqi Liu, Wenzhe Cai, Mingdong Wu, Zhengyu Qian, and Hao Dong. Mo-ddn: A coarse-to-fine attribute-based exploration agent for multi-object demand-driven navigation. ArXiv , abs/2410.03488, 2024. 3 [30] Xiaohan Wang, Yuehu Liu, Xinhang Song, Beibei Wang, and Shuqiang Jiang. Camp: Causal multi-policy planning for in-teractive navigation in multi-room scenes. In Neural Infor-mation Processing Systems , 2023. 2, 3, 5 [31] Xiaohan Wang, Yuehu Liu, Xinhang Song, Yuyi Liu, Six-ian Zhang, and Shuqiang Jiang. An interactive navigation method with effect-oriented affordance. 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 16446–16456, 2024. 3 [32] Gordon T. Wilfong. Motion planning in the presence of mov-able obstacles. Annals of Mathematics and Artificial Intelli-gence , 3:131–150, 1988. 3 [33] F. Xia, Amir Zamir, Zhi-Yang He, Alexander Sax, Jitendra Malik, and Silvio Savarese. Gibson env: Real-world per-ception for embodied agents. 2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9068– 9079, 2018. 2, 3 [34] Xinyao Yu, Sixian Zhang, Xinhang Song, Xiaorong Qin, and Shuqiang Jiang. Trajectory diffusion for objectgoal naviga-tion. Advances in Neural Information Processing Systems 37 , 2024. 3 [35] Kuo-Hao Zeng, Luca Weihs, Ali Farhadi, and Roozbeh Mot-taghi. Pushing it out of the way: Interactive visual naviga-tion. 2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 9863–9872, 2021. 2, 3, 6[36] Yiming Zeng, Hao Ren, Shuhang Wang, Junlong Huang, and Hui Cheng. Navidiffusor: Cost-guided diffusion model for visual navigation. 2025 IEEE International Conference on Robotics and Automation (ICRA) , pages 11994–12001, 2025. 1, 2 [37] Albert Zhai and Shenlong Wang. Peanut: Predicting and navigating to unseen targets. 2023 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 10892– 10901, 2022. [38] Sixian Zhang, Xinhang Song, Yubing Bai, Weijie Li, Yakui Chu, and Shuqiang Jiang. Hierarchical object-to-zone graph for object navigation. 2021 IEEE/CVF International Confer-ence on Computer Vision (ICCV) , pages 15110–15120, 2021. 2[39] Sixian Zhang, Xinyao Yu, Xinhang Song, Xiaohan Wang, and Shuqiang Jiang. Imagine before go: Self-supervised generative map for object goal navigation. 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 16414–16425, 2024. 3 [40] Yuke Zhu, Roozbeh Mottaghi, Eric Kolve, Joseph J. Lim, Abhinav Kumar Gupta, Li Fei-Fei, and Ali Farhadi. Target-driven visual navigation in indoor scenes using deep rein-forcement learning. 2017 IEEE International Conference on Robotics and Automation (ICRA) , pages 3357–3364, 2016. 2 To Move or Not to Move: Constraint-based Planning Enables Zero-Shot Generalization for Interactive Navigation 
+
+# Supplementary Material 
+
+# A. Dataset 
+
+We construct a new dataset of cluttered indoor floors by instantiating ProcTHOR-10 k simulator with procedurally generated clutter. As training set for learning baselines, we generate 10 k episodes with 20 tasks each, following the Lifelong Interactive Navigation setup described in Sec. 1. Our test set consists of 100 environments equally distributed among the number of rooms 1 − 10 .To generate realistic clutter in the environment, we oc-clude a percentage of traversable nodes (based on floorplan area) in the grid graph G = ( N, E ) of the unoccluded envi-ronment, where the probability of a node n ∈ N being se-lected for occlusion is proportional to its betweenness cen-trality bc( n). This biases obstacle placement toward struc-turally critical regions such as hallways, bottlenecks, and intersections, without deterministically blocking all high-centrality nodes. Fig. 3 shows an instance of the process of dataset generation. Fig. 8 shows examples of the generated floorplans. 
+
+# B. Price of Clutter 
+
+In lifelong interactive navigation, an agent’s actions modify the physical structure of its environment, thereby influenc-ing its future navigability. In single-goal episodes, where each episode involves completing only one task, the place-ment of a moved obstacle has no long-term consequence on performance. Hence, such settings offer little incentive for the agent to reason about ‘where’ to relocate an ob-stacle once removed. In contrast, long-horizon, multi-task episodes demand careful reasoning about object placement. An object relocated to a frequently traversed region can block critical routes, forcing repeated manipulations in later tasks. Existing interactive navigation approaches, designed for single-task settings, neither quantify such long-term en-vironmental degradation nor explicitly optimize against it. To address this, we introduce the Price of Clutter (PoC) 
+
+metric, which quantifies how much the environment devi-ates from its obstacle-free optimal configuration. Formally, we define: 
+
+PoC = 
+
+P 
+
+> s,t ∈N
+
+dobs (s, t )
+
+P 
+
+> s,t ∈N
+
+dfree (s, t ) ,
+
+where dobs (s, t ) denotes the shortest-path length between nodes s and t in the cluttered environment, and dfree (s, t )
+
+is the corresponding path length in the obstacle-free envi-ronment. 
+
+Calculation: We consider two versions of the same en-vironment E: (i) a fully traversable configuration Efree with navigable graph Gfree = ( N, E ), and (ii) a partially oc-cluded configuration Ecurr , where obstacles block certain re-gions, yielding a reduced graph Gcurr = ( N ′, E ′). Nodes present in Gfree may be occluded and therefore absent in 
+
+Gcurr . If either the source s or target t of a shortest-path pair in Gfree becomes occluded, that pair is excluded from the computation since it is no longer traversable. Such occlu-sions indirectly increase PoC: when key nodes are removed, surviving paths between other pairs must detour around blocked regions, increasing total path lengths. For paths that originate or terminate at one of the nodes available in Gfree 
+
+but occluded in Gcurr , the path is not traversable, and hence the length is infinite. To keep the metric finite and compara-ble across scales, we replace infinite distances with a capped maximum equal to 10 × the maximum finite shortest-path length observed among surviving nodes. This prevents di-vergence in heavily occluded scenes while still penalizing disconnections proportionally to environment size. 
+
+Interpretation: A lower PoC indicates a more glob-ally navigable and optimally structured environment, while a higher PoC means reduced accessibility and suboptimal long-term behaviour due to clutter. In our experiments, PoC serves as an indicator of how effectively the agent’s actions improve long-term environment efficiency, captur-ing effects that standard task success or path-length metrics fail to account for. 
+
+# C. Long-term Efficiency Score 
+
+In lifelong interactive navigation, the agent must execute a sequence of navigation-manipulation tasks within the same evolving environment. Each object relocation persists and alters future navigability, meaning that decisions made for one task influence the difficulty, cost, and even feasibil-ity of subsequent tasks. Existing metrics – such as Suc-cess Rate (SR), Time Steps (TS), Path Length (PL), Suc-cess weighed by Path length (SPL), Success weighed by Time Steps (STS), and Price of Clutter – capture only iso-lated aspects of performance. For example, SR does not reflect the cost of excessive detours or unnecessary ob-ject manipulation; TS alone cannot distinguish fast-but-myopic planners from methods that intentionally improve global structure; and PoC measures environment optimal-ity but is insensitive to whether tasks are actually com-pleted. Likewise, widely used embodied-AI metrics such as STS and SPL are designed for single-episode naviga-Figure 3. Example dataset generation process. In this instance, we consider a 10 room floorplan from ProcTHOR-10 k. The left image shows the ideal environment without clutter and completely free for optimal navigation throughout the environment. We then generate clutter in the free space using the between-ness centrality of nodes in Gfree . The generated obstacle locations are indicated by red circles in the middle image. This causes the blocking of the paths within the accessible rooms, as well as eliminating access to the two rooms on bottom-right of the map, as shown in the right image. 
+
+tion with fixed environments – they couple success to ex-ecution efficiency, but cannot capture how object reloca-tion reshapes future traversability, nor do they penalize en-vironment configurations that degrade long-horizon perfor-mance. Consequently, STS and SPL reward agents that reach the goal quickly in the current environment configura-tion, even if their manipulations make subsequent tasks sub-stantially harder. As a result, none of these metrics, taken independently, can evaluate long-horizon behavior or the quality of environment shaping. This motivates the need for a single, unified metric that integrates success, efficiency, and long-term environment optimality. 
+
+Calculation: Let SR denote the task success rate over an episode, TS the average number of time steps taken per episode, and PoC the Price of Clutter of the final modified environment. To ensure comparability across floorplans of different sizes and scales, we first normalize each quantity across all evaluated methods on a given floorplan group: 
+
+cSR = SR max m SR m
+
+, cTS = TS max m TS m
+
+,
+
+dPoC = PoC max m PoC m
+
+,
+
+where the maximum is taken over all methods m under comparison. The Long-term Efficiency Score (LES) is then defined as: 
+
+LES = cSR 
+
+cTS · dPoC .
+
+A higher LES indicates a more efficient, globally aware agent that both completes tasks reliably and maintains a navigable environment across the full episode horizon. 
+
+Rationale Behind the Formulation: This formulation provides several advantages for evaluating lifelong interac-tive navigation. • (1) Multi-objective balance. LES combines the three core aspects – high success rate, low time cost, and low PoC – without allowing any one metric to dominate. Methods cannot outperform each other by being fast and environmentally destructive, nor by excessively cleaning the environment to guarantee success. • (2) Global normalization. By normalizing SR, TS, and PoC across all methods within each floorplan group, LES becomes comparable across environments of different sizes and obstacle densities. This enables accounting for larger environments with inflated TS or PoC and ensures consistent scaling. • (3) Globalized environmental assessment. Because PoC itself is computed over all source-target node pairs in the free-space graph, LES incorporates the global im-pact of each manipulation action, rather than local, task-specific effects. • (4) Interpretability and stability. Multiplicative cou-pling ensures that extreme degradation in any one dimen-sion sharply reduces LES, reflecting the reality that a life-long agent must maintain all three properties simultane-ously to remain effective. 
+
+Interpretation: High LES values indicate that an agent not only succeeds at short-term tasks but also maintains an environment whose global navigability remains close to the obstacle-free baseline environment, while completing tasks efficiently. Moderate LES corresponds to agents that solve tasks reliably but incur substantial detours or induce clut-ter configurations that degrade future navigation. Low LES values arise when the agent either fails frequently, manipu-lates objects unnecessarily, or creates highly suboptimal en-vironments with elevated PoC. Because LES is normalized within each floorplan group, scores are directly comparable across methods and can be interpreted as a relative measure of long-term navigation efficiency: methods with higher LES consistently demonstrate better performance across the concurrent objectives of success, path optimality, and envi-ronment shaping. 
+
+# D. Baseline Implementation Details 
+
+This section provides an extended description of the base-lines used in our experiments. To ensure a fair comparison, 
+
+all baseline methods, except Ours (unk), operate under full environment observability : each method is provided with the complete map of obstacles and objects at the start of the episode, including the positions of all task-relevant objects, all drop zones for each obstacle, and all obstacles that block navigation. All baselines share the same embod-iment and low-level actuation stack as our method: navi-gation follows a 0.25 m grid-based discretization available in ProcTHOR; manipulation is implemented via the stan-dard PickupObject and PutObject primitives; and any failures at the level of gripper control, inverse kinemat-ics, or grasp execution are handled by the low-level con-troller and does not terminate the episode. Thus, the base-lines differ only in their high-level strategy for interacting with clutter and solving the navigation-manipulation objec-tives. For clarity, we restate that the evaluation tasks are all object-to-object placement tasks (e.g., Mug → Shelf ,
+
+Vase → StudyTable ), and not navigate-to-region goals. All baselines attempt to complete the same 20 -task se-quence. 
+
+D.1. InterNav 
+
+Original capability: InterNav [35] (officially released as OBJ PLACE ) is designed for single-room interactive naviga-tion using pushing actions on small tabletop or floor obsta-cles. The original action space consists of: • forward/turn navigation actions, • push actions, applied at pixel-level predicted contact points. 
+
+Action-space adaptation: Since our problem setting requires object rearrangement through pick-place actions rather than pushing, we replace the push primitive with 
+
+PickupObject + PutObject . No modifications are made to the architecture. 
+
+Reward structure adaptation: We adapted the origi-nal reward structure to better suit our specific task require-ments. To prevent the agent from prematurely terminating episodes while navigating dense clutter, we eliminated the step penalty. The task reward is distributed across the two distinct phases of the episode - navigation phase and ma-nipulation phase. During navigation, when the agent moves towards the goal object and subsequently towards the tar-get receptacle, the agent receives a positive geodesic re-ward identical to the original InterNav formulation. The sparse success reward ( Rsuccess ) is split to encourage sub-goal completion: the agent receives Rsuccess /2 upon suc-cessfully picking up the correct object, and the remaining 
+
+Rsuccess /2 upon placing the object on the target receptacle. 
+
+Training setup: InterNav is re-trained end-to-end on our 
+
+10 k train episodes of cluttered multi-room dataset. Each task instance (one object-to-receptacle command) serves as a single training episode. Training environments are sam-pled with obstacle density uniformly drawn from d = 0 to the maximum observed in our test split, ensuring a matched distribution. 
+
+Environment knowledge: InterNav receives full ground-truth environment information. It does not require exploration since objects, obstacles, and all occlusions are known at initialization. 
+
+Software implementation: Aside from the change in action primitives (push → pick-place), we do not modify: its mapping logic, its pixel-level interaction predictor, its frontier selection, or its short-range navigation module. Thus the baseline represents a faithful, strong instanti-ation of the published method, adapted only minimally to match the manipulation capabilities of our setting. 
+
+D.2. Always Detour 
+
+This baseline represents an extreme non-interactive strat-egy. 
+
+Interaction rule: The agent is forbidden from manipulat-ing obstacles. If an obstacle lies on the current shortest path to the target object, the agent immediately declares failure. 
+
+Path computation: Shortest paths are computed us-ing NETWORKX ’s Dijkstra solver on the full ground-truth graph. Because all floorplan geometry and all obstacles are known, the path planner never needs to explore. 
+
+Consequences: 
+
+• Success depends purely on whether an entirely obstacle-free path exists. • Never interacts with obstacles. • Adversarially placed mild clutter can cause early termi-nation. • TS can be low (episodes often end quickly) but the low LES score reveals that this is purely due to avoiding meaningful interaction. 
+
+D.3. Always Interact 
+
+This baseline removes every encountered obstacle that blocks the shortest path to the current goal. 
+
+Interaction rule: Upon encountering an obstacle, the agent: 1. picks up the obstacle using PickupObject ,2. navigates to and places it at the nearest drop zone that does not block any path in the free-space graph (com-puted using ground-truth map), 3. recomputes the shortest path and continues. Ground-truth reasoning: The baseline has complete ac-cess to all traversability information and all valid receptacle surfaces. Thus it can deterministically choose a placement that is globally non-blocking. 
+
+Characteristics: 
+
+• Removes all obstacles on the path, regardless of the con-sideration for long-term tasks. • PoC is near-ideal because the agent aggressively removes everything on its immediate route. • TS is high due to excessive manipulation. 
+
+D.4. Clean + Shortest Path (Clean + S/P) 
+
+This is an extreme over-manipulation baseline. 
+
+Interaction rule: Before attempting any task, the agent identifies all movable obstacles in the environment –whether or not they lie on the expected path – and removes them one by one. 
+
+Placement rule: Objects are placed at the nearest drop zone that preserves global traversability, identical to Always In-teract’s placement criterion. 
+
+Execution: After full cleanup: • all obstacles have been removed from free space, • the environment is in a globally optimal state ( PoC ≈
+
+1.00 ), • the agent executes all remaining tasks using shortest paths. 
+
+Characteristics: 
+
+• TS is extremely high due to large-scale cleanup. • Over-interacts with obstacles in the environment. • Environment optimality is maximal, but reasoning is naive. 
+
+D.5. Ours (Known Environment) 
+
+This variant isolates the reasoning component of our frame-work. 
+
+Access to full state: The LLM-based planner receives the complete scene graph at the start: all obstacles, all objects, all receptacles, and all traversability. 
+
+No exploration: The agent does not need to look for objects or reconstruct the map. The policy focuses solely on solving the sequence of tasks while strategically removing obstacles only when they improve long-term connectivity. 
+
+Interpretation: This is an upper bound on our method’s structural reasoning ability, free from challenges of partial observability. 
+
+D.6. Ours (Unknown Environment) 
+
+This is the full framework introduced in the main paper. 
+
+Sensing: The agent perceives the world exclusively through its front-facing cameras. Unlike all other baselines: • it begins with no map, • does not know obstacle positions, • does not know object locations, • must discover all task-relevant elements actively. 
+
+Active perception + LLM reasoning: The LLM receives the incrementally built scene graph and jointly chooses: • where to explore next, • which objects to move, • where to relocate them, • how to sequence navigation, manipulation, and explo-ration. 
+
+Low-level control: All navigation and manipulation ac-tions are executed using the same primitives as in simula-tion, so comparison with baselines is fair. 
+
+Episode termination: The episode ends when: • all 20 object-placement tasks are completed, or • the global max steps threshold is exceeded. This baseline is the only one that must solve the lifelong, partially observed, cluttered problem as formulated in our paper. 
+
+# E. Baseline Comparison (Extended Results) 
+
+In this section, we report two additional evaluations that highlight qualitative differences in how each baseline be-haves over long-horizon episodes: • the final Interaction Efficiency (IE) for each baseline across binned floorplans, and • the Lifelong Environment Score (LES) plotted as a func-tion of floorplan size. These two metrics together quantify how selectively a method manipulates obstacles (IE) and how effectively its decisions maintain long-term environment optimality (LES). 
+
+E.1. LES Across Increasing Environment Sizes 
+
+To understand how each method scales with environment complexity, Fig. 4 plots the Lifelong Environment Score (LES) for all baselines across floorplans containing 1 to 
+
+10 rooms. LES jointly captures (i) task success across the episode, (ii) the long-term navigability of the environment as measured by Price of Clutter (PoC), and (iii) the exe-cuted time steps (TS). Thus, higher LES indicates methods that not only solve tasks but also preserve global structure and efficiency across the entire task sequence. 
+
+Small environments (1–3 rooms): In compact spaces, nearly all baselines exhibit moderate-to-high LES. This oc-curs because the penalty for suboptimal actions is inherently low: even aggressive strategies such as Always Interact or Clean+S/P can over-manipulate the scene with little long-term cost, while purely reactive strategies such as Always Detour can avoid manipulation entirely without incurring long detours. The limited spatial extent caps PoC, short-ens detours, and reduces compounding errors, making the differences between methods less pronounced. Neverthe-less, our method and the oracle variant (Ours-known) al-Figure 4. Lifetime Efficiency Score (LES) plott for floorplans ranging from 1 to 10 rooms. Higher is better. In small environments, nearly all baselines appear competitive because suboptimal actions – such as excessive detours (Detour) or indiscriminate manipulation (Interact, Cleanup) – incur limited long-term cost. As spatial complexity increases, these na¨ ıve policies collapse: detour-heavy strategies suffer from compounding path inefficiency, while cleanup-heavy strategies incur large manipulation overhead. InterNav fails to scale due to brittle obstacle-handling assumptions. Our method remains consistently stable across environment sizes. The widening performance gap highlights the need for selective, globally informed interaction when navigating lifelong, cluttered environments. 
+
+ready show strong LES due to more selective manipulation and shorter time-to-completion. 
+
+Medium environments (4–6 rooms): As spatial layout grows, na¨ ıve strategies begin to diverge. Always Detour and InterNav collapse quickly because never manipulating obstacles leads to increasingly long detours and frequent infeasible plans, driving LES downward. Always Interact and Clean+S/P degrade as well: although they can maintain low PoC by removing many obstacles, the large TS cost of exhaustive cleanup drags LES down sharply. In contrast, our method maintains high LES by performing targeted, high-impact rearrangements while avoiding both excessive cleanup and unbounded detours. This selective behavior re-tains good PoC and strong SR with considerably lower TS than cleanup-based baselines. 
+
+Large environments (7–10 rooms): In large-scale floorplans, the advantages of long-term reasoning become essential. All non-reasoning baselines experience severe LES deterioration. Detour and InterNav fail almost en-tirely due to compounding detours, disconnected regions, and task infeasibility. Always Interact and Clean+S/P suffer from the opposite failure mode: the cost of clearing many distant or irrelevant obstacles explodes as room count in-creases, yielding high SR but extremely poor TS and di-minished LES. Overall, LES reveals a crucial scaling trend: In small environments, many baselines appear competitive because the cost of poor structural decisions is inherently limited. As environments grow, only methods that explicitly reason about long-term connectivity, clutter placement, and selec-tive manipulation maintain strong performance. Our ap-proach is the only non-oracle method whose LES curve re-mains significantly high and stable across all room counts, demonstrating effective lifelong planning and environment shaping. % Interactions 1 − 3 rooms 4 − 6 rooms 7 − 10 rooms                
+
+> Ours (known) 28 .67 37 .33 31 .67
+> Ours (unk) 36 .61 38 .48 32 .09
+> Always Interact 100 .00 100 .00 100 .00
+> Always Detour 0.00 0.00 0.00
+> Clean + S/P 158 .00 161 .61 182 .47
+> Table 6. Percentage of interactions (IE) executed by each baseline across the three floorplan bins.
+
+E.2. Interaction Efficiency Across Floorplans 
+
+To complement the LES analysis, we examine the percent-age of interactions (IE) executed by each baseline across the three floorplan bins (Table 6). IE measures how often an agent chooses to manipulate obstacles relative to the num-ber of obstacles it encounters. Since excessive manipulation is costly in both time and long-term structural distortion, IE captures a core determinant of high LES. A clear trend emerges: methods with extreme interaction policies achieve the lowest LES in large environments. Al-ways Interact performs 100% manipulation regardless of context; this directly explains its sharp LES drop as room count increases (Fig. 4). Clean + S/P is extremely aggres-sive in obstacle manipulation – it removes all obstacles be-fore solving any of the tasks – leading to IE values greater than 150% as it manipulates more obstacles than it ever would encounter along optimal routes. These policies ap-pear competitive in small environments, where their heavy-handed behavior does not incur substantial penalties; how-ever, as free-space geometry becomes more complex, such over-interaction drastically harm long-horizon efficiency, reflected in steep LES decay. Conversely, Always Detour maintains 0% IE by design. While this avoids direct manipulation costs, it forces the agent into long navigation routes whenever clutter blocks high-connectivity regions. In larger floorplans, these de-tours accumulate geometric inefficiencies that outweigh any benefits of interaction frugality, again explaining its lower-ing LES values as the number of rooms increases. Our methods – Ours (unk) and Ours (known) – have IE values in moderate range ( 28 –38% ), increasing slightly with floorplan size as more rooms imply a higher chance of encountering globally central obstacles. Unlike the over-reactive baselines, our approach interacts only when do-ing so meaningfully improves long-term navigability – the behavior rewarded by LES. The LES curves reflect this: while all baselines degrade as room count increases, our ap-proach maintains significantly higher efficiency, with Ours (known) forming an approximate upper bound on selective, globally informed rearrangement. Together, these results show that only planners capable of evaluating global structure – rather than reacting myopi-cally to local blockages – achieve this balance consistently across floorplan scales. 
+
+# F. Obstacle Density Experiments: Comparison with Baselines 
+
+To assess the robustness of our framework under varying clutter conditions, we evaluate all baselines across three ob-stacle densities: d = 0 .5 (sparser than standard), d = 1 .0
+
+(default dataset density), and d = 2.0 (highly cluttered scenes), using identical environments and task sequences. Across all densities, we report Success Rate (SR), envi-ronment optimality (PoC), time steps (TS), and our uni-fied long-horizon metric LES. The results are summarized in Tab. 5. In sparser environments ( d = 0 .5), all meth-ods benefit from increased free space, but the relative order-ing remains informative. Our known-map variant achieves the highest LES in the small-room regime ( 0.6708 ), and re-mains competitive in medium and large scenes ( 0.3410 and 
+
+0.2088 ), exceeding or matching the best non-LLM base-lines except for the trivial Clean+S/P policy – which incurs no perception or reasoning cost and clears all obstacles re-gardless of necessity. The unknown-map variant performs moderately lower due to required exploration, but still re-mains comparable to the heuristic baselines, particularly outperforming Detour in dense connectivity settings where proactive interaction matters. At standard density ( d =1.0), the expected trend reappears: sparser-environment scores reduce, and differences across strategies become more pronounced. Our known-map policy again maintains strong LES in all room bins ( 0.3322 , 0.1945 , 0.1574 ), while the heuristic methods begin to degrade with scale – Al-ways Interact loses efficiency due to unnecessary rearrange-ments, and Detour suffers from high PoC as path options collapse. Clean+S/P remains an upper bound but achieves this by forcing extreme over-interaction (IE ¿ 150% ). In highly cluttered scenes ( d = 2 .0), the compounding chal-lenge of limited visibility, restricted free space, and high oc-clusion amplifies the penalties on all baselines. LES drops sharply across the board. Yet, importantly, our known-map method remains the second-best performer in medium and large environments, surpassed only by Clean+S/P – which has unfair advantage as it clears every obstacle at the start, ignoring task cost and violating real-world practicality. The unknown-map version experiences the largest decline (e.g., LES = 0.1747 to 0.0321 to 0.0152 ) because exploration it-self becomes more expensive and clutter physically restricts reachable areas. Nevertheless, even in this extreme setting, our approach does not collapse to the levels of InterNav or Detour, indicating that our long-horizon reasoning still identifies and manipulates structurally influential obstacles rather than acting reactively. Overall, these results confirm that LES reliably captures the degradation in navigability and long-horizon efficiency as clutter increases, and that our Obstacle Density 1 − 3 rooms 4 − 6 rooms 7 − 10 rooms                                                                                                                                                                                                      
+
+> SR PoC TS LES SR PoC TS LES SR PoC TS LES
+> d=0.5
+> Ours (known) 95 .61 1.10 931 .45 0.6708 100 .00 1.11 1762 .58 0.3410 94 .85 1.30 2384 .24 0.2088
+> Ours (unk) 86 .52 1.31 1678 .06 0.4001 80 .91 1.26 3351 .85 0.1302 65 .00 2.50 4748 .91 0.0489
+> Always Interact 100 .00 1.07 1026 .18 0.6699 100 .00 1.32 2043 .97 0.2702 100 .00 1.35 3359 .55 0.1625
+> Always Detour 87 .88 1.37 707 .06 0.6695 86 .97 1.68 1240 .48 0.2810 73 .48 2.65 1620 .52 0.1313
+> Clean + S/P 100 .00 1.00 1107 .71 0.6501 100 .00 1.00 2126 .58 0.3104 100 .00 1.00 4320 .03 0.1530
+> d=1.0
+> Ours (known) 94 .55 1.50 1044 .55 0.3322 97 .73 1.25 1911 .97 0.1945 100 .00 1.23 2435 .48 0.1574
+> Ours (unk) 88 .94 1.48 1339 .36 0.2753 81 .67 1.81 3211 .20 0.0598 62 .27 2.79 4497 .80 0.0344
+> Always Interact 100 .00 1.14 1108 .88 0.4082 100 .01.13 2416 .67 0.1707 100 .00 1.36 3974 .88 0.0943
+> Always Detour 90 .45 1.96 665 .64 0.3788 83 .18 2.15 1115 .27 0.1644 64 .09 3.43 1381 .61 0.0661
+> Clean + S/P 100 .00 1.00 1200 .48 0.4297 100 .00 1.00 2622 .94 0.1714 100 .00 1.00 5169 .58 0.0841
+> d=2.0
+> Ours (known) 94 .55 2.56 915 .76 0.2987 92 .88 2.46 2014 .21 0.1522 92 .88 2.49 2904 .09 0.0877
+> Ours (unk) 81 .88 3.19 1592 .34 0.1747 55 .15 3.67 3135 .45 0.0321 48 .79 4.55 4773 .21 0.0152
+> Always Interact 100 .00 1.41 1314 .16 0.3904 100 .00 1.72 2953 .97 0.1406 100 .00 1.45 5135 .61 0.0925
+> Always Detour 84 .85 3.30 386 .48 0.3491 41 .67 4.66 541 .42 0.1161 38 .18 5.40 714 .82 0.0686
+> Clean + S/P 100 .00 1.00 1457 .42 0.3280 100 .00 1.00 3609 .36 0.1666 100 .00 1.00 6879 .50 0.0810
+> Table 7. Comparison of our approach with baselines across different floorplans under varying obstacle densities.
+
+method remains competitive and structurally grounded even under severe occlusions, outperforming practical heuristic baselines and trailing only the trivial exhaustive-cleanup policy. 
+
+# G. System Behaviour with Episode Horizon 
+
+To assess the robustness of our method under varying long-horizon episodes, we evaluate all baselines across episodes containing 10 , 15 , and 20 sequential object-placement tasks, keeping environments and goal configurations fixed (Tab. 8). Because each additional task compounds both nav-igation and manipulation consequences, this setting indicate whether a method can maintain accumulated environment optimality rather than simply succeed at isolated goals. Across horizons, our approach – both with known maps and unknown maps – remains consistently competitive un-der the Lifetime Efficiency Score (LES). In shorter episodes (g = 10 ), the known-map variant achieves the highest LES in all floorplan bins, reflecting its ability to strategically modify the environment early and leverage those improve-ments repeatedly. The unknown-map variant, despite re-quiring active exploration, still outperforms detour-based and cleanup-based baselines, indicating that its longer-term reasoning compensates for the overhead of discovery. As the horizon increases to g = 15 , LES values decline for all methods, but the drop for our approach is signifi-cantly smaller than for non-reasoning baselines. Always-Detour and Always-Interact suffer from horizon amplifica-tion: detouring repeatedly accumulates suboptimal transit cost, while interacting excessively compounds manipula-tion penalties - both effects lowering LES. Clean+S/P re-mains strong for small scenes but deteriorates with scale, since aggressive early cleanup no longer amortizes over many tasks in larger environments. In contrast, our method adapts its interaction strategy to horizon length, remov-ing only high-centrality obstacles whose impact propagates across many tasks, keeping PoC low without incurring ex-cessive TS. In the most demanding setting ( g = 20 ), our method with known maps continues to rank among the top-two performers across all floorplan scales, and remains within a small margin of the best LES in large ( 7−10 room) scenes. Meanwhile, other baselines exhibit widening fail-ure modes: Always-Interact and Clean+S/P incur escalating TS due to unnecessary manipulation, while Detour becomes progressively worse as repeated long-path navigation dom-inates total cost. Even the unknown-map variant – despite substantial exploration overhead – remains competitive un-der LES, demonstrating stability absent in all heuristic base-lines. Overall, these results highlight that LES sharply differentiates myopic strategies from genuinely long-term policies, revealing that methods lacking global reasoning degrade rapidly as episode horizons lengthen. In contrast, our approach, through explicit reasoning about environment structure, maintains efficient lifelong performance. 
+
+# H. Hardware Deployment 
+
+We deploy our method on a Boston Dynamics Spot robot equipped with the Spot Arm, demonstrating that our sys-tem transfers from simulation to a real mobile manipulator. Below, we describe the full hardware pipeline used in our Episode Horizon 1 − 3 rooms 4 − 6 rooms 7 − 10 rooms                                                                                                                                                                                                      
+
+> SR PoC TS LES SR PoC TS LES SR PoC TS LES
+> g=10
+> Ours (known) 98 .79 1.29 578 .88 0.9472 100 .00 1.28 1040 .42 0.5038 90 .61 1.54 1594 .36 0.2591
+> Ours (unk) 93 .33 1.85 675 .52 0.6611 72 .42 2.12 2099 .79 0.1155 65 .45 3.00 2270 .42 0.0837
+> Always Interact 100 .00 1.19 681 .79 0.8951 100 .00 1.37 1521 .58 0.3451 100 .00 1.16 2565 .52 0.2248
+> Always Detour 87 .88 2.34 364 .48 0.8229 86 .36 2.10 613 .52 0.4516 66 .06 3.23 758 .76 0.1963
+> Clean + S/P 100 .00 1.00 835 .72 0.8411 100 .00 1.00 1909 .91 0.3352 100 .00 1.00 3865 .10 0.1443
+> g=15
+> Ours (known) 100 .00 1.22 814 .48 0.7453 97.78 1.20 1403 .76 0.3877 94 .14 1.57 2356 .94 0.1910
+> Ours (unk) 94 .14 1.53 857 .79 0.5450 79 .41 1.46 2049 .79 0.1885 64 .85 2.88 2843 .94 0.0632
+> Always Interact 100 .00 1.15 905 .39 0.7044 100 .00 1.34 1983 .30 0.2670 100 .00 1.15 3321 .25 0.1771
+> Always Detour 84 .04 2.19 505 .30 0.5864 84 .44 2.09 878 .97 0.3085 66 .26 3.21 1094 .18 0.1373
+> Clean + S/P 100 .00 1.00 1075 .30 0.5282 100 .00 1.00 2383 .58 0.2708 100 .00 1.00 4693 .99 0.1324
+> g=20
+> Ours (known) 94 .55 1.50 1044 .55 0.3322 97 .73 1.25 1911 .97 0.1945 100 .00 1.23 2435 .48 0.1574
+> Ours (unk) 88 .94 1.48 1339 .36 0.2753 81 .67 1.81 3211 .20 0.0598 62 .27 2.79 4497 .80 0.0344
+> Always Interact 100 .00 1.14 1108 .88 0.4082 100 .01.13 2416 .67 0.1707 100 .00 1.36 3974 .88 0.0943
+> Always Detour 90 .45 1.96 665 .64 0.3788 83 .18 2.15 1115 .27 0.1644 64 .09 3.43 1381 .61 0.0661
+> Clean + S/P 100 .00 1.00 1200 .48 0.4297 100 .00 1.00 2622 .94 0.1714 100 .00 1.00 5169 .58 0.0841
+> Table 8. Comparison of our approach with baselines across different floorplans across varying task horizons.
+
+experiments. 
+
+H.1. Perception and Object Recognition 
+
+Spot is equipped with five front-facing fisheye cameras and a wrist-mounted depth camera on the end-effector. To re-main faithful to our simulation assumptions, we restrict ac-tive perception during navigation to only the front fisheye RGB-D streams; the wrist camera is used exclusively dur-ing grasping and placement to ensure reliable manipulation. Object detection on fisheye images is performed in a two-stage process: 1. Label prediction: We run a YOLO-based detec-tor to obtain coarse object categories that match our simulation-level abstractions (e.g., Mug , Box , Shelf ,
+
+StudyTable ). 2. Mask generation: For each detected object, we apply SAM to obtain a high-quality bounding region and mask, which is then projected into 3D using the synchronized depth image. Detected objects are inserted into the scene graph, main-taining the same representation used in simulation. 
+
+H.2. Environment Representation and State Esti-mation 
+
+Since the physical lab layout is fixed and known, we pre-compute a ground-truth grid graph of traversable free space prior to the episode. This graph uses a grid resolution of 
+
+1.0 m, and is used for shortest-path planning, betweenness estimation, and PoC computation. Spot’s pose within this map is obtained using its onboard state estimator, which fuses IMU, kinematic odometry, and visual-inertial sensing. This provides a drift-minimized, metrically consistent localization signal throughout the episode, enabling us to register detections, depth maps, and manipulated-object trajectories directly into the global co-ordinate frame. During execution, the robot maintains an estimate of cur-rently reachable nodes. For any grid node, we evaluate the local 3D occupancy by analyzing the point cloud density in-side a spherical region of fixed radius. Let S(v) denote the set of depth points within the sphere centered at node v. A node is marked occupied if |S(v)| > τ and free otherwise. We set the occupancy threshold to τ = 400 , selected empir-ically to balance noise suppression and spatial sensitivity. This online occupancy classification yields a dynam-ically evolving traversability graph that the LLM plan-ner queries when reasoning about shortest paths, obstacle-induced bottlenecks, and candidate regions for exploration. 
+
+H.3. Low-Level Control and Execution 
+
+All locomotion and manipulation commands are executed using the official bosdyn Python SDK. Our system inter-faces with Spot via: • Navigation: issuing waypoint-based locomotion goals generated by the mapping module, • Manipulation: using the SDK’s grasp and arm-trajectory APIs for pickup and placement. The low-level controller provides robust execution prim-itives such as: • grasp acquisition with automatic force adjustment, • hand-equipped alignment during approach, • arm release and retreat after placement. These behaviors abstract away most failures at the con-trol layer, allowing the high-level LLM planner to focus on reasoning about obstacle configuration, exploration, and task sequencing. 
+
+H.4. Runtime Integration 
+
+At each control cycle, the system: 1. captures front-camera RGB-D observations, 2. runs YOLO+SAM to update scene graph entries, 3. updates the reachable grid nodes using depth-based oc-cupancy, 4. queries the LLM for the next high-level action (navigate, pick-and-place, or explore), 5. executes the corresponding low-level command through the bosdyn API. This forms a tight perception–reasoning–action loop that closely mirrors our simulator setup while operating under real sensor noise, partial observability, and actuation uncer-tainty. 
+
+H.5. Real Robot Experiments 
+
+We provide visualization of an episode executed on Spot robot. Fig. 5 shows the point cloud and observed free navi-gable space as seen by the robot. 
+
+# I. Prompts 
+
+To facilitate full transparency and reproducibility of our method, we provide the exact system-level (Fig. 6) and developer-level (Fig. 7) prompts used to guide the LLM planner in our framework for constrained-based planning. Our prompts precisely encode the rules of our setting – long-horizon, sequential-tasks, partially observed interac-tive navigation – and expose to the model only those ab-stractions available to the robot at test time (e.g., scene-graph structure, obstacle costs, path characteristics, and re-maining task budget). By doing so, the prompts serve as an explicit interface between high-level reasoning and low-level execution: they constrain the LLM to operate within the capabilities of the underlying planner while enabling flexible, global decision-making about exploration, obsta-cle relocation, and long-term environment shaping. (a) Initial point cloud (b) Initial grid graph  
+
+> (c) Final point cloud (d) Final grid graph
+
+Figure 5. Point-cloud–driven environment mapping during real-world deployment. We visualize the evolution of the robot’s perception and its derived navigation graph during a real episode on the Boston Dynamics Spot. (a) The initial RGB-D observations from the front fisheye cameras produce a sparse and noisy point cloud reflecting partial scene coverage. (b) From this point cloud, the system constructs an initial navigation grid graph by projecting points onto the 2D floor plane and classifying nodes as free (gray) or occupied (red) based on local point density and presence of obstacles. (c) As the robot actively explores and executes navigation and manipulation actions, the accumulated point cloud becomes significantly more complete, revealing previously unseen regions and freed regions due to obstacle relocation. (d) The final grid graph incorporates these expanded observations, yielding a more accurate and globally connected representation of traversable space and obstacles. This perception-mapping loop provides the structured scene graph used by our LLM planner to reason about exploration, obstacle relocation, and long-horizon navigation decisions. Figure 6. Our system prompt for the Large Language Model in our constraint-based planning framework. Figure 7. Our developer prompt for the Large Language Model in our constraint-based planning framework. (a) Occlusion in room 1 floorplan 
+
+(b) Occlusion in room 5 floorplan 
+
+(c) Occlusion in room 10 floorplan 
+
+Figure 8

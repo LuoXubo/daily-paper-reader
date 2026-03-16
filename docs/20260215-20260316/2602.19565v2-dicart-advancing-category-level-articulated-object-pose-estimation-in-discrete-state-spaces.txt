@@ -1,0 +1,415 @@
+Title: DICArt: Advancing Category-level Articulated Object Pose Estimation in Discrete State-Spaces
+
+URL Source: https://arxiv.org/pdf/2602.19565v2
+
+Published Time: Fri, 27 Feb 2026 01:32:52 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# DICArt: Advancing Category-level Articulated Object Pose Estimation in Discrete State-Spaces 
+
+## Li Zhang 1* , Mingyu Mei 3* , Ailing Wang 4, Xianhui Meng 1, Yan Zhong 5,Xinyuan Song 6, Liu Liu 7, 8, 9 † 
+
+## , Rujing Wang 1, Zaixing He 3, Cewu Lu 21 University of Science and Technology of China 2 Shanghai Jiao Tong University  
+
+> 3
+
+## Zhejiang University 4 East China Normal University 5 Peking University 6 Emory University  
+
+> 7
+
+## Hefei University of Technology 8 Jianghuai Advance Technology Center  
+
+> 9
+
+## Anhui Provincial Key Laboratory of Humanoid Robots 
+
+## zanly12138@gmail.com, mingyumei@zju.edu.cn 
+
+## Abstract 
+
+Articulated object pose estimation is a core task in em-bodied AI. Existing methods typically regress poses in a continuous space, but often struggle with 1) navigating a large, complex search space and 2) failing to incorporate intrinsic kinematic constraints. In this work, we introduce 
+
+DICArt (DI sCrete Diffusion for Art iculation Pose Estima-tion), a novel framework that formulates pose estimation as a conditional discrete diffusion process. Instead of op-erating in a continuous domain, DICArt progressively de-noises a noisy pose representation through a learned re-verse diffusion procedure to recover the GT pose. To im-prove modeling fidelity, we propose a flexible flow decider that dynamically determines whether each token should be denoised or reset, effectively balancing the real and noise distributions during diffusion. Additionally, we incorporate a hierarchical kinematic coupling strategy, estimating the pose of each rigid part hierarchically to respect the object’s kinematic structure. We validate DICArt on both synthetic and real-world datasets. Experimental results demonstrate its superior performance and robustness. By integrating discrete generative modeling with structural priors, DI-CArt offers a new paradigm for reliable category-level 6D pose estimation in complex environments. Project website: 
+
+https://sites.google.com/view/dicartpub .
+
+## 1. Introduction 
+
+Object pose estimation is a critical task with applications spanning robotics [4, 31, 36], augmented reality [2, 5, 52, 
+
+> *Equal Contribution.
+> †Corresponding Author.
+
+54], human-computer interaction [29, 32, 33], and embod-ied AI [17, 19, 21, 46]. Articulations, characterized by their inherent flexibility and joint structure, present unique challenges for pose estimation due to their non-rigid mo-tion and complex interdependencies between the individ-ual parts. Accurate 6D Articulation Pose Estimation ( APE task ) is essential for tasks like manipulation [20, 22], track-ing [28, 43], and scene understanding [47, 55]. The ability to reliably estimate the poses of articulated objects facil-itates more precise interaction with the environment, im-proving the performance of robotic systems and enhancing immersive experiences in virtual environments [30, 53, 56]. Compared to instance-level pose estimation, category-level pose estimation requires accurately predicting the 3D rotation and 3D translation of unseen objects, with the given partial observations. One approach [48], for example, uti-lizes the classic continuous diffusion model to perform pose estimation within a canonical space, representing objects of the same category. Despite significant progress in rigid ob-ject pose estimation, methods for articulated pose estima-tion have lagged behind, current methods are still facing several limitations: • Conventional pose regression methods [15, 40, 48, 51] rely on continuous space representations and often re-quire exhaustive searches over large continuous domains for accurate estimation. Moreover, point clouds are dis-cretely and non-uniformly sampled, leading to a mapping mismatch: discrete spatial inputs versus continuous pose outputs. This discrepancy poses a fundamental challenge, hindering precise modeling and limiting prediction per-formance. • Prior methods studied on articulated object pose esti-mation (e.g., [6, 24, 26, 49]) tend to adopt a part-wise approach for pose modeling, where each part’s pose is estimated independently, disregarding the constraints             
+
+> arXiv:2602.19565v2 [cs.CV] 26 Feb 2026 Figure 1. Comparison of Different Denoising Processes. We denote the rotation-related Euler angles as l, m, n , and model them using discretized bin indices for prediction. (a) illustrates the vanilla denoising process of conventional discrete diffusion models, where incon-sistent convergence rates across tokens often introduce uncertainty and ambiguity in pose prediction—this can be viewed as an aggressive
+> denoising strategy. (b) presents the reformulated denoising process proposed in this work, which is centered around a customized Flow-ing Mechanism . This mechanism introduces adaptive directional guidance that determines appropriate update paths for each token. It is designed to enforce consistent convergence trajectories among semantically correlated token groups, thereby enabling a more stable and
+> gentle denoising process. Note that a rigid part ( bottle ) is chosen to illustrate the process for simplicity.
+
+imposed by the kinematic structure. Moreover, these methods exhibit limited robustness in addressing self-occlusion, especially when larger components obscure smaller movable parts from certain camera angles. To tackle the first challenge, our core idea is to model articulation pose estimation as a discrete diffusion process. In this framework, the articulation pose is sampled by re-versing a forward diffusion process that progressively trans-forms the real data into a series of noisy latent variables via a fixed Markov Chain. The reverse process starts from noise and iteratively denoises it, learning the posterior distribution in the process. Building on this discrete diffusion frame-work, we propose a novel yet equivalent re-formulation for the reverse process. To improve the balance between noisy and real distribution at various stages, we introduce the flex-ible flow decider (Fig. 1), which allows each token in the sequence to either be denoised or reset to a noisy state. To address the second challenge, our solution is a hi-erarchical kinematic coupling mechanism that defines part pairs. Conceptually, the rigid components of an articulated object can be divided into two categories: parent part, which can move in any direction (e.g., the main body of a cabinet) without kinematic constraints (typically, there is only one parent part), and child parts, which move along pre-defined joints (e.g., cabinet doors or drawers) according to physi-cal kinematic laws (an articulated object may have multiple child parts). Leveraging this distinction, our approach rep-resents each part’s pose as a coupling state. This formula-tion is more amenable to learning by neural networks than direct 6D pose regression of each rigid part. Furthermore, the coupling state representation enhances pose estimation for occluded parts, as even limited visibility can provide sufficient information for accurate coupling state prediction. Our contributions can be summarized as follows: • DICArt is a novel framework designed to address category-level 6D pose estimation of articulated objects by formulating the articulation pose estimation as a dis-crete diffusion probabilistic process. • To address challenges such as sub-optimal performance and articulation modeling, DICArt incorporates key mod-ules, including the discrete diffusion probabilistic model, reformulated reverse process, and hierarchical kinematic coupling-guided pose estimation mechanism. • Extensive experiments across synthetic, semi-synthetic, and real-world datasets demonstrate that DICArt outper-forms existing state-of-the-art methods on the articulation pose estimation (APE) task. 
+
+## 2. Related work 
+
+⋆ (1) Category-level 6D Pose Estimation. Traditional instance-level pose estimation [12] aligns known 3D CAD models with observed objects. More recently, research has shifted toward category-level 6D pose estimation, which predicts an object’s 3D rotation and translation relative to a canonical category-specific representation. A semi-nal work, NOCS [39], introduced normalized object co-ordinates and employed the Umeyama algorithm [38] for pose recovery. CASS [7] later proposed a learned canon-ical shape space. To address intra-class shape variations, several methods have incorporated point-based shape pri-ors [59]. While most prior efforts focus on rigid objects, re-cent studies have begun addressing articulated objects [50], which consist of multiple rigid parts connected by joints. A-NCSH [24] extended normalized coordinates to handle ar-ticulation, and Liu et al. [27] further adapted this framework to real-world settings using part-pair reasoning to general-ize to unseen instances. 
+
+Nevertheless, these approaches still face unresolved challenges, such as the necessity for explicit structural prior representations and issues arising from self-occlusions, making them less effective compared to our method. 
+
+⋆ (2) Diffusion Probabilistic Models. 
+
+The diffusion generative model, originally proposed in [37], has inspired extensive follow-up research [45]. It comprises a forward Markov process that progressively adds noise to data and a reverse process that denoises it to recover the original distribution. Compared to autore-gressive models, diffusion models offer advantages such as stable training and parallel refinement. Neural network-based reverse process learning has enabled impressive per-formance in continuous-state applications, including image generation [14, 34], editing [10, 23], text synthesis [13, 35], and audio processing [1, 25]. In discrete domains, diffusion models naturally handle discrete variables. The original for-mulation in [37] considered binary variables, while [16] extended the approach to categorical data using uniform transition matrices. Further advancing this line, [3] intro-duced Discrete Denoising Diffusion Probabilistic Models (D3PMs) with structured categorical corruption, improving modeling fidelity in discrete state spaces. 
+
+Existing studies in pose estimation task [9, 39, 41] have demonstrated the strong potential of discrete diffusion mod-els in pose estimation tasks, primarily by constraining the generative process within physically plausible pose spaces to enhance prediction accuracy and stability. Inspired by this insight, we propose a novel design of the state transi-tion matrix coupled with a tailored noise scheduling strat-egy, aiming to achieve a smoother and more progressive perturbation process that better aligns with the structural continuity and geometric plausibility required in pose esti-mation. 
+
+## 3. Notation and Problem Statement 
+
+To achieve a robust algorithm for Category-level 
+
+Articulation Pose Estimation ( APE ) task, our key idea is to advance category-level articulation pose estimation in discrete state-spaces. Here, we formulate a new paradigm for the APE task named DICArt. Concretely, given the partial observation P = {δk}Kk=1 as input ({δk} is the k-th rigid part), DICArt conducts the predictions for i) per-part 3D rotation R(k) ∈ SO (3) . ii ) per-part 3D translation t(k).In total, these together constitute the final pose estimation result: T = {R(k), t(k)}Kk=1 ∈ SE (3) (output ). In this paper, DICArt formulates the APE task as con-ditional generation and learns pθ (T |P ), where P and T ∈ 
+
+SE (3) refer to the input partial observation and target ar-ticulated object pose separately. For simplification, x is represented as the latent variable (i.e., articulation pose), which is composed of a set of pose elements ei. Each pose element ei has three rotation-related tokens and three translation-related tokens. Each element will be processed as a sequence with 6 discrete tokens via bins. i.e., ei =
+
+{li, m i, n i, x i, y i, z i}, which are uniformly discretized into integers between [1 , K]. Then, we represent the pose as a concatenation of element sequences: 
+
+x = {l1, m 1, n 1, x 1, y 1, z 1∥ . . . 
+
+∥lκ, m κ, n κ, x κ, y κ, z κ∥ . . . ∥lK, m K, n K, x K, y K, z K}
+
+(1) Obviously, the pose sequence is heterogeneous . For-mally, the pipeline of our DICArt can be illustrated as fol-lows: given the discrete pose GT x0 ∼ q (x0), the forward 
+
+process corrupts it into a sequence of increasingly noisy la-tent variables x1: T = x1, x2, . . . , xT :
+
+q(x1: T |x0) = 
+
+> T
+
+Y
+
+> t=1
+
+q(xt|xt−1) (2) 
+
+q(xt|xt−1) = xtQtxt−1 (3) 
+
+q(xt|x0) = αtxt−1 + (1 − αt)qnoise (4) Where xt denotes the one-hot version of a single discrete token in the pose sequence xt. αt := Qti=1 βi is speci-fied to decrease from 1 to 0 w.r.t. t. qnoise characterizes different diffusion processes, Qt is the transition matrix, where [Qt]ij = q(xt = j|xt−1 = i) represents the prob-abilities that xt−1 transitions to xt. Due to the property of Markov chain, the cumulative probability of xt at arbitrary timestep from x0 can be derived as q(xt|x0) = xtQtx0,where Qt = Q1Q2 . . . Qt. To conduct the pose prediction, the reverse process starts with a random noise xT and grad-ually recovers it relying on the learned posterior distribution 
+
+pθ (xt−1|xt), i.e., pθ (x0: T ) = p(xT ) QTt=1 pθ (xt−1|xt).It is noted that a reformulated denoising process is in-troduced in this work, aiming at a gentle pose prediction. Finally, the parent part 6D pose, and axis descriptors are uti-lized to recover the final 6D pose via the spatial kinematic reasoning. To avoid ambiguity and better clarify the vari-ables, we use the symbol ‘ ∗ ’ to indicate the GT variables, and ‘ ˆ’ to indicate the predicted variables. 4. Methodology 
+
+4.1. Forward Corruption of Parent Part’s Pose 
+
+As illustrated in Fig. 2, we first predict parent part pose 
+
+Tprt = [ Rprt | tprt ] via discrete diffusion models under the 
+
+hierarchical kinematic coupling strategy. However, directly applying a discrete diffusion model is not straightforward. Inspired by prior works [9, 39], we reformulate the transla-tion regression task t ∈ R3 as a classification problem to en-hance stability and convergence. Specifically, each axis in the 3D coordinate space is discretized into a set of bins, and the network is trained to predict the index of the correspond-ing bin. Similarly, the rotation matrix is converted into three independent Euler angles, which are discretized within their domain (i.e., [0 ◦, 360 ◦) or an equivalent periodic space), thereby transforming the rotation prediction into a classifi-cation task as well. This formulation results in two semanti-cally distinct token groups: {x, y, z } are translation-related tokens, and {l, m, n } are rotation-related tokens, which fa-cilitate structured and interpretable 6D pose prediction. The design of the transition matrix is inspired by the fol-lowing important observations: (1) Token Consistency . The pose sequence consists of two semantically distinct components—rotation and trans-lation, each comprising three dimensions, resulting in a heterogeneous mixture of six token types. Directly apply-ing conventional discrete diffusion models for state transi-tions may lead to semantic inconsistencies—for instance, rotation-related tokens may be erroneously transformed into translation-related tokens, thereby compromising the struc-tural integrity and physical meaning of the pose representa-tion. To address this issue, we introduce a block-wise diag-onal constraint in the state transition matrix, which isolates different token types into separate subspaces and restricts transitions to occur only within tokens of the same semantic category. This design effectively ensures both the validity of sequence generation and the stability of pose prediction. Therefore, to ensure the validity of the predicted pose se-quence, we restrict internal transitions to occur only within the same type of token. Consequently, Qpose t simplifies to a block-wise diagonal matrix, represented mathematically as: 
+
+Qpose t =
+
+ Qrot t
+
+Qtsl t
+
+
+
+, (5) Where Qrot t and Qtsl t represent transition probabilities of rotation and translation tokens, respectively. (2) Smooth Classification . While discretization—such as binning—enables pose estimation to be cast as a clas-sification problem, it differs significantly from traditional categorical classification. To better capture this structural continuity, we draw inspiration from paper [3]. Specifically, each token in the pose sequence evolves under a transition matrix Qt that models its probabilistic trajectory during de-noising. To improve responsiveness to uncertain or noisy tokens, we extend the discrete state space from K to K + 1 
+
+by introducing a special [ MASK ] token. This augmentation enables Qt ∈ R(K+1) ×(K+1) to jointly encode K quantized pose classes and a dynamic masking state, thereby facili-tating more flexible and effective correction of pose tokens during the reverse process. 
+
+4.2. Reformulated Denoising Process 
+
+As previously mentioned, we convert the rotation matrix into three semantically correlated yet independent Euler angles. Due to the strong interdependence among these angles, traditional discrete diffusion models [8, 44] often struggle to denoise them at a synchronized pace during the reverse process: some tokens may prematurely con-verge to their true values before the final diffusion step (i.e., t < T ), while others remain in a high-noise state. This asynchronous convergence disrupts the semantic con-sistency among tokens and ultimately degrades the accuracy of pose estimation. This limitation underscores the funda-mental challenge faced by conventional discrete diffusion models when dealing with tightly coupled token represen-tations. To address this issue, we revisit the reverse process and introduce a novel Reformulated Reverse Process , which is specifically designed to maintain semantic coherence and synchronization during denoising, thereby enhancing the overall prediction accuracy and stability. Our core idea is a flexible flow decider , to apply it in the conditional reverse transition of discrete diffusion mod-els, we draw inspiration from [3, 16, 57], where the varia-tional approach demonstrates that the reverse process shut-tles discrete tokens between noisy states and the ground truth state x0, conditioned on the equality of xt and x0.When xt = x0, the token is likely in a noise-free state. In this scenario, the model maintains the noise-free state by setting xt−1 = xt or reintroduces noise. When xt̸ = x0,the model treats the token as noisy and either denoises xt
+
+towards x0 or keeps it in a noisy state. Concretely, given the forward transition matrix [Qpose t ], the transition formu-lation can be expressed compactly, i.e., the conditional re-verse transition q(xt−1|xt, x0) is represented as:                 
+
+> q(xt−1|xt,x0) =
+> 
+> λ(1)
+> t−1xt+
+> 
+> 1−λ(1)
+> t−1
+> 
+> xT,if xt=x0
+> λ(2)
+> t−1x0+
+> 
+> 1−λ(2)
+> t−1
+> 
+> qnoise (xt),if xt̸=x0.
+> (6)
+
+The coefficient λ(1) 
+
+> t−1
+
+, λ (2)  
+
+> t−1
+
+are the mapping results of 
+
+αt−1, β t−1, which governs the probability of transitioning directly from xt to the ground truth state x0. The terminal state xT is associated with the [ MASK ] token, denoted as the noise distribution qnoise .To integrate the sampling method through an augmented path and simplify the training process, we obtain the com-Figure 2. The Pipeline of Our DICArt. Please note that images of the object with varying saturation levels represent different degrees of noise in the pose annotations. 
+
+plete reformulation as follows: 
+
+bt = I{xt = x0}
+
+v(1)  
+
+> t−1
+
+∼ GS 
+
+
+
+λ(1) 
+
+> t−1
+
+, 1 − λ(1) 
+
+> t−1
+
+
+
+, u(1)  
+
+> t
+
+∼ xT
+
+v(2)  
+
+> t−1
+
+∼ GS 
+
+
+
+λ(2) 
+
+> t−1
+
+, 1 − λ(2) 
+
+> t−1
+
+
+
+, u(2)  
+
+> t
+
+∼ qnoise (xt)
+
+xt−1 = bt
+
+h
+
+v(1) 
+
+> t−1
+
+xt +
+
+
+
+1 − v(1) 
+
+> t−1
+
+
+
+u(1) 
+
+> t
+
+i
+
++ (1 − bt)
+
+h
+
+v(2) 
+
+> t−1
+
+x0 +
+
+
+
+1 − v(2) 
+
+> t−1
+
+
+
+u(2) 
+
+> t
+
+i
+
+(7) To simplify the notation, we denote vt−1 := 
+
+h
+
+v(1) 
+
+> t−1
+
+, v (2) 
+
+> t−1
+
+i
+
+,
+
+ut−1 := 
+
+h
+
+u(1) 
+
+> t−1
+
+, u (2) 
+
+> t−1
+
+i
+
+and λt−1 := 
+
+h
+
+λ(1) 
+
+> t−1
+
+, λ (2) 
+
+> t−1
+
+i
+
+. In Eq 7, 
+
+I is indicator function, qnoise (xt) = βtxt + (1 − βt)qnoise ,taking the value 1 when xt = x0 and 0 otherwise. The variable vt−1, drawn from a Gumbel-Softmax function [18] (GS ( ·)) with time parameter λt−1, governs the discrete 
+
+flowing mechanism , which determines the transition path at each step of the diffusion process. ut denotes a noise distri-bution that sampled by xT or xt.This framework extends the standard discrete diffusion model by introducing a series of binary flow indicators 
+
+{vt−1}Tt=1 , allowing the model to dynamically choose be-tween preserving, denoising, or reintroducing noise at each timestep. The conditional reverse transition is computed by marginalizing over vt−1, yielding: 
+
+q(xt−1 | xt, x0) = Evt−1∼GS (λt−1) [q(xt−1 | vt−1, xt, x0)] .
+
+(8) By explicitly modeling the uncertainty in token behavior through vt−1, this joint formulation enhances both the flexi-bility and representational capacity of the diffusion process. 
+
+4.3. Hierarchical Kinematic Coupling 
+
+To further reduce the pose prediction space (the core moti-vation of this work) and to address the prevalent issue of physical inconsistency in existing methods, we introduce kinematic reasoning and a hierarchical coupling mechanism into the part pose estimation process, forming the hierar-chical kinematic coupling manner for articulated objects. The core idea of this paradigm lies in the fact that an ar-ticulated object is composed of multiple rigid components whose motions are coupled through joint axes within a hi-erarchical structure. Each sub-part’s motion trajectory is strictly constrained by its corresponding joint axis rather than varying arbitrarily. Based on this property, we categorize the rigid compo-nents of an articulated object into two types: 1) Parent Part ,which serving as the motion reference of the entire artic-ulated structure, it can move freely in 3D space (typically, an articulated object contains only one parent part, such as the main body of a cabinet); 2) Child Part , whose motion strictly depends on the parent part and the associated joint, being confined to directions or trajectories defined by the joint and constrained by the underlying kinematic structure (e.g., cabinet doors or drawers). According to the kinematic principles of articulated ob-jects, joint axes can be categorized into two types, each de-fined by specific descriptors: 1) Revolute Axis: enables the child part to rotate around a fixed axis, as exempli-fied by a laptop’s hinge connecting the base (parent) and the screen (child). Its axis descriptor is parameterized as 
+
+ϕr = ( ur , qr ), where ur ∈ R3 denotes the unit direction vector of the joint axis in the canonical coordinate system, and qr ∈ R3 represents the pivot point, i.e., the rotation center. 2) Prismatic Axis: allows linear motion of the child part along a specific direction, such as a drawer sliding rel-ative to its cabinet. It is parameterized as ϕp = (up),where up ∈ R3 denotes the unit direction vector of the joint axis. This unified parameterization establishes a con-sistent mathematical foundation for hierarchical kinematic coupling–based pose estimation. To precisely model the joint constraint information of ar-ticulated objects, two independent MLPs are designed to predict the axis descriptor and the motion axis b(k), respec-tively. Specifically: 1) Axis descriptor prediction: this mod-ule aims to determine the joint axis direction u. The align-ment axis direction of each child part, denoted as a(k), is defined to be parallel to u. The predicted u serves as the initialization basis and is further mapped to a(k), ensuring the spatial geometric consistency and interpretability of the joint axis orientation. 2) Motion axis prediction: to enhance the stability and physical plausibility of joint axis estima-tion, an orthogonality constraint is imposed, enforcing the motion axis b(k) to be strictly orthogonal [11] to the joint axis a(k) in 3D space. This motion axis defines the relative motion direction of the child part with respect to its parent part, ensuring that the predicted motion trajectory complies with the kinematic rules and physical constraints of articu-lated motion. 
+
+## 5. Experiments 
+
+5.1. Experimental Setup 
+
+Dataset, Baselines, Metrics. The following datasets are used: synthetic dataset, ArtImage [42], semi-synthetic dataset ReArtMix [27], and real-world dataset RobotArm [27]. To ensure a fair and comprehensive comparison, the following baselines are selected: A-NCSH [24], Gen-Pose [48], OP-Align [6], ShapePose [58]. To validate the performance of the DICArt, we adopt degree error ( ◦) for 3D rotation, distance error (m) for 3D translation. 
+
+Experimental Details. During the data preprocessing phase, point clouds are uniformly sampled to contain ex-actly 1,024 points, which serve as the inputs to the network. We utilize the Adam optimizer, the learning rate is 0.001, the batch size is 96, and the total number of training epochs is 200. The total diffusion steps T is 100, and the bin size is 360. All experiments were conducted on an NVIDIA GeForce RTX 3090 GPU equipped with 24GB of memory. 
+
+5.2. Comparison with the SOTA Methods 
+
+Quantitative Results. We present the results of DICArt on ArtImage in Tab. 1. Compared to classical methods, we achieve the best pose estimation results for the laptop cat-egory, with rotation errors of 3.2◦ and 3.9◦. This superior performance can be attributed to reformulated reverse pro-cess , which excels in handling objects with similar sizes and shapes at the part level. For the Eyeglasses category, our method demonstrates exceptional performance, achieving translation errors of 0.041 m, 0.091 m, and 0.083 m, which highlights the framework’s precision in estimating axis de-scriptors. Concerning pose error of child part, we achieve a remarkable 3.3◦ and 0.05 m error in average for category 
+
+dishwasher , indicating that articulation modeling with a hi-erarchical kinematic coupling perspective is more effective than part-wise approaches. 
+
+Qualitative Results. In Fig. 3, we show the visualiza-tions of Ground Truth, A-NCSH and our method on ArtIm-age (left). It can be observed that, compared to A-NCSH, our method demonstrates superior performance in predict-ing the pose of each part of the articulated object in cam-era space. Specifically, our method achieves results that are very close to the GT for objects such as laptops, dishwash-ers, and drawers. This indicates that our approach not only provides more accurate predictions but also maintains high consistency across different types of articulated objects. 
+
+5.3. Ablation Study 
+
+Discrete Diffusion v.s Continuous Diffusion. In this pa-per, we present a novel and effective method for APE task using a discrete diffusion model, as opposed to the con-tinuous diffusion model. We argue that pose estimation in discrete state spaces is more effective in the pre-configured state space rather than in a continuous one. To validate the effectiveness of our approach, DICArt, we replace the dis-crete process in DICArt with a continuous one [48] as the baseline. The comparison results, shown in Tab. 2 (I - II), demonstrate the superiority of our method, which signifi-cantly outperforms the baseline in terms of performance. Table 1. Comparisons on the ArtImage Dataset. We validate our DICArt on five categories (Laptop, Eyeglasses, Dishwasher, Scissors, and Drawer) that contain 2, 3, 2, 2, 4 parts, respectively. 
+
+Category Method Per-part 6D Pose Axis Descriptor Rotation Error ( ◦) ↓ Translation Error (m) ↓ Angle Error ( ◦) ↓ Distance Error (m) ↓
+
+Laptop A-NCSH [24] 5.3, 5.4 0.054, 0.043 1.7 0.09 GenPose [48] 5.3, 6.1 0.068, 0.060 3.8 0.03 
+
+OP-Align [6] 6.3, 5.2 0.072, 0.058 4.5 0.11 ShapePose [58] 5.0, 4.6 0.052, 0.064 3.3 0.06 
+
+DICArt (Ours) 3.2 , 3.9 0.045 , 0.040 0.8 0.04 Eyeglasses A-NCSH [24] 3.7, 22.3, 23.2 0.049, 0.313, 0.324 3.1, 3.1 0.07, 0.06 GenPose [48] 5.0, 7.4, 7.6 0.063, 0.113, 0.301 4.1, 4.3 0.04, 0.05 OP-Align [6] 9.3, 8.2, 15.6 0.048, 0.253, 0.281 2.5, 3.2 0.06, 0.08 ShapePose [58] 4.2, 6.0, 6.0 0.049, 0.106, 0.108 3.8, 3.9 0.05, 0.08 
+
+DICArt (Ours) 3.5 , 5.1 , 5.3 0.041 , 0.091 , 0.083 1.5 , 1.6 0.02 , 0.02 
+
+Dishwasher A-NCSH [24] 4.0, 4.8 0.059, 0.123 6.1 0.11 GenPose [48] 6.1, 6.3 0.115, 0.164 4.8 0.09 OP-Align [6] 4.2, 5.8 0.132, 0.182 5.3 0.10 ShapePose [58] 3.9, 4.3 0.055, 0.079 2.2 0.04 
+
+DICArt (Ours) 2.9 , 3.7 0.048 , 0.055 1.7 0.03 
+
+Scissors A-NCSH [24] 2,0, 2.9 0.035, 0.025 0.8 0.04 GenPose [48] 4.1, 3.5 0.050, 0.041 2.8 0.06 OP-Align [6] 3.3, 3.7 0.043, 0.058 2.5 0.09 ShapePose [58] 2.3, 2.9 0.033, 0.045 1.9 0.08 
+
+DICArt (Ours) 1.7 , 2.2 0.024 , 0.021 0.5 0.02 
+
+Drawer A-NCSH [24] 2.8, 3.5, 3.9, 2.9 0.045, 0.155, 0.157, 0.075 2.6, 2.7, 5.2 -, -, -GenPose [48] 4.3, 4.3, 4.3, 4.3 0.125, 0.154, 0.166, 0.126 3.3, 3.3, 3.3 -, -, -OP-Align [6] 5.3, 4.5, 4.6, 4.9 0.101, 0.137, 0.178, 0.135 2.9, 3.1, 3.0 -, -, -ShapePose [58] 3.6, 3.6, 3.6, 3.6 0.068, 0.126, 0.128, 0.115 2.0, 2.3, 2.1 -, -, -
+
+DICArt (Ours) 1.7 , 1.7 , 1.7 , 1.7 0.041 , 0.085 , 0.091 , 0.071 1.4 , 1.8 , 1.9 -, -, - 
+
+> Figure 3. Qualitative Results on the Synthetic Dataset (left) and RGB-D Images Dataset (right).
+
+Self-occlusion Analysis. To further examine the robustness of our DICArt under self-occlusion conditions, we catego-rized the test samples of the Drawer category into three sub-sets according to their occlusion levels, as self-occlusion issues are particularly prevalent in drawers. The occlu-sion level is quantified by the visible ratio of points rel-ative to the total number of points, a metric akin to that used in A-NCSH [24]. Specifically, this experiment in-volves three subsets characterized by different visibility ra-tios: (0%, 40%), (40%, 80%), and (80%, 100%). We utilized both mean rotation and translation errors as uni-form metrics to assess the pose estimation performance. As shown in Tab. 2 (III-V), the results indicate that, despite in-creasing occlusion levels, the rotation error remains largely stable, a testament to the effectiveness of our hierarchical kinematic coupling approach. Notably, our method main-tains a low translation error even at occlusion levels up to 80%. Even in extreme scenarios where occlusion ranges Table 2. Ablation Study Results . Experiments are conducted on the category Drawer .                              
+
+> Index Diffusion Rotation Error ( ◦)Translation Error ( m)
+> IContinuous 3.1 0.143 II Discrete 1.7 0.072
+> Index Occlusion Level (Visibility) Rotation Error ( ◦)Translation Error ( m)
+> III 0%-40% 1.8 0.089 IV 40%-80% 1.9 0.096 V80%-100% 1.9 0.107
+> Index Reformulated Denoising Rotation Error ( ◦)Translation Error ( m)
+> VI -4.0 0.128 VII ✓1.7 0.072
+
+Table 3. Pose Estimation Results on ReArtMix Dataset .                                      
+
+> Category Method Per-part Pose Rotation Error ( ◦)Translation Error (m) Box ReArtNet [27] 3.3, 3.4 0.026, 0.031 DICArt (Ours) 1.5 ,1.6 0.009 ,0.010
+> Stapler ReArtNet [27] 5.1, 6.5 0.035, 0.031 DICArt (Ours) 2.5 ,3.2 0.008 ,0.012
+> Cutter ReArtNet [27] 3.3, 3.0 0.019, 0.014 DICArt (Ours) 2.3 ,2.4 0.007 ,0.009
+> Scissors ReArtNet [27] 5.4, 5.1 0.009, 0.015 DICArt (Ours) 3.5 ,4.2 0.008 ,0.011
+> Drawer ReArtNet [27] 3.4, 3.9 0.024, 0.021 DICArt (Ours) 1.5 ,1.6 0.007 ,0.009
+
+from 80% to 100%, our method continues to deliver satis-factory results, with a translation error of merely 0.107 m.
+
+Reformulated Denoising. As described in Sec. 4.2, tradi-tional diffusion models often struggle to efficiently recover all tokens from pure noise to the target data distribution in a consistent manner during the denoising process. To address this limitation, we introduce the Flowing Mecha-nism , which centers on the proposed Flexible Flow Decider .This component adaptively guides the update direction and magnitude of each token at every denoising step. Abla-tion studies presented in Tab. 2 (VI-VII) demonstrate that the proposed method significantly enhances model perfor-mance, owing to its gentle yet adaptive denoising strategy, which effectively mitigates the imbalance in convergence commonly observed in traditional diffusion processes. 
+
+5.4. Generalization Capacity 
+
+Experiments on Semi-Synthetic Scenarios. Tab. 3 shows quantitative results on the ReArtMix dataset [27]. Com-pared to the baseline, our method demonstrates excellent performance, achieving superior rotation estimation across all categories. Specifically, our method exhibits highly ac-curate translation estimation, with translation errors of only 
+
+0.007 m and 0.009 m for the Drawer category. This level of precision underscores the robustness and reliability of our approach in handling various types of articulated objects. Qualitative results can be seen in Fig. 3 (right). 
+
+Experiments on Real-world Scenarios. We also evalu-ate DICArt using the 7-part RobotArm dataset in real-world 
+
+Table 4. Pose Estimation Results on 7-part RobotArm Dataset.                                           
+
+> Per-part Rotation Error ( ◦)Part ID 1234567A-NCSH [24] 7.8 7.9 10.3 10.5 11.2 16.4 23.5 DICArt (Ours) 1.6 4.8 7.8 7.9 8.1 12.3 15.1
+> Per-part Translation Error (m) Part ID 1234567A-NCSH [24] 0.012 0.044 0.067 0.066 0.179 0.236 0.403 DICArt (Ours) 0.011 0.031 0.051 0.053 0.082 0.156 0.353
+
+scenarios. As shown in Tab. 4, our method performs well in estimating per-part poses, achieving an average rotation er-ror of 8.2 ◦ and a translation error of 0.105 m across parts 1 to 7. These results demonstrate the robustness and accuracy of our approach in handling complex, multi-part articula-tions in real-world settings. Qualitative results are shown in Fig. 4, further confirming the effectiveness of our method. 
+
+Figure 4. Qualitative Results on 7-part RobotArm Dataset. 
+
+## 6. Conclusion 
+
+In this paper, we propose DICArt, a novel category-level articulated object pose estimation framework via improved discrete diffusion models. The central idea is to introduce discretization, transforming the pose estimation task into a more manageable classification problem. To restrictively confine the search space towards physically viable config-urations and a gentle denoising process, a reformulated de-noising mechanism is introduced. To cope with the self-occlusion problems, we propose the hierarchical kinematic coupling mechanism, which takes the kinematic constraints into consideration. Experimental results demonstrate that our method not only achieves SOTA performance on the synthetic dataset (ArtImage) but also exhibits strong gen-eralization capabilities on semi-synthetic (ReArtMix) and real-world articulated object datasets (RobotArm). 
+
+## Acknowledgment 
+
+This work was supported in part by National Natural Science Foundation of China under Grant 62302143 and 52275514, also with Anhui Provincial Natural Science Foundation under Grant 2308085QF207. References 
+
+[1] Simon Alexanderson, Rajmund Nagy, Jonas Beskow, and Gustav Eje Henter. Listen, denoise, action! audio-driven motion synthesis with diffusion models. ACM Transactions on Graphics (TOG) , 42(4):1–20, 2023. 3 [2] Dhiraj Amin and Sharvari Govilkar. Comparative study of augmented reality sdks. International Journal on Computa-tional Science & Applications , 5(1):11–26, 2015. 1 [3] Jacob Austin, Daniel D Johnson, Jonathan Ho, Daniel Tar-low, and Rianne Van Den Berg. Structured denoising dif-fusion models in discrete state-spaces. Advances in Neural Information Processing Systems , 34:17981–17993, 2021. 3, 4[4] Aude Billard and Danica Kragic. Trends and challenges in robot manipulation. Science , 364(6446):eaat8414, 2019. 1 [5] Julie Carmigniani and Borko Furht. Augmented reality: an overview. Handbook of augmented reality , pages 3–46, 2011. 1 [6] Yuchen Che, Ryo Furukawa, and Asako Kanezaki. Op-align: Object-level and part-level alignment for self-supervised category-level articulated object pose estimation. In Eu-ropean Conference on Computer Vision , pages 72–88. Springer, 2024. 1, 6, 7 [7] Dengsheng Chen, Jun Li, Zheng Wang, and Kai Xu. Learn-ing canonical shape space for category-level 6d object pose and size estimation. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 11973–11982, 2020. 3 [8] Ting Chen, Ruixiang Zhang, and Geoffrey Hinton. Analog bits: Generating discrete data using diffusion models with self-conditioning. arXiv preprint arXiv:2208.04202 , 2022. 4 [9] Cheng Chi and Shuran Song. Garmentnets: Category-level pose estimation for garments via canonical space shape com-pletion. In Proceedings of the IEEE/CVF International Con-ference on Computer Vision , pages 3324–3333, 2021. 3, 4 [10] Guillaume Couairon, Jakob Verbeek, Holger Schwenk, and Matthieu Cord. Diffedit: Diffusion-based seman-tic image editing with mask guidance. arXiv preprint arXiv:2210.11427 , 2022. 3 [11] Yan Di, Ruida Zhang, Zhiqiang Lou, Fabian Manhardt, Xi-angyang Ji, Nassir Navab, and Federico Tombari. Gpv-pose: Category-level object pose estimation via geometry-guided point-wise voting. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 6781–6791, 2022. 6 [12] Bardia Doosti, Shujon Naha, Majid Mirbagheri, and David J Crandall. Hope-net: A graph-based model for hand-object pose estimation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 6608– 6617, 2020. 2 [13] Shuyang Gu, Dong Chen, Jianmin Bao, Fang Wen, Bo Zhang, Dongdong Chen, Lu Yuan, and Baining Guo. Vec-tor quantized diffusion model for text-to-image synthesis. In 
+
+Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 10696–10706, 2022. 3 [14] Jonathan Ho, Chitwan Saharia, William Chan, David J Fleet, Mohammad Norouzi, and Tim Salimans. Cascaded diffu-sion models for high fidelity image generation. Journal of Machine Learning Research , 23(47):1–33, 2022. 3 [15] Karl Holmquist and Bastian Wandt. Diffpose: Multi-hypothesis human pose estimation using diffusion models. In Proceedings of the IEEE/CVF international conference on computer vision , pages 15977–15987, 2023. 1 [16] Emiel Hoogeboom, Didrik Nielsen, Priyank Jaini, Patrick Forr´ e, and Max Welling. Argmax flows and multinomial dif-fusion: Towards non-autoregressive language models. arXiv preprint arXiv:2102.05379 , 3(4):5, 2021. 3, 4 [17] Ji Hou, Benjamin Graham, Matthias Nießner, and Saining Xie. Exploring data-efficient 3d scene understanding with contrastive scene contexts. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 15587–15597, 2021. 1 [18] Eric Jang, Shixiang Gu, and Ben Poole. Categorical reparameterization with gumbel-softmax. arXiv preprint arXiv:1611.01144 , 2016. 5 [19] Maximilian Jaritz, Jiayuan Gu, and Hao Su. Multi-view pointnet for 3d scene understanding. In Proceedings of the IEEE/CVF International Conference on Computer Vision Workshops , pages 0–0, 2019. 1 [20] Yunfan Jiang, Agrim Gupta, Zichen Zhang, Guanzhi Wang, Yongqiang Dou, Yanjun Chen, Li Fei-Fei, Anima Anandku-mar, Yuke Zhu, and Linxi Fan. Vima: Robot manipulation with multimodal prompts. 2023. 1 [21] Thorsten Karrer, Moritz Wittenhagen, Leonhard Lichtschlag, Florian Heller, and Jan Borchers. Pin-stripe: eyes-free continuous input on interactive clothing. In 
+
+Proceedings of the SIGCHI Conference on Human Factors in Computing Systems , pages 1313–1322, 2011. 1 [22] Dov Katz and Oliver Brock. Manipulating articulated objects with interactive perception. In 2008 IEEE International Con-ference on Robotics and Automation , pages 272–277. IEEE, 2008. 1 [23] Bahjat Kawar, Shiran Zada, Oran Lang, Omer Tov, Huiwen Chang, Tali Dekel, Inbar Mosseri, and Michal Irani. Imagic: Text-based real image editing with diffusion models. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 6007–6017, 2023. 3 [24] Xiaolong Li, He Wang, Li Yi, Leonidas J Guibas, A Lynn Abbott, and Shuran Song. Category-level articulated object pose estimation. In Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition , pages 3706–3715, 2020. 1, 3, 6, 7, 8 [25] Haohe Liu, Zehua Chen, Yi Yuan, Xinhao Mei, Xubo Liu, Danilo Mandic, Wenwu Wang, and Mark D Plumbley. Audi-oldm: Text-to-audio generation with latent diffusion models. 
+
+arXiv preprint arXiv:2301.12503 , 2023. 3 [26] Liu Liu, Wenqiang Xu, Haoyuan Fu, Sucheng Qian, Qiao-jun Yu, Yang Han, and Cewu Lu. Akb-48: a real-world articulated object knowledge base. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14809–14818, 2022. 1 [27] Liu Liu, Han Xue, Wenqiang Xu, Haoyuan Fu, and Cewu Lu. Toward real-world category-level articulation pose esti-mation. IEEE Transactions on Image Processing , 31:1072– 1083, 2022. 3, 6, 8 [28] Liu Liu, Anran Huang, Qi Wu, Dan Guo, Xun Yang, and Meng Wang. Kpa-tracker: Towards robust and real-time category-level articulated object 6d pose tracking. In Pro-ceedings of the AAAI Conference on Artificial Intelligence ,pages 3684–3692, 2024. 1 [29] Yiming Liu, Chunki Yiu, Huiling Jia, Tszhung Wong, Kuan-ming Yao, Ya Huang, Jingkun Zhou, Xingcan Huang, Ling Zhao, Dengfeng Li, et al. Thin, soft, garment-integrated tri-boelectric nanogenerators for energy harvesting and human machine interfaces. EcoMat , 3(4):e12123, 2021. 1 [30] Francisco-Jos´ e Ma˜ nas- ´ Alvarez, Mar´ ıa Guinaldo, Raquel Dormido, and Sebastian Dormido. Robotic park: Multi-agent platform for teaching control and robotics. IEEE Ac-cess , 11:34899–34911, 2023. 1 [31] Matthew T Mason. Mechanics of robotic manipulation . MIT press, 2001. 1 [32] Brad A Myers. A brief history of human-computer interac-tion technology. interactions , 5(2):44–54, 1998. 1 [33] Jenny Preece, Yvonne Rogers, Helen Sharp, David Benyon, Simon Holland, and Tom Carey. Human-computer interac-tion . Addison-Wesley Longman Ltd., 1994. 1 [34] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 10684–10695, 2022. 3 [35] Nataniel Ruiz, Yuanzhen Li, Varun Jampani, Yael Pritch, Michael Rubinstein, and Kfir Aberman. Dreambooth: Fine tuning text-to-image diffusion models for subject-driven generation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 22500– 22510, 2023. 3 [36] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Cliport: What and where pathways for robotic manipulation. In Con-ference on Robot Learning , pages 894–906. PMLR, 2022. 1[37] Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan, and Surya Ganguli. Deep unsupervised learning using nonequilibrium thermodynamics. In International confer-ence on machine learning , pages 2256–2265. PMLR, 2015. 3[38] Shinji Umeyama. Least-squares estimation of transforma-tion parameters between two point patterns. IEEE Transac-tions on Pattern Analysis & Machine Intelligence , 13(04): 376–380, 1991. 3 [39] He Wang, Srinath Sridhar, Jingwei Huang, Julien Valentin, Shuran Song, and Leonidas J Guibas. Normalized object coordinate space for category-level 6d object pose and size estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 2642– 2651, 2019. 2, 3, 4 [40] Jianyuan Wang, Christian Rupprecht, and David Novotny. Posediffusion: Solving pose estimation via diffusion-aided bundle adjustment. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pages 9773–9783, 2023. 1 [41] Weiquan Wang, Jun Xiao, Chunping Wang, Wei Liu, Zhao Wang, and Long Chen. Dipose: Discrete diffusion model for occluded 3d human pose estimation. CoRR , 2024. 3 [42] Han Xue, Liu Liu, Wenqiang Xu, Haoyuan Fu, and Cewu Lu. Omad: Object model with articulated deformations for pose estimation and retrieval. arXiv preprint arXiv:2112.07334 ,2021. 6 [43] Han Xue, Wenqiang Xu, Jieyi Zhang, Tutian Tang, Yutong Li, Wenxin Du, Ruolin Ye, and Cewu Lu. Garmenttrack-ing: Category-level garment pose tracking. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition , pages 21233–21242, 2023. 1 [44] Dongchao Yang, Jianwei Yu, Helin Wang, Wen Wang, Chao Weng, Yuexian Zou, and Dong Yu. Diffsound: Discrete diffusion model for text-to-sound generation. IEEE/ACM Transactions on Audio, Speech, and Language Processing ,31:1720–1733, 2023. 4 [45] Ling Yang, Zhilong Zhang, Yang Song, Shenda Hong, Run-sheng Xu, Yue Zhao, Wentao Zhang, Bin Cui, and Ming-Hsuan Yang. Diffusion models: A comprehensive survey of methods and applications. ACM Computing Surveys , 56(4): 1–39, 2023. 3 [46] Qiaojun Yu, Junbo Wang, Wenhai Liu, Ce Hao, Liu Liu, Lin Shao, Weiming Wang, and Cewu Lu. Gamma: Generaliz-able articulation modeling and manipulation for articulated objects. arXiv preprint arXiv:2309.16264 , 2023. 1 [47] Ting Yu, Xiaojun Lin, Shuhui Wang, Weiguo Sheng, Qing-ming Huang, and Jun Yu. A comprehensive survey of 3d dense captioning: Localizing and describing objects in 3d scenes. IEEE Transactions on Circuits and Systems for Video Technology , 2023. 1 [48] Jiyao Zhang, Mingdong Wu, and Hao Dong. Genpose: gen-erative category-level object pose estimation via diffusion models. In Proceedings of the 37th International Conference on Neural Information Processing Systems , pages 54627– 54644, 2023. 1, 6, 7 [49] Li Zhang, Weiqing Meng, Yan Zhong, Bin Kong, Mingliang Xu, Jianming Du, Xue Wang, Rujing Wang, and Liu Liu. U-cope: Taking a further step to universal 9d category-level object pose estimation. In European Conference on Com-puter Vision , pages 254–270. Springer, 2024. 1 [50] Li Zhang, Haonan Jiang, Yukang Huo, Yan Zhong, Jianan Wang, Xue Wang, Rujing Wang, and Liu Liu. Rˆ 2-art: Category-level articulation pose estimation from single rgb image via cascade render strategy. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 9985– 9993, 2025. 3 [51] Li Zhang, Mingliang Xu, Jianan Wang, Qiaojun Yu, Lixin Yang, Yonglu Li, Cewu Lu, Rujing Wang, and Liu Liu. Gapt-dar: Category-level garments pose tracking via integrated 2d deformation and 3d reconstruction. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22638–22647, 2025. 1 [52] Chen Zhao, Weiling Cai, Chenyu Dong, and Chengwei Hu. Wavelet-based fourier information interaction with fre-quency diffusion adjustment for underwater image restora-tion. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , pages 8281–8291, 2024. 1 [53] Chen Zhao, Weiling Cai, Chengwei Hu, and Zheng Yuan. Cycle contrastive adversarial learning with structural consis-tency for unsupervised high-quality image deraining trans-former. Neural Networks , 178:106428, 2024. 1 [54] Chen Zhao, Zhizhou Chen, Yunzhe Xu, Enxuan Gu, Jian Li, Zili Yi, Qian Wang, Jian Yang, and Ying Tai. From zero to detail: Deconstructing ultra-high-definition image restora-tion from progressive spectral perspective. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pages 17935–17946, 2025. 1 [55] Chen Zhao, En Ci, Yunzhe Xu, Tiehan Fan, Shanyan Guan, Yanhao Ge, Jian Yang, and Ying Tai. Ultrahr-100k: En-hancing uhr image synthesis with a large-scale high-quality dataset. Advances in Neural Information Processing Sys-tems , 2025. 1 [56] Chen Zhao, Chenyu Dong, Weiling Cai, and Yueyue Wang. Learning a physical-aware diffusion model based on trans-former for underwater image enhancement. IEEE transac-tions on geoscience and remote sensing , 2026. 1 [57] Lin Zheng, Jianbo Yuan, Lei Yu, and Lingpeng Kong. Areparameterized discrete diffusion model for text generation. 
+
+arXiv preprint arXiv:2302.05737 , 2023. 4 [58] Jun Zhou, Kai Chen, Mingqiang Wei, Xiao-Ping Zhang, Qi Dou, and Jing Qin. Canonical shape reconstruction with se (3) equivariance learning for weakly-supervised object pose estimation. IEEE Transactions on Circuits and Systems for Video Technology , 2025. 6, 7 [59] Lu Zou, Zhangjin Huang, Naijie Gu, and Guoping Wang. 6d-vit: Category-level 6d object pose estimation via transformer-based instance representation learning. IEEE Transactions on Image Processing , 31:6907–6921, 2022. 3

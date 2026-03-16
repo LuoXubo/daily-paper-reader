@@ -1,0 +1,542 @@
+Title: pFedNavi: Structure-Aware Personalized Federated Vision-Language Navigation for Embodied AI
+
+URL Source: https://arxiv.org/pdf/2602.14401v1
+
+Published Time: Tue, 17 Feb 2026 02:30:14 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# pFedNavi : Structure-Aware Personalized Federated Vision-Language Navigation for Embodied AI 
+
+Qingqian Yang, Hao Wang 
+
+Stevens Institute of Technology 
+
+Hoboken, NJ, USA 
+
+{qyang21,hwang9}@stevens.edu 
+
+Sai Qian Zhang 
+
+New York University 
+
+New York, NY, USA 
+
+sai.zhang@nyu.edu 
+
+Jian Li 
+
+Stony Brook University 
+
+Stony Brook, NY, USA 
+
+jian.li.3@stonybrook.edu 
+
+Yang Hua 
+
+Queen’s University Belfast 
+
+Belfast, UK 
+
+Y.Hua@qub.ac.uk 
+
+Miao Pan 
+
+University of Houston 
+
+Houston, TX, USA 
+
+mpan2@central.uh.edu 
+
+Tao Song, Zhengwei Qi, Haibing Guan 
+
+Shanghai Jiao Tong University 
+
+Shanghai, China 
+
+{songt333,qizhwei,hbguan}@sjtu.edu.cn 
+
+Abstract —Vision-Language Navigation (VLN) requires large-scale trajectory–instruction data from private indoor environ-ments, raising significant privacy concerns. While Federated Learning (FL) mitigates this by keeping data on-device, vanilla 
+
+FL struggles under VLN’s extreme cross-client heterogeneity in environments and instruction styles, rendering a single global model suboptimal. This paper proposes pFedNavi , a structure-aware and dynamically adaptive personalized federated learning framework tailored for VLN. Our key idea is to personalize where it matters : pFedNavi (i) adaptively identifies client-specific layers via layer-wise mixing coefficients, and (ii) performs fine-grained parameter fusion on the selected components (e.g., the encoder– decoder projection and environment-sensitive decoder layers) to balance global knowledge sharing with local specialization. We evaluate pFedNavi on two standard VLN benchmarks, R2R and RxR, using both ResNet and CLIP visual representations. Across all metrics, pFedNavi consistently outperforms the FedAvg-based VLN baseline, achieving up to 7.5% improvement in navigation success rate and up to 7.8% gain in trajectory fidelity, while converging 1.38 × faster under non-IID conditions. 
+
+Index Terms —Vision-Language Navigation, Personalized Fed-erated Learning, Embodied AI 
+
+I. I NTRODUCTION 
+
+Vision-Language Navigation (VLN) has emerged as a pop-ular and important task in embodied AI, where an agent must interpret natural language instructions and navigate through a visual environment [1, 2]. Solving VLN hinges on abundant, high-quality training data because the agent must perform complex multimodal reasoning, grounding ambiguous natural language in visual observations to reach the target [3]. VLN data often comes from private homes or offices —navigation trajectories and human instructions that can reveal sensitive information like house layouts, objects present, or personal habits. Fig. 1 illustrates typical VLN scenarios and the hetero-geneity across different houses for embodied AI agents exe-cuting VLN tasks. Indeed, conventional VLN training assumes 
+
+This work was supported in part by the National Natural Science Foundation of China (NO. 62472284), Openmind (Wuhu) Intelligent Robot Co., Ltd., and Shanghai Key Laboratory of Scalable Computing and Systems. M. Pan’s work was supported in part by the US National Science Foundation under grants CNS-2107057, CNS-2318664, CSR-2403249, and CNS-2431596. Client i: “Fetch a bottle of drink from 
+
+kitchen to bedroom” 
+
+Client j: “Go through the 
+
+hallway ... to the sofa” Client k: “Go to the balcony via 
+
+the living room” 
+
+Federated Server  
+
+> <latexit sha1_base64="WEPlABs2iuVzz+8xARPerCHKn5I=">AAAB9HicbVBNS8NAEN34WetX1aOXxSJ4kJKIVI8FETxWsB/QxrLZTtulm03YnRRK6P/w4EXFq//Fo//GbcxBWx8MPN6bYWZeEEth0HW/nJXVtfWNzcJWcXtnd2+/dHDYNFGiOTR4JCPdDpgBKRQ0UKCEdqyBhYGEVjC+mfutCWgjIvWA0xj8kA2VGAjO0EqPXRwBsl4qzm8Vn/VKZbfiZqDLxMtJmeSo90qf3X7EkxAUcsmM6XhujH7KNAouYVbsJgZixsdsCB1LFQvB+Gl29YyeWqVPB5G2pZBm6u+JlIXGTMPAdoYMR2bRm4v/eZ0EB9d+KlScINivskWDRFKM6DwC2hcaOMqpJYxrYW+lfMQ042iDshl4ix8vk+ZFxatWqveX5Zqbp1Egx+SEnBGPXJEauSN10iCcaPJEXsirM3GenTfn/ad1xclnjsgfOB/f7xGSYw==</latexit>
+
+ωi,Enc  
+
+> <latexit sha1_base64="S4Z8sYtO7crW3io7wDDT4J1f7Yg=">AAAB9HicbVDLSgNBEJyNrxhfUY9eBoPgQcKuSPQYyMVjBPOAJIbZSW8yZHZ2mekNhCX/4cGLilf/xaN/4yTZgyYWNBRV3XR3+bEUBl3328ltbG5t7+R3C3v7B4dHxeOTpokSzaHBIxnpts8MSKGggQIltGMNLPQltPxxbe63JqCNiNQjTmPohWyoRCA4Qys9dXEEyPqpuKppMesXS27ZXYCuEy8jJZKh3i9+dQcRT0JQyCUzpuO5MfZSplFwCbNCNzEQMz5mQ+hYqlgIppcurp7RC6sMaBBpWwrpQv09kbLQmGno286Q4cisenPxP6+TYHDXS4WKEwTFl4uCRFKM6DwCOhAaOMqpJYxrYW+lfMQ042iDshl4qx+vk+Z12auUKw83paqbpZEnZ+ScXBKP3JIquSd10iCcaPJMXsmbM3FenHfnY9mac7KZU/IHzucP+zGSaw==</latexit>
+
+ωi,Cri  
+
+> <latexit sha1_base64="yjETzNTiYpNIKaF4G7lhIBJIIQg=">AAAB9HicbVDLSgNBEJyNrxhfUY9eBoPgQcKuSPQY0IPHCOYByRpmJ51kyOzsMtMbCEv+w4MXFa/+i0f/xkmyB00saCiquunuCmIpDLrut5NbW9/Y3MpvF3Z29/YPiodHDRMlmkOdRzLSrYAZkEJBHQVKaMUaWBhIaAaj25nfHIM2IlKPOInBD9lAib7gDK301MEhIOum4uIO+LRbLLlldw66SryMlEiGWrf41elFPAlBIZfMmLbnxuinTKPgEqaFTmIgZnzEBtC2VLEQjJ/Or57SM6v0aD/SthTSufp7ImWhMZMwsJ0hw6FZ9mbif147wf6NnwoVJwiKLxb1E0kxorMIaE9o4CgnljCuhb2V8iHTjKMNymbgLX+8ShqXZa9SrjxclapulkaenJBTck48ck2q5J7USJ1woskzeSVvzth5cd6dj0VrzslmjskfOJ8/396SWQ==</latexit>
+
+ωi,Dec 
+
+Language Encoder  
+
+> <latexit sha1_base64="WEPlABs2iuVzz+8xARPerCHKn5I=">AAAB9HicbVBNS8NAEN34WetX1aOXxSJ4kJKIVI8FETxWsB/QxrLZTtulm03YnRRK6P/w4EXFq//Fo//GbcxBWx8MPN6bYWZeEEth0HW/nJXVtfWNzcJWcXtnd2+/dHDYNFGiOTR4JCPdDpgBKRQ0UKCEdqyBhYGEVjC+mfutCWgjIvWA0xj8kA2VGAjO0EqPXRwBsl4qzm8Vn/VKZbfiZqDLxMtJmeSo90qf3X7EkxAUcsmM6XhujH7KNAouYVbsJgZixsdsCB1LFQvB+Gl29YyeWqVPB5G2pZBm6u+JlIXGTMPAdoYMR2bRm4v/eZ0EB9d+KlScINivskWDRFKM6DwC2hcaOMqpJYxrYW+lfMQ042iDshl4ix8vk+ZFxatWqveX5Zqbp1Egx+SEnBGPXJEauSN10iCcaPJEXsirM3GenTfn/ad1xclnjsgfOB/f7xGSYw==</latexit>
+
+ωi,Enc 
+
+Navigation Decoder  
+
+> <latexit sha1_base64="yjETzNTiYpNIKaF4G7lhIBJIIQg=">AAAB9HicbVDLSgNBEJyNrxhfUY9eBoPgQcKuSPQY0IPHCOYByRpmJ51kyOzsMtMbCEv+w4MXFa/+i0f/xkmyB00saCiquunuCmIpDLrut5NbW9/Y3MpvF3Z29/YPiodHDRMlmkOdRzLSrYAZkEJBHQVKaMUaWBhIaAaj25nfHIM2IlKPOInBD9lAib7gDK301MEhIOum4uIO+LRbLLlldw66SryMlEiGWrf41elFPAlBIZfMmLbnxuinTKPgEqaFTmIgZnzEBtC2VLEQjJ/Or57SM6v0aD/SthTSufp7ImWhMZMwsJ0hw6FZ9mbif147wf6NnwoVJwiKLxb1E0kxorMIaE9o4CgnljCuhb2V8iHTjKMNymbgLX+8ShqXZa9SrjxclapulkaenJBTck48ck2q5J7USJ1woskzeSVvzth5cd6dj0VrzslmjskfOJ8/396SWQ==</latexit>
+
+ωi,Dec 
+
+RL Critic Module  
+
+> <latexit sha1_base64="S4Z8sYtO7crW3io7wDDT4J1f7Yg=">AAAB9HicbVDLSgNBEJyNrxhfUY9eBoPgQcKuSPQYyMVjBPOAJIbZSW8yZHZ2mekNhCX/4cGLilf/xaN/4yTZgyYWNBRV3XR3+bEUBl3328ltbG5t7+R3C3v7B4dHxeOTpokSzaHBIxnpts8MSKGggQIltGMNLPQltPxxbe63JqCNiNQjTmPohWyoRCA4Qys9dXEEyPqpuKppMesXS27ZXYCuEy8jJZKh3i9+dQcRT0JQyCUzpuO5MfZSplFwCbNCNzEQMz5mQ+hYqlgIppcurp7RC6sMaBBpWwrpQv09kbLQmGno286Q4cisenPxP6+TYHDXS4WKEwTFl4uCRFKM6DwCOhAaOMqpJYxrYW+lfMQ042iDshl4qx+vk+Z12auUKw83paqbpZEnZ+ScXBKP3JIquSd10iCcaPJMXsmbM3FenHfnY9mac7KZU/IHzucP+zGSaw==</latexit>
+
+ωi,Cri 
+
+Aggregate Local upload 
+
+Client i’s VLN Model  
+
+> <latexit sha1_base64="tDsPkCbeaqthGfvtIix5uR+K5BE=">AAAB/3icbVDLSsNAFJ3UV62vqAsXbgaL4KokItVlwY3LCn1BE8tkMmmHTh7M3AglZOG3uHCj4tbPcOnfOGmz0NYDwxzOuZd77/ESwRVY1rdRWVvf2Nyqbtd2dvf2D8zDo56KU0lZl8YilgOPKCZ4xLrAQbBBIhkJPcH63vS28PuPTCoeRx2YJcwNyTjiAacEtDQyTxwvFr6ahfrLnM6EAckfMshHZt1qWHPgVWKXpI5KtEfml+PHNA1ZBFQQpYa2lYCbEQmcCpbXnFSxhNApGbOhphEJmXKz+QE5PteKj4NY6hcBnqu/OzISqmJHXRkSmKhlrxD/84YpBDduxqMkBRbRxaAgFRhiXKSBfS4ZBTHThFDJ9a6YTogkFHRmOgN7+eJV0rts2M1G8/6q3rLKNKroFJ2hC2Sja9RCd6iNuoiiHD2jV/RmPBkvxrvxsSitGGXPMfoD4/MHUsCXIQ==</latexit>
+
+!t
+
+Fig. 1: Environmental heterogeneity across different houses for VLN task. Each client corresponds to a distinct house with substantially different spatial layout and structural characteristics. 
+
+centralizing all user data on a server, which ignores privacy concerns. Recent studies have noted that most VLN research has overlooked these real-world privacy issues [2, 4], creating a gap between academic work and practical deployment in personal spaces. Federated Learning (FL) offers a promising solution to this dilemma by enabling privacy-preserving collaborative training. In an FL setting, each embodied agent (or each environment) keeps its data locally and only shares model updates with a central server. For example, FedVLN [2] was recently proposed as the first federated VLN framework, showing that decentralized training on house-specific data can achieve navigation performance comparable to centralized training while keeping each user’s data private. As Fig. 1 shows, each house environment in FedVLN is treated as a client that trains a local VLN agent on its private data and periodically shares only the model parameters for aggregation. However, standard FL alone is not enough—a single global  
+
+> arXiv:2602.14401v1 [cs.CV] 16 Feb 2026 100 200 300 0Complexity Scale Path Instruction 10.5 Houses
+
+Fig. 2: Data heterogeneity analysis on RxR dataset [6]. We visualize house-level statistics along four dimensions: 
+
+Instruction , measured by the average instruction length; 
+
+Path , measured by the variance of navigation trajectory lengths within each house; Scale , measured by the number of rooms, indicating the house size; and Complexity , mea-sured by the number of nodes in the induced navigation graph, indicating how many navigation states and decisions the agent needs to encounter. All statistics are normalized to [0,1] across houses. Darker colors indicate lower values, while lighter colors indicate higher values. 
+
+model cannot adequately serve every user when the data are highly heterogeneous. FedVLN relies on the basic FedAvg aggregation [5], which struggles under VLN’s severe non-IID conditions . In practice, different clients’ navigation data follow very different distributions, so blindly averaging their models can lead to an aggregated agent that deviates from the optimal 
+
+for any individual environment. This limitation motivates the need for personalization on top of federated training. 
+
+Why personalized Federated Learning (pFL) for VLN? 
+
+In real-world VLN deployments, the data heterogeneity is extreme, calling for pFL rather than a one-size-fits-all model. Specifically, enabling pFL for VLN is challenging because of several unique characteristics: 1) Heterogeneous Envi-ronments: Each FL client corresponds to a distinct physical environment, e.g., different houses in Room-to-Room (R2R) and Room-across-Room (RxR). In particular, environments differ significantly in their spatial extent, layout organiza-tion, and navigation structure, resulting in induced navigation graphs with various sizes, connectivity patterns, and trajectory distributions. As illustrated in Fig. 2, different clients exhibit substantial heterogeneity in their underlying navigation envi-ronments along multiple complementary dimensions, includ-ing house scale, structural complexity, and path characteris-tics. 2) Personalized Instructions: Language instructions are inherently personal and context-specific. Different users may describe routes in unique ways—with different vocabulary, levels of detail, or referring to custom landmarks. Fig. 2 further highlights such linguistic heterogeneity across clients. 
+
+3) Complex Multimodal Models: VLN agents typically consist of multiple modules (vision encoder, language encoder, attention-based policy network, sometimes a value estimator), which interact sequentially to produce navigation decisions. To address the above challenges, we propose pFedNavi , a model structure-aware personalized federated learning frame-work tailored for vision-language navigation. The key insight behind pFedNavi is that effective VLN personalization must be both structure-aware and dynamically adaptive. In other words, 
+
+pFedNavi treats different parts of the VLN agent differently, allowing each client to adapt the model’s components to its data in a fine-grained way rather than applying coarse global updates. Building on this insight, we make the following contributions:  
+
+> •
+
+Selective Module Personalization: We develop a layer-wise adaptive personalization strategy that learns which parts of the VLN model to personalize for each client.  
+
+> •
+
+Fine-Grained Parameter Fusion: For the model parts identified as needing personalization, we propose a fine-grained parameter fusion mechanism to combine global and local knowledge.  
+
+> •
+
+Our extensive experiments on standard VLN benchmarks, R2R [1] and RxR [6], confirm that pFedNavi significantly outperforms conventional federated VLN models (which lack personalization) and even approaches the perfor-mance of centrally-trained models. Specifically, pFedNavi 
+
+achieves up to 7.5% improvement in success rate, 7.8% in normalized dynamic time warping (nDTW), highlighting its effectiveness in improving task completion as well as trajectory fidelity in VLN. Moreover, pFedNavi achieves 1.38 × faster loss convergence than baseline. II. B ACKGROUND AND MOTIVATION 
+
+A. Vision-Language Navigation (VLN) 
+
+VLN [1] is a multimodal navigation task in which an embodied AI agent must follow natural-language instructions to reach a target location by making sequential decisions from egocentric visual observations. A defining property of VLN is its strong environment heterogeneity . In standard benchmarks such as R2R [1] and RxR [6], each environment (e.g., a building/scan) presents a distinct indoor layout, topology, object distribution, and navigation affordances, leading to substantially different visual and trajectory distributions across environments. Meanwhile, VLN instructions are naturally personalized :different users (or annotators) describe the same route with different vocabulary, granularity, and landmark choices, and this variability is further amplified in multilingual settings such as RxR [6]. These two factors jointly induce severe non-IID behavior in VLN training and deployment. To improve generalization, prior work has explored di-verse modeling and training strategies, including imitation and reinforcement learning, structured reasoning via graph-based representations [7], long-term memory for accumulating navigation context [8], and data augmentation / fine-tuning with synthesized trajectory-instruction pairs [9]. Recent studies further consider pre-exploration for better adaptation to unseen environments [10] and leverage LLMs for explicit planning and reasoning (e.g., NavGPT [11]). However, these methods largely assume centralized access to training data, which is often unrealistic in practice because VLN trajectories and instructions are collected in private indoor spaces (e.g., homes, offices, and labs), making raw data sharing undesirable. Success Rate 
+
+0
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+Communication rounds 
+
+50 100 150 200 
+
+pFedNavi 
+
+FedVLN 
+
+> Navigation Error
+
+4
+
+6
+
+8
+
+10 
+
+12 
+
+14 
+
+Communication rounds 
+
+50 100 150 200 Fig. 3: Success rate and navigation error comparison on R2R dataset. The line and the shadow mean the average and variance of performance across clients. 
+
+B. Federated VLN Formulation 
+
+FedVLN [2], recently proposed as the first federated VLN framework, trains the trajectory model, language encoder, multimodal decision module, and speaker model across clients using FedAvg [5], and further introduces a federated pre-exploration phase for adaptation after deployment. A VLN agent deployed in a house environment i acts as a client in FL. In each local round, the agent follows a set of human linguistic instructions I = {I1, I 2, . . . }, where each instruction I ∈ I is a sequence of tokens I = ⟨w1, w 2, . . . , w m⟩ (m is the instruc-tion length and wj is a word token). For each instruction, the agent executes a navigation episode and produces a trajectory 
+
+τ = ⟨o0, a 0, . . . , o T ⟩ by interacting with the environment, terminating upon issuing a STOP action. Each local dataset 
+
+Di therefore consists of instruction–trajectory pairs (I, τ ).The local VLN model contains three modules: a language instruction encoder θtEnc , a navigation decoder θtDec , and a critic module θtCri for RL learning. At communication round t, client i receives the global parameters Θt =
+
+{θtEnc , θ tDec , θ tCri }, and performs local optimization on its private dataset Di (paired instruction–trajectory samples). After local training, the updated parameters Θ(t+1) 
+
+i are uploaded to the server. The server aggregates updates from a subset of participating clients St ⊆ { 1, . . . , N } to construct the next-round global model. This federated optimization proceeds iteratively across rounds. The objective of vanilla federated VLN is to collaboratively learn a navigation policy that can operate across diverse embodied environments without sharing raw data. 
+
+C. Motivating pFL for VLN 
+
+While FL protects privacy and enables knowledge sharing, 
+
+vanilla federated VLN (e.g., FedVLN [2]) that aggregates all client models into a single global model often struggles under VLN’s severe data heterogeneity. This has motivated pFL, which aims to learn client-adaptive models rather than enforc-ing a one-size-fits-all solution. Fig. 3 shows that FedAvg-based VLN exhibits large performance variance across FL clients, demonstrating that a single model cannot sufficiently serve all environments. Existing pFL methods include model-splitting approaches such as FedCP [12], which separate globally shared and client-specific components (e.g., backbone vs. head), as well as full-model adaptation approaches such as Per-FedAvg-style personalization [13]. However, VLN introduces additional RL Critic Module 
+
+Federated Server 
+
+Client i’s VLN Local Model  
+
+> <latexit sha1_base64="2SIovmsQOY1wZ5bM/ZvTfiC86WY=">AAAB+HicbVBNS8NAEN34WetX1KOXYBE8SElEqsdCLx4r2A9oY9hsp+3SzSbsTgo19J948KLi1X/i0X/jts1BWx8MPN6bYWZemAiu0XW/rbX1jc2t7cJOcXdv/+DQPjpu6jhVDBosFrFqh1SD4BIayFFAO1FAo1BAKxzVZn5rDErzWD7gJAE/ogPJ+5xRNFJg210cAtIg45c1xaePGNglt+zO4awSLyclkqMe2F/dXszSCCQyQbXueG6CfkYVciZgWuymGhLKRnQAHUMljUD72fzyqXNulJ7Tj5Upic5c/T2R0UjrSRSazojiUC97M/E/r5Ni/9bPuExSBMkWi/qpcDB2ZjE4Pa6AoZgYQpni5laHDamiDE1YJgNv+eNV0rwqe5Vy5f66VHXzNArklJyRC+KRG1Ild6ROGoSRMXkmr+TNerJerHfrY9G6ZuUzJ+QPrM8fBduTgg==</latexit>
+
+ωt
+
+i,Cri 
+
+Navigation Decoder 
+
+Language Encoder  
+
+> <latexit sha1_base64="2SIovmsQOY1wZ5bM/ZvTfiC86WY=">AAAB+HicbVBNS8NAEN34WetX1KOXYBE8SElEqsdCLx4r2A9oY9hsp+3SzSbsTgo19J948KLi1X/i0X/jts1BWx8MPN6bYWZemAiu0XW/rbX1jc2t7cJOcXdv/+DQPjpu6jhVDBosFrFqh1SD4BIayFFAO1FAo1BAKxzVZn5rDErzWD7gJAE/ogPJ+5xRNFJg210cAtIg45c1xaePGNglt+zO4awSLyclkqMe2F/dXszSCCQyQbXueG6CfkYVciZgWuymGhLKRnQAHUMljUD72fzyqXNulJ7Tj5Upic5c/T2R0UjrSRSazojiUC97M/E/r5Ni/9bPuExSBMkWi/qpcDB2ZjE4Pa6AoZgYQpni5laHDamiDE1YJgNv+eNV0rwqe5Vy5f66VHXzNArklJyRC+KRG1Ild6ROGoSRMXkmr+TNerJerHfrY9G6ZuUzJ+QPrM8fBduTgg==</latexit>
+
+ωt
+
+i,Cri 
+
+Fused 
+
+Decoder 
+
+Fused 
+
+Encoder 
+
+Critic 
+
+Step 1: 
+
+Adaptive 
+
+Selection of 
+
+Layers to be 
+
+Personalized 
+
+Step 2: Fine-grained 
+
+Parameter Fusion 
+
+Step 3: Local Training and 
+
+Upload 
+
+Client i: “Go to upstair and …” 
+
+Learning 
+
+mixing 
+
+coe ffi cients 
+
+Navigation Decoder 
+
+Language Encoder  
+
+> <latexit sha1_base64="66JDf9AXAWjYTKqtgtKb1CANtkE=">AAAB+HicbVBNS8NAEN3Ur1q/oh69LBbBg5REpHosiOCxgv2ANobNdtMu3WzC7qRQQ/+JBy8qXv0nHv03bmMO2vpg4PHeDDPzgkRwDY7zZZVWVtfWN8qbla3tnd09e/+greNUUdaisYhVNyCaCS5ZCzgI1k0UI1EgWCcYX8/9zoQpzWN5D9OEeREZSh5ySsBIvm33YcSA+Bk/u5F09gC+XXVqTg68TNyCVFGBpm9/9gcxTSMmgQqidc91EvAyooBTwWaVfqpZQuiYDFnPUEkipr0sv3yGT4wywGGsTEnAufp7IiOR1tMoMJ0RgZFe9Obif14vhfDKy7hMUmDmr3xRmAoMMZ7HgAdcMQpiagihiptbMR0RRSiYsEwG7uLHy6R9XnPrtfrdRbXhFGmU0RE6RqfIRZeogW5RE7UQRRP0hF7Qq/VoPVtv1vtPa8kqZg7RH1gf3/mck3o=</latexit>
+
+ωt
+
+i,Enc  
+
+> <latexit sha1_base64="JtborX3+8ivt6s/cc1Yy6OaBmUM=">AAAB+nicbVDJSgNBEO2JW4zbGI9eBoPgQcKMSPQY0IPHCGaBZBx6OjVJk56F7hoxjPMrHryoePVHPPo3dpaDJj4oeLxXRVU9PxFcoW1/G4WV1bX1jeJmaWt7Z3fP3C+3VJxKBk0Wi1h2fKpA8AiayFFAJ5FAQ19A2x9dTfz2A0jF4+gOxwm4IR1EPOCMopY8s5z1cAhIcy/jp9fA8nv0zIpdtaewlokzJxUyR8Mzv3r9mKUhRMgEVarr2Am6GZXImYC81EsVJJSN6AC6mkY0BOVm09tz61grfSuIpa4Iran6eyKjoVLj0NedIcWhWvQm4n9eN8Xg0s14lKQIEZstClJhYWxNgrD6XAJDMdaEMsn1rRYbUkkZ6rh0Bs7ix8ukdVZ1atXa7Xmlbs/TKJJDckROiEMuSJ3ckAZpEkYeyTN5JW/Gk/FivBsfs9aCMZ85IH9gfP4AuxyUfA==</latexit>
+
+ωt
+
+i,Dec  
+
+> <latexit sha1_base64="YYLgS864JivUAMbb8QjFmNzv5CQ=">AAAB+HicbVBNS8NAEN34WetX1KOXxSJ4KolI9VgQwWMF+wFtDJvtpl262YTdSaGG/BMPXlS8+k88+m/cxhy09cHA470ZZuYFieAaHOfLWlldW9/YrGxVt3d29/btg8OOjlNFWZvGIla9gGgmuGRt4CBYL1GMRIFg3WByPfe7U6Y0j+U9zBLmRWQkecgpASP5tp0NYMyA5H52I2n+AL5dc+pOAbxM3JLUUImWb38OhjFNIyaBCqJ133US8DKigFPB8uog1SwhdEJGrG+oJBHTXlZcnuNTowxxGCtTEnCh/p7ISKT1LApMZ0RgrBe9ufif108hvPIyLpMUmPmrWBSmAkOM5zHgIVeMgpgZQqji5lZMx0QRCiYsk4G7+PEy6ZzX3Ua9cXdRazplGhV0jE7QGXLRJWqiW9RCbUTRFD2hF/RqPVrP1pv1/tO6YpUzR+gPrI9vkmST3Q==</latexit>
+
+ωt
+
+Enc  
+
+> <latexit sha1_base64="Yx3antzqgdnTONlIP434RRpeWfs=">AAAB+HicbVBNS8NAEN3Ur1q/oh69BIvgqSQi1WNBDx4r2A9oY9hsJ+3SzQe7k0IN+ScevKh49Z949N+4bXPQ1gcDj/dmmJnnJ4IrtO1vo7S2vrG5Vd6u7Ozu7R+Yh0dtFaeSQYvFIpZdnyoQPIIWchTQTSTQ0BfQ8cc3M78zAal4HD3gNAE3pMOIB5xR1JJnmlkfR4A097JbYPkjembVrtlzWKvEKUiVFGh65ld/ELM0hAiZoEr1HDtBN6MSOROQV/qpgoSyMR1CT9OIhqDcbH55bp1pZWAFsdQVoTVXf09kNFRqGvq6M6Q4UsveTPzP66UYXLsZj5IUIWKLRUEqLIytWQzWgEtgKKaaUCa5vtViIyopQx2WzsBZ/niVtC9qTr1Wv7+sNuwijTI5IafknDjkijTIHWmSFmFkQp7JK3kznowX4934WLSWjGLmmPyB8fkDgx2T0w==</latexit>
+
+ωt
+
+Dec 
+
+Fig. 4: pFedNavi ’s workflow. pFedNavi operates in three stages: (1) adaptive personalized layer selection; (2) fine-grained parameter fusion; and (3) local training with federated aggregation. 
+
+difficulties due to multimodal grounding and tightly coupled encoder-decoder architectures, where indiscriminate personal-ization can degrade language grounding or action prediction. III. T HE DESIGN OF pFedNavi A. Overview 
+
+Enabling pFL for VLN is fundamentally challenging due to the joint effects of multimodal inputs, tightly coupled encoder-decoder structures, and strong environment-induced heterogeneity across clients. Building on the key insight that effective VLN personalization must be structure-aware and 
+
+dynamically adaptive , we design pFedNavi in Fig. 4. 
+
+Design Objectives: 1) Client-adaptive navigation without sacrificing shared generalization; 2) Structure-aware person-alization that preserves grounding; and 3) Stable and data-efficient personalization under severe non-IID. 
+
+Key Challenges: These objectives translate into three key challenges that directly motivate our design components: 
+
+• Non-IID drift makes naive aggregation suboptimal. 
+
+With extreme cross-environment and cross-instruction het-erogeneity, FedAvg-style averaging can produce a global model that is not optimal for any particular client, and local updates can be inconsistent across rounds. 
+
+• VLN module coupling makes indiscriminate person-alization harmful. Unlike standard pFL settings, blindly personalizing arbitrary layers can easily disrupt language grounding or action prediction because VLN decisions rely on tightly coupled encoder-decoder interactions.  
+
+> •
+
+“Which layers to personalize” is client- and round-dependent. Different environments and instruction styles stress different model components; thus, a fixed model split (e.g., backbone and head) is often insufficient, and we need to adaptively recognize and personalize layers in the global model with clients’ local information. 
+
+A Bird’s Eye View of pFedNavi : Step 1 Adaptive layer selection: We first identify model components that require per-sonalization, including the encoder-decoder projection layer and selected decoder layers, using adaptive layer-wise mixing. 
+
+Step 2 Fine-grained parameter fusion: We apply fine-grained parameter fusion to the selected components to bal-ance global knowledge and local specialization. Step 3 Local training & upload: We initialize the local model using the above steps and train on the private data. 
+
+B. Formulating pFL for VLN 
+
+Personalized federated objective. Let there be N clients, where Client i corresponds to a VLN agent deployed in envi-ronment i with private dataset Di (paired instruction–trajectory samples). Unlike vanilla FL that optimizes a single shared model, pFL for VLN aims to learn a set of client-specific models {Θi}Ni=1 : min {Θi}
+
+PNi=1 E(I,τ )∼D i
+
+h
+
+LVLN (I, τ ; Θi)
+
+i
+
+,
+
+where LVLN denotes the standard VLN training objective (e.g., imitation loss and, when used, RL loss/critic terms). To encourage knowledge sharing, we maintain a global reference 
+
+model Θ on the server, constructed by aggregating client updates on globally shared parameters. 
+
+Why structure-aware personalization. VLN models differ from standard unimodal networks because language under-standing and action prediction are tightly coupled through structured modules. Different components therefore exhibit different degrees of environment sensitivity. Accordingly, 
+
+pFedNavi treats the VLN model as three modules and per-sonalizes them differently:  
+
+> •
+
+Encoder. We follow the standard VLN encoder [1], consist-ing of (i) an embedding layer, (ii) an instruction BiLSTM encoder, and (iii) an encoder-to-decoder projection. The embedding and BiLSTM mainly capture general lin-guistic regularities and are thus globally shared, while the projection directly mediates language grounding into navi-gation intent and is more environment-sensitive. Therefore, 
+
+pFedNavi always includes the encoder-decoder projection layer in personalization.  
+
+> •
+
+Decoder. We adopt the standard attention-based decoder used in prior VLN agents [1, 9], which contains multiple functional components (action embedding, visual attention, recurrent state update, instruction attention, candidate scor-ing). Since these components have heterogeneous sensitivity to local environments, pFedNavi does not predefine person-alized decoder layers; instead, it adaptively selects them for each client and each round (Sec. III-C).  
+
+> •
+
+Critic. The critic estimates value functions that depend heavily on environment-specific dynamics and reward land-scapes. To avoid destabilizing training via cross-client aver-aging, pFedNavi keeps the critic local and does not force it to match the global reference. 
+
+C. Adaptive Layer Selection for Personalization 
+
+Given the received global model and the client’s previous local model, we want to decide which decoder layers should be personalized for client i at round t.Therefore, instead of predefining personalized layers, we adopt a layer-wise adaptive fusion mechanism to automatically identify decoder components that benefit from personalization. Specifically, we associate each decoder component (layer) 
+
+ℓ ∈ Ldec with a learnable mixing coefficient αti,ℓ ∈ [0 , 1] 
+
+for client i at round t. The fused parameters are defined as 
+
+ˆθt+1 ,0 
+
+> i,ℓ
+
+=  1−αti,ℓ 
+
+ θtℓ +αti,ℓ θti,ℓ , where θtℓ denotes the globally aggregated parameters of decoder layer ℓ at round t, and θti,ℓ 
+
+is the corresponding previous local parameters. We learn αti = {αti,ℓ }ℓ∈Ldec by minimizing the teacher-forcing imitation loss on a small local batch set Bi ⊂ D i:
+
+αti ← arg min α LIL 
+
+
+
+Bi; ˆθt+1 ,0 
+
+> i, Dec
+
+(α)
+
+
+
+. Layers selected for personalization are then determined by a thresholding rule: Personalized_layer ti = ℓ ∈ Ldec αti,ℓ ≥ δ . (1) Layers with a small αti,ℓ are treated as globally shared and directly inherited from the global model. Here, δ controls how strongly a layer must prefer local parameters to be considered personalized. We set δ = 0 .6 rather than 0.5 to avoid marginal or ambiguous personalization decisions. 
+
+D. Fine-grained Parameter Fusion 
+
+After identifying personalized components, we perform fine-grained parameter fusion to initialize the client’s personalized model before local training. For client i at communication round t, let Kti denote the set of all layers selected for personalization, which includes: (i) encoder-decoder projection layer, and (ii) Personalized_layer ti
+
+identified in Equation (1). For each layer l ∈ K ti , we construct the personalized initialization via element-wise interpolation between the global and previous local parameters: 
+
+θt+1 ,0 
+
+> i,l
+
+= θti,l + W ti,l ⊙  θtl − θti,l 
+
+, (2) where θtl denotes the globally aggregated layer parameter, θti,p 
+
+is the corresponding parameter from the previous local model, and W ti,l ∈ [0 , 1] is a learnable fusion weight controlling the contribution of global knowledge. This design enables flexible personalization while constraining the additional cost to preserve scalability, as fusion weights are introduced only for a small subset of decoder components. Parameters not selected for personalization are directly inherited from the global model: 
+
+θt+1 ,0 
+
+> i,p
+
+← θtp, ∀p / ∈ K ti . (3) The critic module is kept local and initialized as 
+
+θt+1 ,0 
+
+> i, Cri
+
+← θti, Cri , (4) since it primarily estimates value functions conditioned on environment-specific dynamics. The fusion weights 
+
+Wti = {W ti,l }l∈K ti are optimized by minimizing the supervised imitation loss under teacher forcing: 
+
+min Wti LIL 
+
+
+
+Di; Θt+1 ,0 
+
+> i
+
+(Wti )
+
+
+
+, which adaptively balances global generalization and local specialization for each personalized parameter. 
+
+E. Local Training and Upload 
+
+After learning the fusion weight, we calculate the initialized personalized model Θt+1 ,0 
+
+> i
+
+by Equations (2, 3, 4) and then train on the client’s local dataset Di using the standard VLN objective, which combines imitation loss (IL) and RL loss [9]. After local training, the updated model Θt+1  
+
+> i
+
+is uploaded to the server for aggregation: Θt+1 = P   
+
+> i∈S t
+> |D i|P
+> j∈S t|D j|
+
+Θt+1  
+
+> i
+
+,
+
+where St denotes the set of participating clients at round t
+
+and |D i| is the size of client i’s local dataset. The aggregated global model Θt+1 is then broadcast to clients for the next communication round. IV. E VALUATION 
+
+A. Setup 
+
+Dataset and Model: We evaluate pFedNavi on two widely used VLN datasets: Room-to-Room (R2R) [1] and Room-across-Room (RxR) [6], which are both constructed from the Matterport3D dataset. R2R contains 7K navigation trajectories paired with human-written English instructions. RxR [6] is a larger multilingual dataset with more trajectories and denser linguistic grounding, where each word is time-aligned to annotator viewpoints. We follow the standard data prepro-cessing and environment configurations used in prior VLN work [2]. We adopt the VLN agent architecture consistent with prior studies [1] and evaluate it with two widely used alternative pretrained visual feature extractors, ResNet-152 and CLIP. The navigation instructions are encoded using an LSTM-based language encoder, and an attention-based LSTM decoder attends to both textual and visual features to predict actions at each step. The critic module is implemented to estimate state values during reinforcement learning. 
+
+FL Setup: We regard each agent in a building environment as an FL client. All experiments are conducted on a single machine with two NVIDIA RTX 3090 GPUs bridged with NVLink. We reuse the federated learning hyperparameters, such as the number of training rounds, the number of local epochs, and both the local and global learning rates, from FedVLN [2]. Specifically, at each communication round, a subset of clients is randomly sampled with a participation rate of Sr = 0 .2. Each participating client performs local training for 5 epochs, and all models are trained until convergence. For personalized layer selection, the mixing coefficients α are optimized using a learning rate of αlr = 0 .1 for Sα = 2 
+
+steps. We select personalized decoder layers using a threshold 
+
+δ = 0.6. For fine-grained fusion, the fusion weights are updated with a learning rate of η = 0 .1 for SW = 1 step per round, and are fully optimized until convergence only in the second round, after which they are lightly fine-tuned. 
+
+TABLE I: Evaluation Results on R2R and RxR Datasets (all metrics except NE in %). ResNet and CLIP indicate the visual feature extractors used by VLN agent, with the model architecture remaining identical. ↑ indicates higher values correspond to better performance, whereas ↓ indi-cates lower values are better. Please note that EnvDrop [9] is a centralized learning baseline.                                                                                                 
+
+> Method on R2R SR ↑SPL ↑OSR ↑CLS ↑nDTW ↑NE ↓
+> ResNet EnvDrop [9] 56.7 54.3 63.9 67.2 56.0 4.55
+> FedVLN [2] 50.7 47.3 60.3 63.4 50.8 5.37
+> pFedNavi 54.5 51.7 65.2 66.4 54.8 4.86 CLIP EnvDrop [9] 61.5 56.5 69.8 67.3 55.4 3.94 FedVLN [2] 59.5 56.3 65.1 67.5 55.1 4.24
+> pFedNavi 60.7 57.4 67.3 68.6 57.1 3.65 Method on RxR SR ↑SPL ↑OSR ↑CLS ↑nDTW ↑NE ↓
+> ResNet EnvDrop [9] 41.3 36.6 50.4 57.2 53.6 8.03
+> FedVLN [2] 39.9 33.1 47.8 55.5 50.7 8.62
+> pFedNavi 40.1 36.7 51.2 57.3 52.9 8.10 CLIP EnvDrop [9] 47.7 43.4 56.1 61.2 56.8 6.53
+> FedVLN [2] 43.0 39.4 51.5 58.7 54.8 7.37
+> pFedNavi 46.1 41.2 56.3 59.8 56.9 6.91
+
+Baselines: We compare our method with both centralized and federated learning approaches. For centralized training, we use EnvDrop [9], which employs a BiLSTM-based language encoder, an attentive LSTM decoder for action prediction. We evaluate EnvDrop under two visual feature extraction settings, using either pretrained ResNet-based features or CLIP-based features. For federated learning, we evaluate FedVLN [2], the first work that applies FedAvg [5] to the VLN setting. 
+
+Metrics: To comprehensively assess navigation ability, we consider two categories of evaluation metrics: 1) goal-reaching performance and 2) trajectory fidelity. 1) Success Rate (SR) 
+
+computes the proportion of episodes in which the agent issues a stop action within 3 meters of the target. Success weighted by Path Length (SPL) extends SR by incorporating path optimality, rewarding agents that reach the goal with shorter and more efficient paths. Oracle Success Rate (OSR) reflects the agent’s ability to at least visit a promising region even if it fails to stop correctly. Navigation Error (NE) reports the average distance between the agent’s final position and the goal location, providing a continuous measure of goal accuracy. 2) Coverage weighted by Length Score (CLS) jointly considers spatial coverage and trajectory length to evaluate how well the agent explores relevant regions. Normalized Dynamic Time Warping (nDTW) aligns the predicted and reference trajectories to quantify their similarity. Together, these metrics assess high-level task completion as well as low-level behavioral fidelity, both of which are essential for VLN evaluation. Notably, we use the average client-side value of each metric for our pFedNavi method and compare it with the corresponding global metric value. 
+
+B. The Effectiveness of pFedNavi 
+
+Table I summarizes the performance comparison among centralized training, FedAvg-based federated learning, and our personalized federated approach on both R2R and RxR datasets. Overall, pFedNavi consistently outperforms FedVLN SR  
+
+> OSR
+> nDTW
+> CLS
+> Metric Value
+> 0.3  0.4  0.5  0.6
+> Communication round
+> 0
+> 50
+> 100
+> 150
+> Communication round
+> 0
+> 50
+> 100
+> 150
+> FedVLN
+> pFedNavi
+> Loss value
+> 4
+> 6
+> 8
+> Communication round
+> 0
+> 200
+> 400
+> (a) (b)
+
+Fig. 5: Comparison between pFedNavi and FedVLN on R2R dataset using ResNet-152 visual features. (a) The per-formance curves of various metrics (e.g., SR, OSR, nDTW, and CLS), and (b) loss convergence over communication rounds (red: pFedNavi , blue: FedVLN). 
+
+across all metrics under both ResNet-152 and CLIP visual representations, demonstrating the effectiveness of personal-ization for VLN in the federated setting. Compared with FedVLN, pFedNavi ’s improvement is particularly evident on metrics that reflect trajectory quality and goal grounding. These gains indicate that personalized federated learning en-ables each client to better adapt navigation policies to its local environment, alleviating the bias introduced by naive parameter averaging under heterogeneous VLN data. Besides, we set the client participation rate to Sr = 1 for clearer visualization of learning dynamics. Fig. 5(a) compares the learning dynamics of pFedNavi and FedVLN on the R2R dataset with ResNet features. Across all metrics, pFedNavi 
+
+achieves faster performance improvement. Notably, the more rapid gains on OSR and nDTW indicate that personalized pa-rameter fusion helps preserve environment-specific navigation patterns and instruction grounding, whereas FedVLN improves more slowly due to averaging across heterogeneous clients. 
+
+C. Convergence and Overhead Analysis & Ablation Study 
+
+Fig. 5(b) shows the convergence performance compared with FedVLN, demonstrating that pFedNavi converges to the target loss = 3.0 in 208 communication rounds, whereas FedVLN requires 288 communication rounds, resulting in a 27.8% improvement in efficiency (1.38 × faster convergence). Despite this short-term fluctuation, pFedNavi converges sub-stantially faster thereafter. Since the critic module is always kept local and only the encoder and decoder modules are transmitted each round, our communication overhead is lower than FedVLN. In wall-clock time, our approach costs 3.6 min per round compared with 2.2 min for FedVLN. We evaluate three variants to analyze the impact of per-sonalized layer selection: 1) All layers, where all model parameters conduct parameter fusion for each client; 2) No layer, where all parameters are globally shared (FedVLN); and 3) pFedNavi . Table II shows that personalizing all layers leads to a clear performance degradation across all metrics. This indicates that fully localizing the entire VLN model is ineffective under federated settings, as each client typically has limited data and cannot reliably learn both general navigation knowledge and environment-specific behaviors. In addition, personalizing all layers incurs substantially higher computa-tional and storage overhead. In contrast, pFedNavi selectively 
+
+TABLE II: Evaluation results for various personalized layer selection strategies.                              
+
+> SR ↑SPL ↑OSR ↑CLS ↑nDTW ↑NE ↓
+> All layers 32.7 30.1 41.0 42.5 45.2 8.52 No layer 39.9 33.1 47.8 55.5 50.7 8.62
+> pFedNavi 40.1 36.7 51.2 57.3 52.9 8.10
+
+personalizes structure-sensitive components, achieving supe-rior performance while significantly reducing training cost and model storage. V. C ONCLUSION 
+
+This paper studies pFL for VLN under realistic hetero-geneity, where each client corresponds to a distinct indoor environment with unique spatial structure and personalized instructions. We propose pFedNavi , a structure-aware person-alized FL framework that adaptively selects components for personalization via layer-wise mixing and initializes client models through fine-grained parameter fusion, effectively bal-ancing global generalization and local adaptation. Experiments on R2R and RxR demonstrate that pFedNavi consistently outperforms FedVLN, achieving up to 7.5% improvement in success rate and 7.8% improvement in normalized dynamic time warping, while converging 1.38 × faster. REFERENCES [1] P. Anderson, Q. Wu, D. Teney, J. Bruce, M. Johnson, N. Sünderhauf, I. D. Reid, S. Gould, and A. van den Hengel, “Vision-and-language navigation: Interpreting visually-grounded navigation instructions in real environments,” in Proc. CVPR , 2018. [2] K. Zhou and X. E. Wang, “FedVLN: Privacy-preserving federated vision-and-language navigation,” in Proc. ECCV , 2022. [3] K. He, C. Si, Z. Lu, Y. Huang, L. Wang, and X. Wang, “Frequency-enhanced data augmentation for vision-and-language navigation,” in

@@ -1,0 +1,743 @@
+Title: Learning to Localize Reference Trajectories in Image-Space for Visual Navigation
+
+URL Source: https://arxiv.org/pdf/2602.18803v1
+
+Published Time: Tue, 24 Feb 2026 01:33:22 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Learning to Localize Reference Trajectories in Image-Space for Visual Navigation 
+
+Finn Lukas Busch, Matti Vahs, Quantao Yang, Jes´ us Gerardo Ortega Peimbert, Yixi Cai, Jana Tumova, Olov Andersson 
+
+Abstract —We present LoTIS, a model for visual navigation that provides robot-agnostic image-space guidance by localizing a reference RGB trajectory in the robot’s current view, without requiring camera calibration, poses, or robot-specific training. Instead of predicting actions tied to specific robots, we predict the image-space coordinates of the reference trajectory as they would appear in the robot’s current view. This creates robot-agnostic visual guidance that easily integrates with local planning. Consequently, our model’s predictions provide guidance zero-shot across diverse embodiments. By decoupling perception from action and learning to localize trajectory points rather than imitate behavioral priors, we enable a cross-trajectory training strategy for robustness to viewpoint and camera changes. We outperform state-of-the-art methods by 20-50 percentage points in success rate on conventional forward navigation, achieving 94-98% success rate across diverse sim and real environments. Furthermore, we achieve over 5 × improvements on challenging tasks where baselines fail, such as backward traversal. The system is straightforward to use: we show how even a video from a phone camera directly enables different robots to navigate to any point on the trajectory. Videos, demo, and code are available at https://finnbusch.com/lotis. 
+
+I. I NTRODUCTION 
+
+Visual navigation enables robots to navigate environments using only camera observations. Early work focused on navi-gating to a single goal image. To enable long range navigation, subsequent work has considered visual reference trajectories, i.e. sequences of unposed RGB images recorded along a path that capture the full route to be followed. Such trajectories can be recorded with any camera, from a handheld smartphone to a robot-mounted sensor, allowing routes to be defined through demonstration without requiring metric maps. State-of-the-art approaches typically address this task via end-to-end learning, training policies that map current obser-vations and a goal image directly to robot actions [25, 28, 30]. To follow trajectories, these methods extract a single subgoal image from the trajectory and use this as the goal image for the learned policy. We identify three limitations. First, outputting actions directly constrains models to the training action space (typically planar differential drive), limiting generalization to platforms like aerial robots. Second, to learn a policy mapping 
+
+This work was partially supported by the Wallenberg AI, Autonomous Systems and Software Program (WASP) funded by the Knut and Alice Wallenberg Foundation. The development was partly enabled by the Berzelius resource provided by the Knut and Alice Wallenberg Foundation at the National Supercomputer Centre. The authors are with the Division of Robotics, Perception, and Learning, KTH Royal Institute of Technology, Sweden, and also affiliated with Digi-tal Futures. Contact: {flbusch, vahs, quantao, jgop, yixica, tumova, olovand }@kth.se 
+
+Reference Trajectory T 
+
+> Forward Navigation Backward Navigation
+> Predicted Image-Space Location of T
+> pi,v i,d i
+> Local
+> Planning
+
+Fig. 1. Given only a reference trajectory of (unposed) RGB images T , our model localizes the trajectory within the robot’s current view. The predicted image-space coordinates, distances and visibility of the reference trajectory poses (pi, d i, v i) provide robot-agnostic guidance for local planning, enabling different robots to go to any point on the trajectory, from any view of the trajectory. 
+
+from observations to actions, these methods require training examples where the robot traverses from the current view to the goal image. This restricts training to start and goal images from the same trajectory, and thus implicitly assumes that the deployment camera shares the characteristics of the recording device. We show that deviations in camera intrinsics or robot embodiment therefore lead to degraded performance. Third, relying on a single subgoal image makes the system sensitive to subgoal selection errors. If an incorrect target is chosen, the navigation policy may fail, as the robot cannot visually match its current view to the incorrect subgoal. We approach the problem of visual navigation by decou-pling perception from action, and propose to learn a model that predicts the reference trajectory directly in image space, such that it can be tracked by conventional local planners. To this end, we present LoTIS, a model for visual navigation that given a reference trajectory (sequence of RGB images) predicts the following representation: 1) the image-space co-ordinates of where each trajectory pose would appear in the robot’s current view, 2) whether these poses are visible, and 3) a normalized distance to each visible pose, see Fig. 1. This overcomes the aforementioned challenges: First, our model predictions can be easily paired with downstream controllers or planners for diverse robot embodiments, without further training. Second, because our model learns to localize trajec-tory poses rather than imitate actions, we can construct training pairs by sampling reference and query images from different 
+
+> arXiv:2602.18803v1 [cs.RO] 21 Feb 2026
+
+trajectories. As a result, we can explicitly train on data from mismatched cameras, varied mounting heights, and off-trajectory viewpoints, enabling robustness to such variations. Finally, processing the full trajectory sequence rather than selecting a single subgoal image overcomes the sensitivity of accurate subgoal selection in existing works, leading to substantial performance gains in navigation success rate across all evaluations. In addition, our model enables new capabilities, most no-tably backward traversal, where related approaches largely fail while our method maintains robust performance. This enables, for the first time, using an RGB reference trajectory in the general setting where the robot can navigate from any view of the trajectory to any point on it. This means a single phone camera recording is enough for different robots to navigate to any point along it, in either direction, without needing to re-record or recalibrate for a new platform. In summary, we decouple perception from action and pro-vide a learned perception model that interfaces with classical planners, with the following contributions: 1) We propose an image-space representation, defined by 2D coordinates, visibility, and distance of each reference trajectory pose in the robot’s current view, that easily pairs with local planners to guide diverse robots in image space. In real-world indoor and outdoor experiments, we show that this representation is suitable to guide both a quadrotor and a quadruped from a single phone-recorded trajectory. 2) We introduce a cross-trajectory training strategy tai-lored for this representation, where reference and query images are sampled from different trajectories, expos-ing the model to camera mismatches and challenging viewpoints. This enables robust backward traversal and consequently supports navigation to any point on the trajectory. 3) We propose a model architecture that processes the full reference trajectory jointly rather than relying on single subgoal-selection, while enabling real-time deployment on embedded hardware. We show that for existing methods, reliance on a single subgoal-selection leads to decreased localization accuracy with distance from the trajectory, whereas our joint processing enables LoTIS paired with a local planner to maintain robust success rates even when initialized far from the trajectory. II. R ELATED WORK 
+
+A. Visual Navigation 
+
+The core challenge of visual navigation is translating image observations into physical motion, a task traditionally ad-dressed by visual servoing. Visual servoing stands as the clas-sical foundation for visual navigation, providing a framework for translating sensor visual feedback into control actions, with Image-Based Visual Servoing (IBVS) minimizing error directly in feature space and Position-Based Visual Servoing (PBVS) operating through explicit pose estimation [7, 4, 5]. However, these methods suffer from well-documented lim-itations: local minima, sensitivity to calibration errors, and reliance on continuous feature tracking that breaks under occlusions or appearance changes [3]. These challenges mo-tivated learning-based approaches that can extract features robust to appearance variation and operate without explicit calibration. Modern learning-based visual navigation has evolved from image-goal navigation benchmarks [12, 13] toward topological methods designed for real-world deployment. GNM [24] in-troduced a cross-embodiment navigation policy trained on het-erogeneous robot data, predicting both temporal distance for subgoal selection and normalized waypoint actions. ViNT [25] scaled this approach using a Transformer architecture trained on over one hundred hours of diverse navigation data. No-MaD [28] unified goal-directed navigation and exploration within a diffusion policy, using goal masking to enable flexible inference. Since performance largely depends on accurate subgoal selection, PlaceNav [30] aims to improve robustness by re-framing subgoal selection as visual place recognition using CosPlace [1], applying Bayesian filtering for temporal consis-tency while relying on GNM for low-level waypoint control. FAINT [31] combines EigenPlaces [2] for place recogni-tion with a navigation policy trained on frozen Theia [26] representations, demonstrating that simulation-trained policies can outperform real-world-trained counterparts when sufficient synthetic data is available. These methods share fundamental limitations that our work addresses. First, they couple perception with learned behav-ioral priors, outputting actions tied to specific robot kine-matics. While these approaches train on data from multiple robots, they remain constrained to platforms with similar action spaces (e.g., ground-based differential drive), limiting generalization to platforms with different motion capabilities such as aerial robots. Second, they are primarily designed for forward trajectory following and struggle with backward traversal, where the robot encounters viewpoints substantially different from those in the recorded trajectory. Third, they are sensitive to camera mismatch between recording and deployment, as training on on-trajectory data does not expose the models to such variations. 
+
+B. Learned Visual Geometry 
+
+The field of learned visual geometry is related to visual navigation through a shared need for spatial understanding from images. In this domain, recent models achieve remark-able geometric understanding from images. DUSt3R [35] re-covers dense pointmaps from image pairs without calibration, MASt3R [14] augments this with dense local features and a matching loss for robust correspondences under extreme view-point changes, VGGT [34] extends to joint pose and geometry estimation, and Depth Anything 3 [15] unifies multi-view depth and pose estimation through a depth-ray representation with a plain DINOv2 backbone. ×L/ 2
+
+DINOv3 
+
+DINOv3 
+
+c0
+
+> Frame Attn
+
+×L   
+
+> Global Attn
+> FT
+> Framewise Attn
+> Fq
+> F′
+> T
+> Query Iq
+> T={I1,...,I N}
+
+×L/ 2Cross-Attention 
+
+> Framewise Attn
+> QK,V
+> Reference Trajectory Encoder (offline) Query Encoder Prediction Head Query-Trajectory Fusion
+
+ET
+
+ci
+
+h0
+
+> i
+> Pose Mod Self Attn
+
+hk+1 
+
+> i
+> Outputs:
+
+Local Planning 
+
+> pi∈R2
+> di∈R
+> vi∈R
+> coordinates norm. dist. visibility
+
+FqT          
+
+> Fig. 2. LoTIS Architecture. Reference trajectory Tand query Iqare processed by frozen DINOv3 backbones. A trajectory encoder ( ET) captures spatio-temporal context once (offline), while a query encoder ( Eq) and query-trajectory fusion ( FqT ) perform online feature extraction and fusion, respectively. Finally, a recurrent transformer iteratively regresses image-space coordinates ( pi), visibility ( vi), and distances ( di).
+
+These methods are primarily designed for 3D reconstruction and mapping rather than online robot control, and have not yet been adapted into real-time navigation policies. We suspect that solving the full 3D reconstruction problem, which prior-itizes global metric accuracy, is computationally heavier and likely harder than the task of relative trajectory localization required for navigation. We found that applying these state-of-the-art reconstruction models to our evaluation trajectories (see Fig. 4) often yielded inconsistent poses or failed re-constructions. We provide examples in Appendix G. LoTIS addresses this by learning a representation explicitly tailored for navigation. Instead of recovering general scene geometry, our model is designed to provide the specific information required for navigation: the location of the reference trajectory relative to the robot’s current view. III. P ROBLEM STATEMENT 
+
+We consider the task of navigating to any point along a recorded RGB reference trajectory using only RGB images. Formally, given a reference trajectory T = {I1, . . . , I N }
+
+consisting of N RGB images, and a query image Iq from the robot’s current viewpoint, the goal is to navigate to any point on the trajectory, indexed by g ∈ { 1, . . . , N }, starting from any position in the trajectory’s vicinity, as long as there is visual overlap with some portion of T .We make no explicit assumptions about camera calibration or robot embodiment. As such the reference trajectory T may be recorded with a different camera or platform than the one used for navigation. IV. M ETHOD 
+
+We approach this problem by decoupling perception from action and learn a model that provides robot-agnostic guidance that can be easily consumed by classical motion planning and control stacks designed for specific embodiments. To this end, we propose LoTIS, a model that predicts where the poses of a reference trajectory appear in the robot’s current view in image-space. As this output is formulated in the robot’s current view, it can easily be used by downstream controllers, e.g. by simply steering towards the predicted points. 
+
+A. Guidance Representation 
+
+Our model’s output provides guidance to be used by clas-sical motion planning stacks. Formally, in the image-space of the robot’s current view, we predict a triplet (pi, v i, d i) for each reference frame Ii ∈ T : 
+
+> •
+
+A 2D point in image-space pi ∈ R2: where the camera pose corresponding to trajectory image Ii would appear in the query view, normalized to [−1, 1] × [−1, 1]  
+
+> •
+
+A visibility logit vi ∈ R: whether the pose is visible or occluded/out of view  
+
+> •
+
+A normalized distance di ∈ [0 , 1] : relative distance to the pose from the current query viewpoint. For scale-independency, we normalize the distances such that the farthest visible point is at distance 1. 
+
+B. Model Architecture 
+
+We design our model to process the reference trajectory T
+
+and match this with the current view of the robot Iq. Unlike most existing methods [25, 28, 31, 30] that match the current view pairwise to each image on the trajectory, we propose processing the full trajectory jointly and matching the robot’s view against that. To ensure real-time deployment, we propose an asymmetric model architecture: a large trajectory encoder 
+
+ET runs once at deployment to process the full trajectory, while a lightweight query encoder Eq and decoder run efficiently online to produce the final predictions. The decoder consists of query-trajectory fusion FqT , which matches Iq against the processed trajectory to find visual correspondences, and aggregates those into a global context within one summary token ci per frame i on the reference trajectory; and aprediction head predicts the one final prediction pi, v i, d i per frame i from the summary tokens. An overview is provided in Fig. 2 We use DINOv3 [27] as a frozen backbone to extract initial features for all images, given the strong performance of the DINO family on geometric vision tasks [34]. 
+
+1) Trajectory Encoder ET: Given the reference trajectory 
+
+T = {I1, . . . , I N }, we extract per-frame features using frozen DINOv3, project to dimension D, and prepend a learnable 
+
+summary token ci per frame. The resulting tokens are pro-cessed by L transformer blocks, each alternating between global attention (across all frames and patches) and frame-wise attention (within each frame), following [34]. We incorporate temporal structure via rotary position encodings (RoPE [29]). The encoder outputs FT ∈ RN ×(P +1) ×D , where P is the number of patches per image. 
+
+2) Query Encoder Eq: The query image Iq is processed by the same frozen DINOv3 backbone, projected to dimension 
+
+D, and refined through L/ 2 self-attention layers with spatial RoPE, producing tokens Fq ∈ RP ×D. A linear adapter aligns features with the trajectory encoder’s representation space. 
+
+3) Query-Trajectory Fusion FqT : This module fuses query and trajectory features Fq, FT through L/ 2 blocks, each alternating cross-attention and frame-wise self-attention. For cross-attention, trajectory features FT (patches and summary tokens) serve as queries, while query image tokens Fq serve as keys and values: 
+
+F′ 
+
+> T
+
+= CrossAttn( Q=FT, K =Fq, V =Fq). (1) This allows each trajectory frame to attend to the query view and find visual correspondences. The subsequent frame-wise self-attention aggregates these local correspondences into global context within each frame’s summary token ci.
+
+4) Prediction Head P: We employ a recurrent trans-former regressor, adapting the iterative refinement architecture from [34]. The head maintains a latent estimate hi ∈ RD for each trajectory frame i ∈ { 1, . . . , N }, initialized by a learnable query. Over K iterations, the current estimate h(k) is projected and used to condition the summary tokens ci via Adaptive Layer Normalization (AdaLN [20]). The modulated tokens are processed by self-attention across all N frames, enabling the model to enforce geometric consistency along the trajectory. A linear layer predicts residual updates, and the estimate is refined as h(k+1) ← h(k) + ∆ h.After K iterations, the final estimates are projected to the output space: image coordinates pi via tanh (normalized to 
+
+[−1, 1] 2), visibility logits vi, and normalized distances di via scaled tanh (bounded to [0 , 1] ). 
+
+5) Implementation: We use L=12 layers, hidden dimension 
+
+D=256 , and K=4 refinement iterations. This yields ∼50 M 
+
+parameters, with ∼32 M in the trajectory encoder. Further details are provided in Appendix F. 
+
+C. Training 1) Cross-Trajectory Training: We train on a combination of real-world navigation datasets and synthetic data generated in simulation [23]. A key advantage of our representation is that it enables 
+
+cross-trajectory sampling: For real-world datasets, we sample the reference trajectory T and query image Iq from different 
+
+trajectories within the same environment. We do this to en-courage generalization, as this exposes the model to camera mismatches, off-trajectory viewpoints and environmental vari-ations between traversals (lighting changes, dynamic objects, seasonal differences). Importantly, cross-trajectory sampling is only possible because we do not require action annotations between reference trajectory and query image. In simulation, we generate reference trajectories between random start and goal points, sampling query images from random poses in the vicinity of these trajectories. To encourage generalization, we independently randomize camera parame-ters (field-of-view, aspect ratio, mounting height) for reference and query views, and apply rotational perturbations to query and trajectory poses before recording the images. Trajectory frames are sampled at stochastic intervals to vary sequence density for both simulation and real-world datasets. Ground truth labels are generated via geometric projection using camera poses and depth maps. For real-world data, we preprocess depth maps with PriorDepthAnything [36]. 
+
+2) Losses: We optimize the model using a weighted sum of three objectives: 
+
+L = λpos Lpos + λvis Lvis + λdist Ldist , (2) where Lpos is an L1 loss applied to the predicted coordinates 
+
+pi, masked to only penalize points where the ground truth is visible ( v∗ 
+
+> i
+
+= 1). Lvis is a Binary Cross-Entropy loss applied to the visibility logits. Ldist is an L1 loss applied to the normalized distance predictions. We compute this loss on the output of each iteration of the prediction head and apply temporal weighing [32]. 
+
+3) Datasets: Our training data spans diverse environ-ments, including simulation (HM3D [22], HSSD [10], AI2-THOR [11]) and real-world trajectories (CODa [40], LILocBench [33], BotanicGarden [16], TartanGround [19]). This mixture exposes the model to cluttered indoor spaces, unstructured outdoor paths, and urban settings with dynamic objects, as well as seasonal and day-night variations. In total, we use approximately 25,000 reference trajectories (up to 40 frames each) and 850,000 query images across 500 unique environments. We train on a single NVIDIA RTX 5090 for approximately 4 days. 
+
+D. Navigation 
+
+Our model outputs a set of points pi in the robot’s current image frame representing the reference trajectory. To navigate, a downstream controller uses these predictions alongside a user-specified goal index g ∈ { 1, . . . , N } to determine the appropriate actions. We demonstrate this flexibility on two distinct controllers: 
+
+1) Yaw Controller with constant forward velocity: To demonstrate robust performance with minimal complexity, we employ a simple controller that controls only yaw velocity while commanding constant forward velocity. The controller identifies visible points Ivis = {i | σ(vi) > 0.5}, selects the closest one ( k = argmin i∈I vis di), and applies an offset in the desired direction of travel. We apply a proportional controller to derive yaw velocity commands that steer toward this target while commanding constant forward velocity. 
+
+2) Model Predictive Path Integral Control: To demonstrate that our model predictions can be easily combined with more sophisticated control strategies, we employ a perception-aware Model Predictive Path Integral (MPPI) controller [37] for a drone. We formulate a cost function that ensures that our predictions remain in the robot’s FOV, aligning with similar approaches in perception-aware MPC [8, 17], and further incorporate proactive collision-avoidance. To this end, we use depth maps predicted by UniDepthV2 [21] to ground the model’s predictions in 3D and to formulate collision avoidance. We refer the reader to Appendix H for details on both controllers. V. S IMULATION EXPERIMENTS 
+
+We evaluate our method in photo-realistic simulation to assess robustness to environmental variations and to enable reproducible experiments, addressing the following questions: 
+
+Q1: How well does our method perform on forward trajectory following compared to baselines that were specifically designed for this task? 
+
+Q2: How does our model handle off-trajectory starts com-pared to methods that rely on discrete subgoal retrieval? 
+
+Q3 : How robust is our method to mismatched camera intrin-sics and mounting heights between reference and query trajectories? 
+
+Q4: To what extent does a model trained only on forward tra-jectories generalize to backward traversal without explicit backward traversal demonstrations? 
+
+A. Experimental Setup 
+
+We utilize the Gibson Habitat split [39] (5 environments) and HM3D [22] (100 environments) datasets within the Habi-tat simulator, and evaluate exclusively on scenes not seen in training. Overall, we evaluate on 100 reference trajectories for each dataset using two randomized initial poses for the robot per trajectory for each evaluation setup. To test robustness against camera mismatch, we define two evaluation setups: 1) Matched Camera: The query agent is equipped with the exact camera with same mounting height as the reference trajectory, and 2) Cross-Camera: The query agent has mismatched FOV (avg. 20 ◦, max 60 ◦ difference), aspect ratio (avg. 0.5, max 
+
+1.5), and mounting height (avg. 0.5 m , max 1.2 m ) compared to the recorder. We provide details about the evaluation dataset statistics in Appendix D. Furthermore, we apply rotational noise to the reference trajectory poses before capturing the frames to simulate imperfect recording. We investigate the following three navigation tasks: 1) To End (Forward Navigation): The goal is the final frame IN of the reference trajectory. This is the standard task for the baselines we compare against. 2) To Start (Backward Navigation): The goal is the first frame I1 of the reference trajectory. The agent must retrace the trajectory in reverse order, i.e. while opposing the views the reference trajectory was recorded from. 3) Any Point (Random Goal): The goal is a randomly se-lected frame Ik along the trajectory, requiring the agent to navigate to arbitrary targets within the trajectory. For the To End and To Start tasks, we evaluate two initialization conditions: (1) On-Trajectory: The agent starts at a pose exactly belonging to the reference trajectory. (2) Off-Trajectory: The agent starts at a random pose in the vicinity of the trajectory with visual overlap. The Any Point task is evaluated only in the off-trajectory setting, as it is intended to assess the most versatile setting, where the agent starts from arbitrary starting positions and is tasked to navigate to any point on the reference trajectory. 
+
+Metrics. We report Success Rate (SR) and Success weighted by Path Length (SPL). A run is considered successful if the agent arrives within 0.5 m of the goal. We terminate a run after 1000 simulation steps. 
+
+Baselines. We compare against four state-of-the-art naviga-tion methods using official pre-trained weights. All baselines operate on a topological graph constructed from the reference trajectory: ViNT [25] and NoMaD [28] select subgoals via learned temporal distance, with NoMaD employing a diffusion policy for multimodal action distributions. PlaceNav [30] utilizes visual place recognition (CosPlace [1]) for retrieval and GNM [24] for waypoint control. Finally, FAINT [31] uses EigenPlaces [2] for retrieval and learns a navigation policy over frozen Theia [26] representations to enhance sim-to-real transfer. We use the yaw controller with constant forward velocity, see Sec. IV-D, paired with LoTIS for our simulation experi-ments. We also report LoTIS and the controller paired with simple reactive obstacle avoidance to correct movements to ensure collision-free movement. Baselines integrate collision handling into their learned policies and cannot easily be aug-mented with external modules, illustrating a practical benefit of decoupling perception and control. 
+
+B. Results 
+
+We summarize our simulation results in Table I. 
+
+1) Forward On-Trajectory Navigation: We first evaluate the standard navigation task: following a reference trajec-tory forward from an on-trajectory start. LoTIS achieves a 94.7% success rate (SR) on Gibson and 98.5% on HM3D, outperforming the strongest baseline (ViNT) by 24.3 and 32.8 percentage points, respectively. Notably, when paired with simple obstacle avoidance, our method achieves 100% SR on both datasets. We hypothesize that this performance gap is largely due to how the reference trajectory is processed: while baselines extract a single subgoal, LoTIS localizes the entire sequence in image-space. This likely provides a much richer and more consistent guidance signal, which even a basic downstream controller (controlling only yaw angle) can exploit to achieve superior performance. TABLE I 
+
+NAVIGATION PERFORMANCE : W E REPORT SUCCESS RATE (SR) AND SPL ( IN PARENTHESES ). CROSS : Q UERY CAMERA DIFFERS FROM REFERENCE CAMERA . MATCHED : S AME CAMERA PARAMETERS . OFF -T RAJECTORY : R OBOT INITIALIZED AWAY FROM THE TRAJECTORY . ON-T RAJECTORY :ROBOT INITIALIZED ON THE TRAJECTORY . F OR DETAILS , SEE SEC . V-A. 
+
+To End (Forward) To Start (Backward) Any Point 
+
+On-Trajectory Off-Trajectory On-Trajectory Off-Trajectory Off-Trajectory 
+
+Method Matched Cross Matched Cross Matched Cross Matched Cross Matched Cross 
+
+> Gibson
+
+ViNT [25] 70.4 (67.8) 21.1 (17.8) 40.1 (30.7) 21.1 (17.5) 1.3 (0.9) 3.9 (3.4) 9.2 (8.1) 9.9 (7.8) 27.6 (22.8) 21.7 (19.3) 
+
+PlaceNav [30] 53.9 (52.0) 5.3 (4.9) 15.1 (12.8) 11.2 (10.5) 3.9 (3.7) 4.6 (3.9) 9.2 (9.0) 10.5 (9.9) 22.4 (19.5) 13.8 (12.2) 
+
+NoMaD [28] 23.0 (20.2) 8.6 (7.4) 24.3 (17.0) 17.1 (11.8) 8.6 (7.0) 7.2 (5.8) 11.2 (8.7) 11.2 (9.0) 31.6 (22.4) 27.0 (19.8) 
+
+FAINT [31] 50.7 (47.8) 34.2 (31.0) 50.0 (42.5) 41.4 (33.6) 11.8 (9.3) 9.2 (7.5) 11.2 (10.1) 13.2 (10.4) 52.0 (42.6) 40.8 (35.2) 
+
+LoTIS (Ours) 94.7 (94.7 ) 83.6 (83.1 ) 88.2 (85.0 ) 82.2 (79.5 ) 88.2 (84.2 ) 80.9 (78.1 ) 77.6 (72.4 ) 71.7 (67.7 ) 85.5 (82.7 ) 81.6 (77.8 )
+
++ Obstcl. Avoidance 100.0 (99.9 ) 98.0 (96.1 ) 98.7 (93.9 ) 94.7 (87.8 ) 97.4 (89.9 ) 89.5 (83.6 ) 96.7 (87.6 ) 90.8 (81.9 ) 98.0 (92.4 ) 95.4 (87.9 )
+
+> HM3D
+
+ViNT [25] 65.7 (64.4) 12.7 (12.1) 24.0 (20.8) 12.3 (10.3) 3.4 (3.1) 2.5 (2.3) 4.4 (3.7) 5.4 (5.0) 20.1 (17.9) 10.3 (9.3) 
+
+PlaceNav [30] 55.4 (54.5) 7.8 (7.3) 11.3 (10.0) 6.4 (5.0) 3.4 (3.2) 2.5 (2.1) 4.9 (3.4) 4.9 (4.0) 13.2 (11.4) 8.3 (7.5) 
+
+NoMaD [28] 25.0 (22.2) 9.3 (8.2) 14.2 (11.2) 12.7 (10.0) 4.4 (4.0) 4.4 (3.9) 10.3 (8.9) 8.3 (7.1) 23.5 (16.3) 14.7 (12.3) 
+
+FAINT [31] 60.3 (59.0) 34.8 (31.6) 46.1 (40.6) 28.9 (25.3) 7.8 (7.1) 11.3 (10.3) 10.8 (9.6) 10.8 (9.3) 36.3 (32.4) 26.5 (23.5) 
+
+LoTIS (Ours) 98.5 (98.4 ) 90.2 (90.1 ) 74.0 (72.3 ) 74.5 (73.0 ) 81.9 (79.4 ) 69.6 (67.6 ) 69.6 (65.6 ) 65.2 (61.6 ) 71.1 (69.5 ) 71.6 (70.4 )
+
++ Obstcl. Avoidance 100.0 (99.8 ) 97.5 (96.7 ) 95.1 (89.6 ) 92.2 (85.1 ) 96.1 (90.7 ) 84.8 (80.2 ) 92.6 (83.2 ) 86.8 (76.2 ) 94.1 (90.0 ) 94.1 (88.2 )
+
+2 4 6 8 10 
+
+0
+
+50 
+
+100 
+
+Init. Distance (m) 
+
+> Relative SR
+
+2 4 6 8 10 
+
+Init. Distance (m) 
+
+> Relative Loc. Acc.
+
+LoTIS FAINT NoMaD PlaceNav ViNT 
+
+Fig. 3. Relative success rate (SR) for all methods on off-trajectory initial-ization over initialization distance (left), compared to subgoal localization accuracy for baseline methods (right). LoTIS does not perform discrete subgoal selection and is therefore omitted from the right panel. 
+
+2) Off-Trajectory Initialization: A common failure mode for visual navigation is the inability to recover when the robot begins far from the reference trajectory. As shown in the results, baseline performance drops sharply in the ”Off-Trajectory” setting. For example, ViNT’s success rate on HM3D falls from 65.7% to 24.0%. Our model remains robust in these settings, maintaining 88.2% SR on Gibson. We observe lower off-trajectory per-formance on HM3D compared to Gibson (74.0% vs. 88.2%), which we attribute to HM3D’s more cluttered environments. We note that the naive yaw controller at times causes the robot to get stuck behind small obstacles while attempting to return to the trajectory. By integrating basic obstacle avoidance, our success rate increases to 98.7% (Gibson) and 95.1% (HM3D). This performance suggests that our model’s predictions remain accurate even from distant viewpoints where baselines get lost. We further explore this in Fig. 3, which shows the localization accuracy of the baselines (right), measured by correctly identifying the closest image of the reference trajectory, compared to their respective localization accuracy for on-trajectory following. We observe that this accuracy drops rapidly as the initialization distance increases, which leads to substantial degradation of performance in SR (left). By contrast, LoTIS’s ability to localize the full trajectory appears to be substantially more robust, resulting in less sensitivity with respect to the initialization distance. 
+
+3) Camera Mismatch Robustness: The ”Cross” columns in Table I evaluate each method’s ability to handle mismatches in camera FOV, aspect ratio and camera mounting height. We observe a significant performance drop for all baselines here, e.g. ViNT’s performance on Gibson drops from 70.4% to 21.1% in SR when the camera changes. In contrast, LoTIS maintains high performance across all evaluations (e.g. 83.6% SR on Gibson, and 98.0% when paired with obstacle avoidance). We attribute this to our cross-trajectory training strategy, which likely helps increase robustness for the model against camera mismatch between query and reference trajectory. We note that our method is more sensitive to large height mismatches than FOV or AR mismatch, as this can lead to the trajectory being outside the field of view of the robot which may result in the robot getting lost. We provide a more detailed analysis of each method’s sensitivity to different parameter mismatches in Appendix E. 
+
+4) Backward Navigation: We evaluate the methods on the ”To Start” task, where the robot must navigate to the first image of the reference trajectory. To successfully do this, the robot must be able to understand views that oppose the images of the reference trajectory. The results for this task are summarized in the ”To Start” columns of Table I. We observe a significant performance gap between LoTIS and the baseline methods in this setting. On the Gibson dataset (On-Trajectory/Matched),LoTIS achieves a 88.2% success rate (SR) or 97.4% when paired with obstacle avoidance. In con-trast, the baselines largely fail: ViNT achieves 1.3%, NoMaD 8.6%, and FAINT 11.8%. This trend remains consistent across the HM3D dataset, where LoTIS maintains an 96.1% SR while all baselines remain below 8%. We note that here, even if subgoal selection is accurate, the baselines still largely fail due to the policy not being able to predict appropriate actions Indoors 1 Indoors 2 Outdoors 1 Outdoors 2      
+
+> Reference View Onboard View Extra View
+> ∼35 m
+> ∼37 m
+> ∼100 m
+> ∼95 m
+> Fig. 4. Four trajectories used for real-world evaluation. Each reference trajectory starts at and ends at , with initial experiment positions shown as .We present an offline-computed reconstruction of the environments [18] alongside representative views from: reference trajectory camera , on-board camera (analog FPV for indoors, RealSense D455 for outdoors), and additional robustness study viewpoints . Our model’s trajectory predictions for the on-board cameras are overlaid in the corresponding views.
+
+due to the robot’s view opposing the chosen subgoal image. When moving to the most challenging Off-Trajectory+Cross-Camera setting for backward navigation, LoTIS performance experiences a moderate decrease but remains mostly successful, with success rates between 65.2% and 86.8% (86.8% to 90.8% when paired with obstacle avoidance). Meanwhile, the success rates of the baseline methods stay within the 2% to 13% range. We note that LoTIS achieves this without being trained on data that includes explicit backward traversal demonstrations. We attribute this capability to two factors: First, due to our cross-trajectory training strategy, we can include query views from other trajectories that observe the reference trajectory from opposing viewpoints in training. This is inaccessible to the baselines, since they require explicit demonstrations of traversal between query and goal. Second, our model processes all trajectory frames jointly and subsequently fuses them with the current view which we hypothesize to lead to more robust predictions from challenging backward facing viewpoints. 
+
+5) Navigation to Arbitrary Goals (Any Point): The Any Point setting represents a more general usage of a reference trajectory where the robot is initialized off-trajectory and tasked to reach a certain point on the reference trajectory. This task serves as a summary for each method’s performance as it requires strong capabilities in each of the aforementioned tasks. As shown in the rightmost columns of Table I, LoTIS maintains high performance in this setting, achieving an 85.5% SR on Gibson and 71.1% on HM3D (increasing to >94% with obstacle avoidance). In summary, the results demonstrate that LoTIS paired with only a simple yaw controller achieves substantially higher success rates than the baselines across all evaluations, while enabling backwards traversal where baselines largely fail. When further paired with reactive collision avoidance, this leads to robust overall performance with over 95% success rates across most experiments. VI. R EAL -W ORLD EXPERIMENTS 
+
+We evaluate our method in real-world scenarios to answer: 
+
+Q1: How does the performance transfer from simulation to real-world deployment? 
+
+Q2: How well does our method allow transfer to diverse em-bodiments (quadrotor, quadruped) from phone-recorded trajectories? 
+
+Q3: How do environmental variations, such as dynamic occlu-sions and day-night lighting changes, impact navigation performance? 
+
+Reference Trajectory T Seasonal Change + Lighting Change + Occlusions  
+
+> Fig. 5. Impact of environment changes on the predictions of our model with respect to a reference trajectory recorded on a sunny autumn day. Top Right: Seasonal Change, Bottom Left: Seasonal and day-night change, Bottom Right: Seasonal, day-night change and people occluding the view.
+
+A. Evaluation Setup 
+
+We collect four reference trajectories using a handheld Google Pixel 6 smartphone: two indoors and two outdoors, see Fig 4. We evaluate on a Crazyflie quadrotor with an analog FPV camera with MPPI control (Sec. IV-D) for indoors trajectories, and on a Boston Dynamics Spot equipped with a Realsense D455 with our yaw controller (Sec. IV-D), but leave its on-board collision avoidance enabled. All trials initialize off-trajectory. We compare against FAINT [31], the strongest baseline in the off-trajectory cross-camera simulation setting. Each trajectory is evaluated with 6 trials (indoors) or 3 trials (outdoors) per direction, totaling 36 runs per method. For the Spot, we run our method on a Jetson Orin AGX, where offline trajectory encoding takes 120 ms and the online query encoder + decoder take 45 ms , resulting in ∼ 22 Hz online inference. For the Crazyflie, we run computation off-board on a desktop with an RTX 5090, where offline trajectory encoding takes 15 ms and the online query encoder + decoder take 6 ms , resulting in ∼ 160 Hz online inference. We provide videos of all real-world evaluations on the project page: https://finnbusch.com/lotis. 
+
+B. Results  
+
+> TABLE II REAL -WORLD NAVIGATION RESULTS . A LL TRIALS USE PHONE -RECORDED TRAJECTORIES WITH OFF -TRAJECTORY INITIALIZATION . I NDOORS :CRAZYFLIE WITH MPPI. O UTDOORS : S POT WITH YAW CONTROLLER .
+
+Indoors 1 Indoors 2 Outdoors 1 Outdoors 2 Fwd Bwd Fwd Bwd Fwd Bwd Fwd Bwd FAINT [31] 3/6 0/6 1/6 1/6 1/3 0/3 3/3 0/3 LoTIS (Ours) 6/6 5/6 6/6 6/6 3/3 3/3 3/3 3/3 
+
+As shown in Table II, our method achieves 100% success on forward navigation across all environments, while FAINT succeeds in only 27.8% of trials. This matches, or outperforms the results obtained in simulation. For indoors, we attribute the improved real-world performance compared to sim to the MPPI’s ability to keep the predicted trajectory centered in view by actively matching the reference height. We note that for fairness, we manually adjust the drone’s flight height to match the recording height for FAINT since FAINT solely provides actions in the horizontal plane. We show that the yaw controller is sufficient for the evaluated outdoors settings due to larger open spaces where Spot’s internal reactive collision avoidance is sufficient, though it was not required to intervene during our evaluations. For both indoors and outdoors, we observe that FAINT being unable to reliably localize from off-trajectory initializations, is a main cause of failure. The gap widens further on backward traversal: our method maintains 94.4% success (17/18), whereas FAINT largely fails (5.6%). These results match our simulation findings and suggest that our cross-trajectory training strategy and joint processing of the full trajectory enables the challenging task of backward traversal. Though performance remains consistent overall, we occasionally encounter views during backward traversal where our model can no longer match the view, and thus predicts no visible points. For the indoors setting, the MPPI is warm-started by the previous solution and will thus continue following the previous solutions, usually leading to better views and recovery within a few steps. For outdoors, we hypothesize that larger open spaces are less prone to produce views with no or little overlap with the trajectory.       
+
+> TABLE III ROBUSTNESS TO ENVIRONMENTAL CHANGES .CROWDED ENV : I NDOORS
+> 2WITH AND WITHOUT PEOPLE OCCLUDING THE VIEW .DAY →NIGHT :OUTDOORS 2EVALUATED AT NIGHT WITH SCENE CHANGES .
+
+Crowded Env Day →Night 
+
+Clean +People Day Night Forward 6/6 5/6 3/3 3/3 Backward 6/6 5/6 3/3 2/3 
+
+Table III evaluates robustness under challenging conditions, and we provide an example of our model queried for rep-resentative challenging conditions in Fig. 5. We study two changes for the navigating agent: 1.) We repeat the Indoors 2 evaluation with people present in the environment, at times occluding the robot’s view and blocking its path, and 2.) We repeat the Outdoors 2 evaluation but with changes in scene (crowded parking lot is now empty) and at night time. Note that the reference trajectory remains the same as in our original evaluation, i.e. no people for indoors and a crowded parking lot at daytime for outdoors. When people walk through the scene and temporarily occlude the camera view, our method maintains high success (5/6 forward, 5/6 backward). The model’s predictions remain accurate, even if a large proportion of the view is occluded and correctly predicts points that are still visible. The one additional failure case can be attributed to people walking in the drone’s path in a way that the drone needs to steer away from the reference trajectory, ultimately losing view of the trajectory and being unable to recover (see videos on project page). For day-to-night transfer with simultaneous scene changes (trajectory recorded in a daytime parking lot with cars, evaluated at night with the lot empty), we achieve 6/6 forward and 5/6 backward. The one failure case for day-night can be attributed to one initial condition whose view was largely impacted by the scene changes, which leads to the system not being able to recognize any points of the trajectory. While we observe some degradation in the quality of the predictions for the day-night transfer, the results demonstrate that our learned representation is robust to appearance and geometric variation. VII. C ONCLUSION 
+
+We presented LoTIS, a model for visual navigation that predicts where reference trajectory would appear in the robot’s current view. Our approach provides zero-shot guidance for different embodiments, and enables backward traversal and robustness to camera mismatch—capabilities difficult for prior end-to-end methods. Experiments demonstrate 94-98% suc-cess on forward navigation across diverse embodiments both in simulation and real-world, and 5× improvement on backward traversal, with real-world deployment confirming transfer to both quadrotor and quadruped platforms using phone-recorded trajectories. For the first time, we used a single RGB reference trajectory in the general setting where the robot can navigate from anywhere in the vicinity to any point on the trajectory, both forward and backward. 
+
+Limitations. Our method requires visual overlap between the current view and some portion of the reference trajec-tory; failures occur when this overlap is lost, particularly during backward traversal around sharp corners or under extreme viewpoint differences. Performance degrades with large camera height mismatches (see Appendix E). Our real-world evaluation is limited to four environments, and does not exhaustively cover the diversity of challenging scenarios (e.g., unstructured environments, or highly repetitive environments) where failure modes may differ. We evaluated trajectories up to ∼100 m subsampled to 40 frames. Longer trajectories require chunking to ensure coverage, which we demonstrate at kilometer-scale in the project page video but do not sys-tematically evaluate. 
+
+Future work. Incorporating temporal memory could help recover when the trajectory temporarily leaves the field of view. Learning to provide guidance even without a clear view of the trajectory could address the limitation of height mismatch. Finally, combining image-space guidance with se-mantic understanding could enable navigation to functional goals (e.g., “the kitchen”) rather than trajectory indices. REFERENCES 
+
+[1] Gabriele Berton, Carlo Masone, and Barbara Caputo. Rethinking visual geo-localization for large-scale appli-cations. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4878– 4888, 2022. [2] Gabriele Berton, Gabriele Trivigno, Barbara Caputo, and Carlo Masone. Eigenplaces: Training viewpoint robust models for visual place recognition. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 11080–11090, 2023. [3] Francois Chaumette. Potential problems of stability and convergence in image-based and position-based visual servoing. In The confluence of vision and control , pages 66–78. Springer, 2007. [4] Francois Chaumette and Seth Hutchinson. Visual servo control. i. basic approaches. IEEE Robotics & Automa-tion Magazine , 13(4):82–90, 2006. doi: 10.1109/MRA. 2006.250573. [5] Francois Chaumette and Seth Hutchinson. Visual servo control. ii. advanced approaches [tutorial]. IEEE Robotics & Automation Magazine , 14(1):109–118, 2007. doi: 10. 1109/MRA.2007.339609. [6] Lizhang Chen, Jonathan Li, Kaizhao Liang, Baiyu Su, Cong Xie, Nuo Wang Pierse, Chen Liang, Ni Lao, and Qiang Liu. Cautious weight decay. arXiv preprint arXiv:2510.12402 , 2025. [7] Bernard Espiau, Franc ¸ois Chaumette, and Patrick Rives. A new approach to visual servoing in robotics. In 
+
+Workshop on Geometric Reasoning for Perception and Action , pages 106–136. Springer, 1991. [8] Davide Falanga, Philipp Foehn, Peng Lu, and Davide Scaramuzza. Pampc: Perception-aware model predictive control for quadrotors. In 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,pages 1–8. IEEE, 2018. [9] Keller Jordan, Yuchen Jin, Vlado Boza, Jiacheng You, Franz Cesista, Laker Newhouse, and Jeremy Bernstein. Muon: An optimizer for hidden layers in neural networks, 2024. URL https://kellerjordan.github.io/posts/muon/. [10] Mukul Khanna, Yongsen Mao, Hanxiao Jiang, San-jay Haresh, Brennan Shacklett, Dhruv Batra, Alexander Clegg, Eric Undersander, Angel X Chang, and Manolis Savva. Habitat synthetic scenes dataset (hssd-200): An analysis of 3d scene scale and realism tradeoffs for objectgoal navigation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 16384–16393, 2024. [11] Eric Kolve, Roozbeh Mottaghi, Winson Han, Eli Vander-Bilt, Luca Weihs, Alvaro Herrasti, Matt Deitke, Kiana Ehsani, Daniel Gordon, Yuke Zhu, et al. Ai2-thor: An interactive 3d environment for visual ai. arXiv preprint arXiv:1712.05474 , 2017. [12] Jacob Krantz, Stefan Lee, Jitendra Malik, Dhruv Batra, and Devendra Singh Chaplot. Instance-specific image goal navigation: Training embodied agents to find object instances. arXiv preprint arXiv:2211.15876 , 2022. [13] Jacob Krantz, Theophile Gervet, Karmesh Yadav, Austin Wang, Chris Paxton, Roozbeh Mottaghi, Dhruv Batra, Jitendra Malik, Stefan Lee, and Devendra Singh Chap-lot. Navigating to objects specified by images. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 10916–10925, 2023. [14] Vincent Leroy, Yohann Cabon, and J´ erˆ ome Revaud. Grounding image matching in 3d with mast3r. In 
+
+European Conference on Computer Vision , pages 71–91. Springer, 2024. [15] Haotong Lin, Sili Chen, Junhao Liew, Donny Y Chen, Zhenyu Li, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth anything 3: Recovering the visual space from any views. arXiv preprint arXiv:2511.10647 , 2025. [16] Yuanzhi Liu, Yujia Fu, Minghui Qin, Yufeng Xu, Baoxin Xu, Fengdong Chen, Bart Goossens, Poly ZH Sun, Hongwei Yu, Chun Liu, et al. Botanicgarden: A high-quality dataset for robot navigation in unstructured natu-ral environments. IEEE Robotics and Automation Letters ,9(3):2798–2805, 2024. [17] Ihab S Mohamed, Guillaume Allibert, and Philippe Mar-tinet. Sampling-based mpc for constrained vision based control. In 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 3753–3758. IEEE, 2021. [18] Riku Murai, Eric Dexheimer, and Andrew J. Davison. MASt3R-SLAM: Real-time dense SLAM with 3D re-construction priors. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2025. [19] Manthan Patel, Fan Yang, Yuheng Qiu, Cesar Ca-dena, Sebastian Scherer, Marco Hutter, and Wen-shan Wang. Tartanground: A large-scale dataset for ground robot perception and navigation. arXiv preprint arXiv:2505.10696 , 2025. [20] William Peebles and Saining Xie. Scalable diffu-sion models with transformers. In Proceedings of the IEEE/CVF international conference on computer vision ,pages 4195–4205, 2023. [21] Luigi Piccinelli, Christos Sakaridis, Yung-Hsu Yang, Mattia Segu, Siyuan Li, Wim Abbeloos, and Luc Van Gool. Unidepthv2: Universal monocular met-ric depth estimation made simpler. arXiv preprint arXiv:2502.20110 , 2025. [22] Santhosh K Ramakrishnan, Aaron Gokaslan, Erik Wij-mans, Oleksandr Maksymets, Alex Clegg, John Turner, Eric Undersander, Wojciech Galuba, Andrew Westbury, Angel X Chang, et al. Habitat-matterport 3d dataset (hm3d): 1000 large-scale 3d environments for embodied ai. arXiv preprint arXiv:2109.08238 , 2021. [23] Manolis Savva, Abhishek Kadian, Oleksandr Maksymets, Yili Zhao, Erik Wijmans, Bhavana Jain, Julian Straub, Jia Liu, Vladlen Koltun, Jitendra Malik, Devi Parikh, and Dhruv Batra. Habitat: A Platform for Embodied AI Research. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , 2019. [24] Dhruv Shah, Ajay Sridhar, Arjun Bhorkar, Noriaki Hi-rose, and Sergey Levine. Gnm: A general navigation model to drive any robot. In 2023 IEEE International Conference on Robotics and Automation (ICRA) , pages 7226–7233. IEEE, 2023. [25] Dhruv Shah, Ajay Sridhar, Nitish Dashora, Kyle Sta-chowicz, Kevin Black, Noriaki Hirose, and Sergey Levine. Vint: A foundation model for visual navigation. 
+
+arXiv preprint arXiv:2306.14846 , 2023. [26] Jinghuan Shang, Karl Schmeckpeper, Brandon B May, Maria Vittoria Minniti, Tarik Kelestemur, David Watkins, and Laura Herlant. Theia: Distilling diverse vision foundation models for robot learning. In Conference on Robot Learning , pages 724–748. PMLR, 2025. [27] Oriane Sim´ eoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Micha¨ el Ramamonjisoa, et al. Dinov3. arXiv preprint arXiv:2508.10104 , 2025. [28] Ajay Sridhar, Dhruv Shah, Catherine Glossop, and Sergey Levine. Nomad: Goal masked diffusion policies for navigation and exploration. In 2024 IEEE Interna-tional Conference on Robotics and Automation (ICRA) ,pages 63–70. IEEE, 2024. [29] Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen Bo, and Yunfeng Liu. Roformer: Enhanced trans-former with rotary position embedding. Neurocomputing ,568:127063, 2024. [30] Lauri Suomela, Jussi Kalliola, Harry Edelman, and Joni-Kristian K¨ am¨ ar¨ ainen. Placenav: Topological navigation through place recognition. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 5205–5213. IEEE, 2024. [31] Lauri Suomela, Sasanka Kuruppu Arachchige, German F. Torres, Harry Edelman, and Joni-Kristian K¨ am¨ ar¨ ainen. Synthetic vs. real training data for visual navigation. In 
+
+arXiv preprint arXiv:2509.11791 , 2025. [32] Zachary Teed and Jia Deng. Raft: Recurrent all-pairs field transforms for optical flow. In European conference on computer vision , pages 402–419. Springer, 2020. [33] Niklas Trekel, Tiziano Guadagnino, Thomas L¨ abe, Louis Wiesmann, Perrine Aguiar, Jens Behley, and Cyrill Stach-niss. Benchmark for evaluating long-term localization in indoor environments under substantial static and dynamic scene changes. In 2025 IEEE/RSJ International Confer-ence on Intelligent Robots and Systems (IROS) , pages 10770–10777. IEEE, 2025. [34] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. Vggt: Visual geometry grounded transformer. In Proceedings of the Computer Vision and Pattern Recognition Confer-ence , pages 5294–5306, 2025. [35] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris Chidlovskii, and Jerome Revaud. Dust3r: Geometric 3d vision made easy. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 20697–20709, 2024. [36] Zehan Wang, Siyu Chen, Lihe Yang, Jialei Wang, Ziang Zhang, Hengshuang Zhao, and Zhou Zhao. Depth any-thing with any prior. arXiv preprint arXiv:2505.10565 ,2025. [37] Grady Williams, Paul Drews, Brian Goldfain, James M Rehg, and Evangelos A Theodorou. Aggressive driving with model predictive path integral control. In 2016 IEEE international conference on robotics and automation (ICRA) , pages 1433–1440. IEEE, 2016. [38] Grady Williams, Andrew Aldrich, and Evangelos ATheodorou. Model predictive path integral control: From theory to parallel computation. Journal of Guidance, Control, and Dynamics , 40(2):344–357, 2017. [39] Fei Xia, Amir R. Zamir, Zhiyang He, Alexander Sax, Jitendra Malik, and Silvio Savarese. Gibson Env: real-world perception for embodied agents. In Computer Vision and Pattern Recognition (CVPR), 2018 IEEE Conference on . IEEE, 2018. [40] Arthur Zhang, Chaitanya Eranki, Christina Zhang, Ji-Hwan Park, Raymond Hong, Pranav Kalyani, Lochana Kalyanaraman, Arsh Gamare, Arnav Bagad, Maria Es-teva, et al. Toward robust robot 3-d perception in urban environments: The ut campus object dataset. IEEE Transactions on Robotics , 40:3322–3340, 2024. Appendix 
+
+A. O VERVIEW 
+
+This appendix provides additional implementation details, extended results, and video demonstrations for our paper. The appendix is organized as follows:  
+
+> •
+
+video demonstrations (project page), Sec. B  
+
+> •
+
+an ablation on full-trajectory vs. frame-wise processing, Sec. C  
+
+> •
+
+the parameter statistics of simulation evaluation dataset, Sec. D  
+
+> •
+
+details on performance under camera mismatch for each varied camera parameter, Sec. E  
+
+> •
+
+model architecture and training details, Sec. F  
+
+> •
+
+qualitative comparison with MASt3R and VGGT for navigation, Sec. G  
+
+> •
+
+navigation implementation details, Sec. H B. V IDEO DEMONSTRATIONS 
+
+We highly encourage the reader to review the video demon-strations available on the project page: https://finnbusch.com/ lotis The videos include:  
+
+> •
+
+Real-World Navigation : All 36 trials (forward and back-ward) on quadrotor on two indoor, and quadruped on two outdoors environments for LoTIS (Table III)  
+
+> •
+
+Robustness Studies : Day-to-night transfer, dynamic oc-clusions, and environmental changes (Table II)  
+
+> •
+
+Kilometer-Scale Demonstration : Long-range inference with trajectory chunking C. A BLATION : F ULL -T RAJECTORY VS . F RAME -WISE 
+
+PROCESSING 
+
+To investigate the importance of joint processing the full reference trajectory rather than matching the query view with each frame individually, we conduct an ablation comparing our default model ( Full ) against a frame-wise baseline ( Single ). 
+
+Configuration. In the Single configuration, we modify the Trajectory Encoder ET to process each reference frame Ii ∈T independently. We achieve this by restricting the attention mechanism in ET : tokens are only allowed to attend to other tokens within the same frame, effectively treating a trajectory of length N as N independent trajectories of length 1. The Query-Trajectory Fusion module FqT remains un-changed. However, we note that by design, this module performs cross-attention where trajectory tokens attend to the query image tokens. Consequently, there is no communication between different reference trajectory frames within the fusion layers. The only stage where information is exchanged across the trajectory sequence in the Single model is within the 
+
+Prediction Head , via self-attention over the summary tokens 
+
+ci. We retain this final mixing stage because the model is required to output normalized distances di (where d = 1
+
+corresponds to the farthest visible point), an operation that inherently requires access to the distribution of predictions across the sequence. In the ”Single” model, the patch-level features of frame Ii
+
+cannot inform the representation of frame Ij during encoding or fusion; temporal consistency can only be recovered by the prediction head using the compressed summary tokens.                                                                 
+
+> TABLE A1 ABLATION ON PROCESSING THE FULL TRAJECTORY JOINTLY (L OTIS-F),
+> OR PROCESSING THE TRAJECTORY AS INDIVIDUAL FRAMES BEFORE MATCHING (L OTIS-S). W E REPORT SUCCESS RATE (SR). T HE Diff ROW SHOWS THE DROP IN SR WHEN USING SINGLE VS FULL .
+> To End (Forward) To Start (Backward)
+> On-Trajectory Off-Trajectory On-Trajectory Off-Trajectory
+> Method Matched Cross Matched Cross Matched Cross Matched Cross
+> Gibson  LoTIS-F 100.0 98.0 98.7 94.7 97.4 89.5 96.7 90.8
+> LoTIS-S 95.4 91.4 86.8 79.6 69.7 67.8 71.1 57.9
+> Diff -4.6 -6.6 -11.9 -15.1 -27.7 -21.7 -25.6 -32.9
+> HM3D  LoTIS-F 100.0 97.5 95.1 92.2 96.1 84.8 92.6 86.8
+> LoTIS-S 94.1 78.9 68.6 67.6 63.2 59.8 59.3 56.4
+> Diff -5.9 -18.6 -26.5 -24.6 -32.9 -25.0 -33.3 -30.4
+
+Discussion. The results are reported in Table A1. We make the following observations: 1) Degradation with Distance: As shown in Fig. A1, while both methods perform well when initialized on the trajectory, the performance of ”Single” degrades rapidly as the initialization distance increases. The degradation curve of ”Single” nears those of the best baseline (FAINT), which also relies on pairwise matching or re-trieval. By contrast, ”Full” maintains significantly higher relative success rates at large distances ( > 8 m). This suggests that early joint processing allows the trajectory encoder to learn a consistent geometric structure of the trajectory, providing robustness under more challenging viewpoints. 2) Backward Traversal: In Table A1, the performance gap is most pronounced in the ”Backward” setting ( ∼30% drop in SR). Backward traversal often results in views with very challenging viewpoints. We hypothesize that the ”Single” model struggles here because the Query-Trajectory Fusion needs to match the query view pair-wise with every view of the trajectory. D. E VALUATION DATASET STATISTICS 
+
+In this section, we provide more details on the variations introduced in our simulation evaluation to test robustness. Fig. A2 illustrates the distribution of camera parameter mis-matches and initialization offsets across the evaluation. E. P ER -P ARAMETER CAMERA MISMATCH ANALYSIS 
+
+In Sec. V of the main paper, we evaluate the impact of camera parameter mismatches on each method’s performance. Here, we provide further details on the impact of each specific parameter. Fig. A3 shows the performance of each method 2 4 6 8 10 
+
+0
+
+50 
+
+100 
+
+Initialization Distance from Path (m) 
+
+> Relative SR
+
+LoTIS (Full) LoTIS (Single) FAINT 
+
+NoMaD PlaceNav ViNT  
+
+> Fig. A1. LoTIS with full joint trajectory processing (Full) compared against frame-wise trajectory processing (Single), and all baselines. Processing the full-trajectory leads to better result when initialized farther, i.e. in more challenging views.
+
+0 20 40 60 
+
+0
+
+5
+
+10 
+
+FOV Difference ( ◦)
+
+> Percentage (%)
+
+0 0.5 1
+
+0
+
+5
+
+10 
+
+AR Difference 
+
+0 0.5 1
+
+0
+
+5
+
+10 
+
+Height Difference (m) 
+
+> Percentage (%)
+
+2 4 6 8 10 
+
+0
+
+5
+
+10 
+
+Init. Dist. (m)           
+
+> Fig. A2. Dataset statistics across all evaluation scenes. Camera parameter differences (a-c) are computed for all query types, while off-trajectory distances (d) are computed only for the off-trajectory queries.
+
+over the magnitude of each parameter’s mismatch, compared to the performance achieved with no camera mismatch. LoTIS is largely insensitive to mismatches in FOV and aspect ratio (AR), but drops in performance for large mounting height differences. We attribute this to the fact that the trajectory is oftentimes not visible, when observed viewpoints at a largely different height. For the baselines, all the camera parameter mismatches consistently lead to performance drops. We note that even at small parameter mismatches, baseline performance falls below their ’matched’-camera results. This is partly because the ’cross’ evaluation setting also applies rotational perturbations to the reference trajectory poses (see Sec. V-A), simulating realistic imperfect recordings.x F. M ODEL AND TRAINING DETAILS 
+
+This section provides implementation details for our model and training, see Sec. IV-B and Sec. IV-C of the main paper. 
+
+0 0.2 0.4 0.6 0.8 1 1.2 1.4
+
+0
+
+50 
+
+100 
+
+Height Mismatch (m) 
+
+> % of Baseline
+
+LoTIS FAINT PlaceNav NoMaD ViNT 
+
+0 10 20 30 40 50 60 
+
+0
+
+50 
+
+100 
+
+FOV Mismatch (deg) 
+
+> % of Baseline
+
+0 0.2 0.4 0.6 0.8 1 1.2 1.4 1.6
+
+0
+
+50 
+
+100 
+
+AR Mismatch  
+
+> % of Baseline
+> Fig. A3. Performance degradation vs. camera parameter mismatch.
+
+A. Model Configuration 
+
+Table A2 summarises the key architectural parameters. For all the transformer blocks, both multi-head attention and MLP follow a common pre-norm residual structure: 
+
+x ← x + LayerScale 
+
+
+
+Op  RMSNorm (x)
+
+,
+
+where Op is either multi-head attention layer or MLP. Drop-path regularization is applied to all residual branches during training, and per-head QK-norm (RMSNorm on queries and keys) is used in every attention layer.                               
+
+> TABLE A2 MODEL ARCHITECTURE CONFIGURATION
+> Component Configuration
+> Backbone DINOv3 ViT-B/14 (frozen) Input feature dimension 768 Hidden dimension D256 Attention heads H8Head dimension D/H 32 Trajectory encoder depth L12 Query encoder depth 6 ( L/ 2)Decoder depth 6 ( L/ 2)Prediction head trunk depth 3Prediction head iterations K4FFN expansion ratio 3Normalization RMSNorm Dropout / Att. dropout / Drop-path 0.1 /0.1 /0.1 RoPE head-dim split (spatial / temporal) 24 /8RoPE base frequencies (spatial / temporal) 500 /100 Total trainable parameters ∼50M
+
+a) Backbone and feature projection.: A frozen DINOv3 ViT-B/14 backbone produces 14 × 14 = 196 patch tokens of dimension 768 per input frame. These are projected to the hidden dimension D = 256 via a linear layer followed by GELU; separate projection layers are used for trajectory frames and the query frame. A learnable summary token of dimension D is prepended to each frame’s patch tokens, yielding P = 197 tokens per frame. The camera token has two learned variants stored as a single parameter: one is used for the query frame and the other is shared across all trajectory frames. 
+
+b) Rotary Position Embeddings.: Each attention head’s 32-dimensional space is partitioned into a spatial portion (24 dimensions) and a temporal portion (8 dimensions). The spa-tial portion is further split equally into vertical and horizontal halves, each encoded with 1D RoPE using the corresponding patch-grid coordinate and base frequency 500. The temporal portion receives 1D RoPE using the frame’s sequential index within the trajectory, with base frequency 100. 
+
+c) Trajectory encoder.: The trajectory encoder stacks 
+
+L = 12 Dual Attention blocks. Each block operates on tokens of shape [B, S, P, D ] and applies two sub-layers in sequence: 1) Global self-attention. Tokens are reshaped to 
+
+[B, S·P, D] so that attention operates over all frames jointly, using full spatio-temporal RoPE. Followed by an MLP with expansion ratio 3. 2) Spatial self-attention. Tokens are reshaped to 
+
+[B·S, P, D] so that attention operates independently within each frame, using spatial RoPE only. Followed by an MLP with expansion ratio 3. 
+
+d) Query encoder.: The query encoder has L/ 2 = 6 
+
+blocks, each consisting of a single spatial self-attention sub-layer (spatial RoPE, followed by an MLP with expansion ratio 3), identical in structure to the spatial sub-layer of the trajectory encoder. The output is passed through a feature adapter (RMSNorm → Linear → GELU → RMSNorm) before entering the decoder. 
+
+e) Decoder.: The decoder has L/ 2 = 6 blocks, each interleaving cross-attention with a local self-attention sub-layer: 1) Cross-attention. Trajectory tokens (queries) attend to the adapted query tokens (keys and values), with spatial RoPE applied. Followed by an MLP with expansion ratio 3. 2) Local spatial self-attention. A spatial self-attention sub-layer, identical in structure to those in the trajectory encoder, operates independently per frame. Followed by an MLP with expansion ratio 3. After all decoder blocks, the summary token (position 0) is extracted from each frame, producing a [B, S, D ] tensor that is passed to the prediction head. 
+
+f) Iterative prediction head.: The prediction head refines its output over K = 4 iterations using an AdaLN-conditioned trunk inspired by DiT [20]. At each iteration k:1) The prediction from iteration k−1 is detached from the computation graph and embedded via a linear layer. At 
+
+k = 0 a learned empty-pose token is used instead. 2) The embedded vector is projected through SiLU → Linear to produce shift, scale, and gate vectors. These condition the input tokens via Adaptive Layer Normalization: 
+
+x′ = x + gate ⊙
+
+h
+
+(1 + scale ) ⊙ RMSNorm (x) + shift 
+
+i
+
+.
+
+3) The conditioned tokens are processed by a trunk of 3 self-attention blocks, each followed by an MLP with expansion ratio 3. 4) A two-layer MLP projects the output to a 4-dimensional residual update, which is accumulated onto the running prediction. The final predictions are mapped to bounded ranges: image coordinates pi = tanh( ·) ∈ [−1, 1] ; a visibility logit vi; and a normalized distance di = 12
+
+  tanh( ·) + 1  ∈ [0 , 1] .
+
+B. Training Configuration a) Optimization: We employ the MUON [9] optimizer for all two-dimensional weight matrices except those in the prediction head, while AdamW optimizes the remaining pa-rameters (biases, normalization layers, Layer Scale values, and all prediction-head parameters). Both optimizers use Cautious Weight Decay [6] and share a cosine-annealing learning-rate schedule with linear warm-up. Hyperparameters are listed below:  
+
+> •
+
+Base learning rate: 5 × 10 −4 
+
+> •
+
+MUON momentum: 0.95 (Nesterov)  
+
+> •
+
+AdamW: β1 = 0 .9, β2 = 0 .999  
+
+> •
+
+Weight decay: λ = 0 .05  
+
+> •
+
+Warm-up steps: 2 000  
+
+> •
+
+Total training epochs: 40  
+
+> •
+
+Gradient clipping: max norm 1.0
+
+b) Loss Configuration: The total loss is a weighted sum of three terms, each evaluated over non-padded sequence positions only:  
+
+> •
+
+λpos = 10 .0 : L1 loss on predicted image coordinates, computed only at frames where the target is visible.  
+
+> •
+
+λvis = 1 .0 : Binary cross-entropy on visibility predictions.  
+
+> •
+
+λdist = 6 .0 : L1 loss on predicted distances, normalised per trajectory by the maximum ground-truth distance, computed only at visible frames. All three losses are aggregated across the K = 4 prediction-head iterations with geometric weighting: iteration k receives weight wk = 0 .8 K−1−k, and the weighted sum is divided by 
+
+K. Because predictions are detached between iterations, each iteration contributes an independent gradient. 
+
+c) Efficient Batching Strategy: We exploit the asym-metric cost of the encoder–decoder architecture to maximise throughput. A batch consists of NT trajectories whose features are encoded once by ET. The encoded representations are then replicated and paired with up to 8 × NT query views; the decoder processes all pairs simultaneously, reusing the trajectory encodings. Because trajectory encoding constitutes the dominant compute cost (see Section IV-B), this amorti-zation yields an effective batch size of 8×NT query images at relatively low additional cost. In practice we set NT = 8 ,giving an effective batch size of 64 query images. 
+
+d) Implementation Details: We represent variable-length trajectory sequences as PyTorch NestedTensors to avoid padding overhead, and make use of torch.compile and PyTorch’s BF16 mixed precision training together with acti-vation checkpointing. All backbone features are pre-extracted before training begins. Training takes approximately 4 days on a single NVIDIA RTX 5090. G. MAS T3R AND VGGT FOR NAVIGATION 
+
+In Section II of the main paper, we discuss recent learned visual geometry methods including MASt3R [14] and VGGT [34]. Here, we provide examples supporting our hypothesis that applying these methods directly to visual navigation presents challenges. 
+
+A. Full Reconstruction 
+
+We processed each trajectory using both methods following their official implementations (VGGT: Depthmap and Camera branch, MASt3R: full pairwise matching with global optimiza-tion). Fig. A4 shows the results. Both methods produce recon-structions that, for these trajectory lengths and environments, exhibit pose errors and inconsistencies that would make direct use for navigation challenging. Moreover, MASt3R required approximately 5,min per trajectory, and VGGT about 0.2 s.
+
+B. One-to-Many Matching Analysis 
+
+We also tested MASt3R’s one-to-many matching mode, which matches all frames against a single query image, which is closer to our online setting. Fig. A5 compares the resulting pose predictions (projected to image space) against LoTIS’s predictions for both on-trajectory and off-trajectory query views. MASt3R’s predictions are noisy and inconsistent, while LoTIS produces stable image-space outputs suitable for control. These results suggest that the methods do not directly provide meaningful real-time navigation guidance, at least on trajectories similar to ours. H. C ONTROLLER IMPLEMENTATION DETAILS 
+
+This section details the controllers discussed in Sec. IV-D in the main paper. 
+
+A. Yaw Controller with constant forward velocity 
+
+From the current predictions (p1: N , v 1: N , d i,N ), we first extract the indices corresponding to visible predicted points, 
+
+Ivis , by thresholding the visibility confidence: 
+
+Ivis = {i | σ(vi) > 0.5, i ∈ [1 , N ]}. (3) Since prediction indices naturally follow the trajectory or-dering, this sequence is sorted, where the higher indices correspond to points closer to the end of the trajectory. From this sequence, we identify the current reference trajectory index k ∈ I vis as the visible point closest to the robot: 
+
+k = argmin 
+
+> i∈I vis
+
+di. (4) The traversal direction s ∈ { +1 , −1} is determined by com-paring this trajectory index k to the goal index: s = sgn( g−k).We apply a small lookahead ∆ within the visible sequence space to determine the target point. Let j be the position of k
+
+in the sequence of visible indices (i.e., Ivis [j] = k). The target point ptarget is selected as: 
+
+ptarget = pm, where m = Ivis [clip( j+s·∆, 1, |I vis |)] . (5) For views in which the trajectory is out-of-view (e.g. below the camera, or in sharp turns), we found that our model still provides meaningful guidance by predicting points at the border of the frame in the direction of the out-of-view trajectory, but (correctly) predicts them as not visible. To take advantage of that, we consider close, non-visible points as target points if Ivis = ∅. Finally, we apply a P-controller to minimize the horizontal pixel error between the image center and ptarget , while commanding constant forward velocity. 
+
+B. Model Predictive Path Integral Control 
+
+MPPI is a control method to solve stochastic Optimal Control Problems for discrete-time dynamical systems 
+
+xk+1 = F(xk, vk), vk ∼ N (uk, Σ).
+
+MPPI samples M random control input sequences v(1: M )0: K−1
+
+of length K − 1 and forward simulates the system dy-namics given the current state x0 to obtain X(m) =[x0, F(x0, v(m)0 ), . . . , F(xK−1, v(m)
+
+> K−1
+
+)] . In our implementa-tion, we use a simplified single integrator model which in-dependently controls the linear velocity and yaw rate of the quadcopter, i.e. 
+
+xk+1 = xk + δt · uk (6) with state x = [px, p y , ψ ]T and control input u =[vx, v y , ω ψ ]T . The height pz is independently controlled by keeping the vertical position of the goal point in the image-space center. Then, given the state rollouts and a cost function J(X)
+
+to be minimized, each rollout is weighted by an importance sampling weight 
+
+w(m) = 1
+
+η exp 
+
+
+
+− 1
+
+β
+
+
+
+J(X(m)) − ρ)
+
+
+
+, (7) where η is a normalization constant ensuring PMm=1 w(m) =1, ρ = min m J(X(m)) is subtracted for numerical stability and β is the inverse temperature which serves as a tuning parameter for the sharpness of the control distribution. Finally, an approximate optimal control sequence can be obtained as 
+
+u∗ 
+
+> 0: K−1
+
+=
+
+> M
+
+X
+
+> m=0
+
+w(m)v(m)0: K−1,Fig. A4. Real-world trajectories processed by VGGT (top row) and MAST3R (bottom row). Obtaining the full reconstruction took about ∼ 5 min . per scenario for MAST3R. For more accurate reconstructions, see Fig. 4 in the main paper.  
+
+> Fig. A5. LoTIS’s predictions (left) compared to MASt3R’s one-to-many matching (right). We project MASt3R’s predicted poses back to image space. We show the results for on-trajectory views (top) and off-trajectory views from on-board the quadcopter (bottom).
+
+which is a weighted average of sampled control trajectories and is applied in a receding horizon fashion. For a detailed discussion and theoretical properties, we refer to [38]. 
+
+C. Cost Terms 
+
+Our cost function 
+
+J(X) = 
+
+> K
+
+X
+
+> i=1
+
+wgoal Cgoal + wvis Cvis + wcol Ccol (8) consists of three terms that penalize deviation from the goal point, loosing visibility of the goal point and collisions in the environment. The first term our cost formulation in Eq. (8) rewards progress along the path by penalizing distance to a goal point. Since only visible image-space predictions Ivis are available, we first ground them in 3D to obtain a reference trajectory. We use UniDepthV2 [21] to predict depth and camera parameters from the current query image Iq . Given the model predictions 
+
+(pi, v i, d i)i∈I vis , we project the unscaled image-space points into the depth image using the normalized distances di. As metric scale is unknown, we scale the resulting trajectory as far as possible within the collision-free space and use the scaled points ˜pref  
+
+> 1
+
+, ˜pref  
+
+> 2
+
+, . . . as the reference trajectory. The goal cost is implemented as a simple two-norm, i.e. 
+
+Cgoal = ∥[px, p y ]T − g∥ (9) where g ∈ { ˜pref  
+
+> 1
+
+, ˜pref  
+
+> 2
+
+, . . . } can be any point on the reference trajectory depending on the strategy. For instance, the goal point can be chosen as the furthest progressed one to encour-age short-cutting behavior, or an earlier point on the path to prefer trajectory tracking. In practice, we use the third point to balance the two behaviors. For collision avoidance, we use the predicted depth image to create a distance field DF : px × py 7 → R≥0 and add a penetration cost as 
+
+Ccoll = 1DF (px,p y )≤r · DF (px, p y ) (10) where r denotes the collision radius of the quadcopter. Lastly, in order to keep the predictions in the FOV, we add an additional cost term 
+
+Cvis = (atan2 ( gy − py , g x − px) − ψ)2 (11) that penalizes paths that loose track of the predicted points. Overall, the first two cost terms address collision-free path tracking through velocity commands vx, v y while Cvis encour-ages the robot to seperately make use of ωψ to keep the goal point in the FOV. Throughout our experiments, we use weights 
+
+wgoal = 10 , w coll = 100 and wvis = 10 .

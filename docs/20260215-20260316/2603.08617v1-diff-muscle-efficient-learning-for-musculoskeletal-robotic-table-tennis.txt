@@ -1,0 +1,486 @@
+Title: Diff-Muscle: Efficient Learning for Musculoskeletal Robotic Table Tennis
+
+URL Source: https://arxiv.org/pdf/2603.08617v1
+
+Published Time: Tue, 10 Mar 2026 02:36:29 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Diff-Muscle: Efficient Learning for Musculoskeletal Robotic Table Tennis 
+
+Wentao Zhao 1, Jun Guo 1, Kangyao Huang 1, Xin Liu 1, Huaping Liu 1†
+
+Abstract — Musculoskeletal robots provide superior advan-tages in flexibility and dexterity, positioning them as a promis-ing frontier towards embodied intelligence. However, current research is largely confined to relative simple tasks, restricting the exploration of their full potential in multi-segment coor-dination. Furthermore, efficient learning remains a challenge, primarily due to the high-dimensional action space and inher-ent overactuated structures. To address these challenges, we propose Diff-Muscle , a musculoskeletal robot control algorithm that leverages differential flatness to reformulate policy learning from the redundant muscle-activation space into a significantly lower-dimensional joint space. Furthermore, we utilize the highly dynamic robotic table tennis task to evaluate our algorithm. Specifically, we propose a hierarchical reinforcement learning framework that integrates a Kinematics-based Muscle Actuation Controller (K-MAC) with high-level trajectory plan-ning, enabling a musculoskeletal robot to perform dexterous and precise rallies. Experimental results demonstrate that Diff-Muscle significantly outperforms state-of-the-art baselines in success rates while maintaining minimal muscle activation. Notably, the proposed framework successfully enables the mus-culoskeletal robots to achieve continuous rallies in a challenging dual-robot setting. 
+
+I. INTRODUCTION One of the primary objectives in the pursuit of generalist embodied intelligence is to develop agents capable of exhibit-ing human-like flexibility, dexterity, and behavioral diversity within dynamic and unstructured environments [1]. Com-pared to conventional motor-driven systems, musculoskeletal systems have recently been demonstrated to offer superior flexibility and dexterity, attributed to their inherent overactu-ated nature [2]. However, current research on musculoskele-tal robots remains largely confined to simplified tasks within isolated body segments, such as in-hand manipulation. While these scenarios provide valuable insights, they often overlook the critical importance of multi-segment coordination and fail to fully capture the extreme control dimensionality inherent in complex musculoskeletal systems. Consequently, these restricted experimental settings struggle to fully exploit the mechanical potential of musculoskeletal robots, leaving a significant gap between theoretical advantages and practical execution in complex tasks. Robotic table tennis has long served as a premier bench-mark for evaluating the integrated capabilities of robotic systems [3], for it demands whole-body coordination, rapid reactive responses, and high-precision manipulation. Execut-ing a successful return necessitates not only the coordina-tion between trunk, arm, and hand but also instantaneous   
+
+> †Corresponding author: hpliu@tsinghua.edu.cn
+> 1Department of Computer Science and Technology, Tsinghua University, China. Single Serve Return Dual Robot Rally
+
+Robotic Table Tennis 
+
+> random server
+
+(b) 
+
+Action Mapping via Differential Flatness                 
+
+> Joint Position Space
+> Muscle Activation Space
+> 𝑧 ∈ℝ$,𝑛 ≪𝑚
+> 𝑢 ∈ℝ%
+> 𝑢 =𝑈 (𝑧 ,̇𝑧 ,̈𝑧 ,...)
+
+(a)       
+
+> Fig. 1. Diff-Muscle. (a) Utilizing the inherent differential flatness, Diff-Muscle reformulates the learning problem in musculoskeletal systems from high-dimensional muscle space to low-dimensional joint space. (b) We evaluate Diff-Muscle in the highly dynamic robotic table tennis task to demonstrate its capability and efficiency in learning multi-segment coor-dination and rapid reactive behaviors.
+
+decision-making to intercept fast-moving balls. Such a task compels the robots to maintain a stable, active grasp while si-multaneously modeling the racket’s impact position, velocity, and orientation with extreme accuracy. Consequently, robotic table tennis serves as an ideal platform to develop advanced control algorithms for musculoskeletal robots, manifesting inherent potential in flexibility, dexterity, and behavioral diversity. Learning control policies for musculoskeletal systems has long been a challenge due to the following reasons. First, the performance suffers from the high dimensionality and overactuated nature. For instance, the motion of the human lumbar spine is driven by over 180 individual muscles, and the hand is driven by more than 30 muscles to perform complex tasks [4], [5]. Besides, there exists a complex mapping relation between muscles and joints, where a sin-gle joint is actuated by multiple muscles, and a single muscle may simultaneously influence the states of several joints [6]. Furthermore, the muscle dynamic is non-linear and characterized by its unidirectional force-generating nature, as muscles can only generate contractile forces [7]. While these properties provide significant control flexibility, they simultaneously increase the difficulty of learning a precise control policy. Existing research primarily focuses on leveraging muscle 
+
+> arXiv:2603.08617v1 [cs.RO] 9 Mar 2026
+
+synergy prior to learn a synergy representation [8], [9]. Nevertheless, synergy patterns of specific muscle groups exhibit variations in different moving directions [10]. For instance, in multi-DoF structures like the lumbar spine, a change in movement direction may shift a pair of muscles from synergy to antagonism, making it difficult to identify explicit synergy patterns from collected data. Besides, such methods fail to achieve an effective reduction in the actual dimensionality of the action space, leaving policies to explore in high-dimensional muscle space. These limitations moti-vate us with a question: can we leverage inherent kinematic structure and muscle dynamics in musculoskeletal systems to map redundant action spaces onto a lower-dimensional joint space, bridging the gap from joint coordination to muscle execution? In this work, we address this challenge by reformulating the musculoskeletal control problem through the lens of differential flatness. Differential flatness [11] is a powerful property of certain nonlinear systems that allows the full state and input to be algebraically determined by a set of carefully chosen flat outputs and their finite derivatives. Through rigorous mathematical derivation, we prove the conditional differential flatness of musculoskeletal systems, identifying joint configurations as the ideal flat outputs. This theoretical foundation enables a principled transformation of the control manifold, effectively mapping the highly redundant and high-dimensional muscle activation space onto a significantly lower-dimensional joint space. Building upon this bridge, we propose Diff-Muscle (Fig. 1), a framework that achieves substantial dimensionality reduction, significantly enhancing exploration efficiency while simultaneously preserving the intrinsic dynamical fidelity of musculoskeletal systems. The main contributions of this work are summarized as follows:  
+
+> •
+
+We propose Diff-Muscle , which enables direct policy learning in joint space by utilizing a Kinematics-based Muscle Actuation Controller (K-MAC), improving the exploration efficiency for musculoskeletal systems.  
+
+> •
+
+We develop a hierarchical reinforcement learning frame-work for the robotic table tennis task, enabling efficient learning of complex striking behaviors.  
+
+> •
+
+Extensive experiments demonstrate that the Diff-Muscle 
+
+framework significantly outperforms current baselines, and we successfully enable two musculoskeletal robots to execute consecutive rallies. II. RELATED WORKS 
+
+A. Musculoskeletal System Control 
+
+The control of high-dimensional, overactuated muscu-loskeletal systems is a longstanding challenge in both robotics and biomechanics due to the high dimensionality of action space and the redundancy of muscle actuators [12], [13]. While deep reinforcement learning has become the predominant approach for musculoskeletal systems, the vast action space often leads to poor exploration efficiency. Be-sides, standard reinforcement learning algorithms typically rely on independent Gaussian noise for exploration, which is suboptimal for musculoskeletal models where uncorrelated perturbations in redundant muscles might diminish each other’s effects. To address this, DEP-RL [14] integrates Differential Extrinsic Plasticity (DEP) to generate action correlated noise for more effective exploration. Similarly, Lattice [15] injects temporally correlated noise into the latent state of the policy network to induce structured, cross-actuator correlations, effectively leveraging learned actuator synergies to improve exploration efficiency. Besides advanc-ing exploration efficiency, some other studies leverage bio-inspired muscle synergies to mitigate the complexity of policy learning. SAR [9] acquires synergistic action represen-tations from behaviors learned during play and transfer these knowledge to more complex tasks. Along the same lines, Dynsyn [8] generates synergistic representation directly from the system’s dynamical structure via random perturbations, demonstrating superior learning efficiency across various high-dimensional musculoskeletal models. 
+
+B. Robotic Table Tennis 
+
+Robotic table tennis has long been a focal point in the robotics community, serving as an ideal testbed for eval-uating control algorithms due to its inherent requirements for rapid response, agile movement, and high-precision manipulation. Early research [16], [17] primarily explored self-play algorithms, where agents iteratively refined their performance by competing against historical versions of their own policies. Recently, drawing inspiration from the hierar-chical nature observed in biological motor control, a growing body of literature has leveraged hierarchical frameworks to learn more complex maneuvers in robot table tennis. Google DeepMind [17] proposes a hierarchical and modular policy architecture that utilizes a high-level controller to select between various low-level strike skill policies. While this approach achieves human-level performance in robot table tennis, it is validated on a relatively simple 6-DoF robot arm platform. To bridge the gap towards more complex robot systems, Hitter [18] extends to a Unitree G1 humanoid robot, enabling consecutive strikes through hierarchical planning and learning. To move closer towards human-like dexterity and intelligence, MyoSuite [19] proposes a challenge fo-cusing on mastering an upper-body musculoskeletal model to rally table tennis, and our approach is validated on this platform. III. PROBLEM FORMULATION We formulate the robotic table tennis task as a Partially Observable Markov Decision Process (POMDP), defined by a tuple M = (S, O, A, P, R, Ω, γ ), where S ∈ Rn
+
+represents all valid states, O ∈ Rm represents the partial observation received by the agent according to the function 
+
+Ω, and A ∈ Rk represents continuous actions. The transition function P (st+1 |st, a t) describes the probability of an agent taking an action at to transfer from the current state st to 
+
+st+1 at time t. R : S × A → R is the reward function. And 
+
+γ ∈ [0 , 1) is the discount factor. The objective is to optimize (a)  
+
+> Environment
+> Physics -based
+> Planner
+> RL Policy
+> K-MAC
+> Update
+> Ball
+> State
+> Command
+> Obs
+> Previledged Obs
+> Value
+
+Framework Overview    
+
+> Muscle Signal 𝑢
+> Actor Target Joint pos 𝑧 ∗
+
+Kinematics -based Muscle Actuation Controller   
+
+> Forward
+> Kinematics
+> Joint Position Muscle Length Muscle Signals
+> PD
+> Controller
+
+Physics -based Planner 
+
+> Initial Vel
+> Desired Racket
+> Predefined
+> Hit Plane
+> Ctitic
+
+Consecutive Rally 
+
+> Extend
+
+(d) (c)      
+
+> ∈ℝ!" ∈ℝ"#! ∈ℝ"#!
+
+(b)      
+
+> Differential Flatness
+> Initial Serve Distribution
+> Predifined Plane Distribution Initial Serve Distribution
+> Heuristic Rules Extra Rewards
+
+Fig. 2. Hierarchical reinforcement learning framework. (a) In this framework, the policy takes as input current observation and high-level commands, and generates the target joint positions, which are subsequently translated into muscle signals through the Kinematics-based Muscle Actuation Controller (K-MAC). (b) We extend the framework and achieve successful consecutive dual-robot rallies. (c) Given the ball state, the planner predicts the desired racket position, orientation, and velocity at the predefined plane. (d) The Kinematics-based Muscle Actuation Controller integrates forward kinematics and a PD controller to translate target joint positions into muscle control signals. 
+
+a policy πϕ that maximizes the expected discounted return: 
+
+π∗
+
+> ϕ
+
+(at|ot) = arg max  
+
+> ϕ
+
+Eτ ∼πϕ
+
+" ∞X
+
+> t=0
+
+γtr(st, a t)
+
+#
+
+(1) where ot is the observation at step t, and we optimize the policy with Proximal Policy Optimization (PPO) [20]. We later demonstrate (Fig. 4) that direct end-to-end learn-ing in the raw muscle action space fails to learn complex behaviors. This failure is attributed to the inherent chal-lenges of high-dimensionality and the overactuated nature of musculoskeletal systems. In contrast, the differential flatness of musculoskeletal systems with respect to joint positions suggests that the learning paradigm can be algebraically simplified. In the next section, we detail our Diff-Muscle 
+
+algorithm, which leverages this prior to learn control policy directly in lower-dimensional joint space. IV. METHOD We first provide a rigorous proof of conditional differential flatness for musculoskeletal systems, establishing joint con-figurations as flat outputs. Building on this, we introduce the Kinematics-based Muscle Actuation Controller (K-MAC) to analytically translate joint targets into physiological activa-tions. We then detail the hierarchical reinforcement learning framework (Fig. 2) designed for robotic table tennis and finally extend this framework to achieve dual-robot rallies by decoupling striking and recovery phases. 
+
+A. Differential Flatness and Action Mapping 
+
+Controlling a musculoskeletal robot using traditional RL methods suffers from the curse of dimensionality caused by high-dimensional inputs and outputs. In this work, we lever-age differential flatness to address the ultra-high-dimensional output problem, thereby reducing the output from the high-dimensional muscle activation space to a low-dimensional target joint angle space, significantly compressing the search space without information loss. 
+
+1) Conditional Differential Flatness: To establish the differential flatness of the musculoskeletal system, we first define its governing dynamics and subsequently provide a constructive proof. Specially, our formulation is strictly grounded in the widely accepted Hill-type muscle model as implemented in MuJoCo [21]. The complete musculoskeletal dynamics comprises four coupled components–the skele-tal dynamics, muscle-joint geometry, the Hill-type muscle model, and muscle activation dynamics: 
+
+M (z)¨ z + C(z, ˙z) ˙ z + G(z) = τm + τext , (2) 
+
+τm = J⊤
+
+> m
+
+(z)fm, (3) 
+
+fm = act · Fmax · FL(lm) · FV ( ˙lm) + FP (lm), (4) 
+
+∂act (t)
+
+∂t = u(t) − act (t)
+
+τu,act 
+
+(5) where z ∈ Rn denotes the joint angles and τext is the external torque; τm denotes the resultant torque generated by muscles; 
+
+fm ∈ Rm is the muscle tension vector; Fmax is the peak active force at zero velocity; act ∈ [0 , 1] m and u ∈ [0 , 1] m
+
+are muscle activation state and the bounded control input respectively; Jm(z) = ∂ℓ F K (z)/∂z is the transposition of the muscle Jacobian matrix; FL denotes the active force-length function, FV denotes force-velocity function, and FPdenotes passive force function. Besides, τu,act is the time constant computed at runtime as: 
+
+τu,act =
+
+(
+
+τact · (0 .5 + 1 .5 · act ), u − act > 0
+
+τdeact /(0 .5 + 1 .5 · act ), u − act ≤ 0 (6) where τact and τdeact are with defaults (0 .01 , 0.04) .
+
+Theorem 1 Conditional Differential Flatness . Consid-ering Eq.2–Eq.5, the system is differentially flat with flat output y = z if and only if: (C1) Kinematic solvability :
+
+rank( J⊤
+
+> m
+
+(z)) = n, z ∈ Z ; (C2) Physiological feasibility :
+
+act ∈ [0 , 1] m; (C3) Velocity non-singularity : FV ( ˙lm)̸ = 0 
+
+for all active muscles. 
+
+Proof. (Sufficiency) Let the flat output be y = z. The state variables are trivially expressed as z = y and ˙z = ˙ y. From Eq.2, the required joint torque is obtained as 
+
+τm = M (y)¨ y + C(y, ˙y) ˙ y + G(y) − τext =: T (y, ˙y, ¨y, τ ext )
+
+(7) where the symbol =: indicates “is defined as”. The muscle kinematics follow from the forward kinematics mapping 
+
+ℓF K :
+
+lm = ℓF K (y), ˙lm = Jm(y) ˙ y. (8) Consequently, the force-length, force-velocity, and passive force functions can be expressed as: 
+
+FL(lm) = FL(ℓF K (y)) =: FL(y), (9) 
+
+FV ( ˙lm) = FV (Jm(y) ˙ y) =: FV (y, ˙y), (10) 
+
+FP (lm) = FP (ℓF K (y)) =: FP (y). (11) By condition (C1), J⊤ 
+
+> m
+
+is full row rank, hence the linear system Eq.3 admits the general solution: 
+
+fm = ( J⊤
+
+> m
+
+)+τm + PN · α (12) where (·)+ denotes the Moore-Penrose pseudoinverse, and 
+
+PN = I − (J⊤
+
+> m
+
+)+J⊤ 
+
+> m
+
+is the projection onto the null space 
+
+N (J⊤
+
+> m
+
+) which includes all combinations of muscle forces that do not generate joint torque, and α ∈ Rm is a free parameter. Substituting τm = T (y, ˙y, ¨y, τ ext ) yields 
+
+fm = F(y, ˙y, ¨y, τ ext ). (13) Finally, solving Eq.4 for the activation input under condition (C3) gives 
+
+act = fm − F P (y)
+
+Fmax FL(y)FV (y, ˙y) =: A(y, ˙y, ¨y, τ ext ). (14) Condition (C2) ensures A ∈ [0 , 1] . Furthermore, the system control input u gives 
+
+u =
+
+(
+
+act + ˙act · τact · (0 .5 + 1 .5 · act ), u − act > 0
+
+act + ˙act · τdeact /(0 .5 + 1 .5 · act ), u − act ≤ 0
+
+(15) 
+
+⇒ u =: U(y, ˙y, ¨y, ... 
+
+y , τ ext ) (16) Thus, all states of the system and u are algebraically deter-mined by y and its derivatives up to third order, establishing differential flatness for Eq.2–Eq.5. This completes the proof. 
+
+Proof. (Necessity) If (C1) fails, Eq.3 has no solution. If (C3) fails, act cannot be algebraically determined from Eq.4. If (C2) fails, the feasible activation set is empty, and the muscle cannot be activated. Thus, all three conditions are necessary. 
+
+2) Kinematics-based Action Mapping: According to the conditional differential flatness of the system, we propose a kinematics-based muscle actuation controller, which inte-grates forward kinematics to translate target joint configu-rations into physiological muscle activations. As illustrated in Fig. 2(d), given the target joint positions z∗ from πϕ, the desired muscle lengths l∗ 
+
+> m
+
+can be derived through the forward kinematics of the musculoskeletal system: 
+
+l∗ 
+
+> m
+
+= ℓF K (z∗). (17) To compute the muscle forces required to achieve these desired muscle lengths, we then employ a PD controller to generate the required muscle force based on current muscle length lm and velocity ˙lm:
+
+fm = Fmax 
+
+
+
+Kp(l∗ 
+
+> m
+
+− lm) − Kd ˙lm
+
+
+
+/∆lm (18) where Kp is proportional gain parameter and Kd is derivative parameter, and both are hyperparameters. ∆lm is the length range. Subsequently, the muscle force is clipped within a physiologically plausible range: 
+
+f ∗ 
+
+> m
+
+= CLIP (fm, −Fmax , 0) (19) Given the desired muscle force f ∗
+
+> m
+
+, the corresponding muscle activation act and system input u can be computed by Eq.4 and Eq.5 respectively. 
+
+B. Physics-based Planner 1) Planner Construction: Generating actions directly from a fast-moving ball presents significant challenges, as RL policies require extensive undirected exploration to develop an understanding of ball trajectories and learn to return the ball at appropriate positions. However, acquiring the future states of the ball allows the policy to proactively plan current movements and advance the reward signals. Drawing inspira-tion from Hitter [18], we implement a Physics-based Planner (Fig. 2(c)) to predict the incoming ball’s trajectory and compute the target racket position, velocity, and orientation as high-level commands for the policy πϕ.Given the initial ball position p and velocity v, we model its flight and table-collision dynamics, ignoring air resistance and spin: 
+
+ ˙v = g, if pz > 0
+
+v+ = Cv −, if pz = 0 
+
+(20a) (20b) where g is gravitational acceleration, v+ and v− represent the velocity before and after impact with the table, and 
+
+C = diag( Ch, C h, −Cv ) is the restitution matrix with hori-zontal Ch and vertical Cv coefficients. The planner integrates Eq. (20) forward until the ball intersects a predefined virtual hitting plane, yielding the predicted striking position ˆpstrike .Assuming the striking velocity is normal to the racket plane, we sample the target return velocity vo. We first sam-ple the vertical component vz randomly from a predefined range, and derive the flight duration t via the flight dynamics. Subsequently, we determine the feasible velocity bounds in the xy -plane to ensure the ball lands within the opponent’s table area while crossing the net: 
+
+vx ∼ U ( xlower 
+
+t , xupper 
+
+t ) (21) 
+
+vy ∼ U ( ylower 
+
+t , yupper 
+
+t ) (22) Assuming frictionless contact with a restitution coefficient 
+
+Cr along the normal direction of the racket surface, the desired racket velocity at contact is computed as: 
+
+ˆvracket = vo · u + Cr vi · u
+
+1 + Cr
+
+u, u = vo − vi
+
+∥vo − vi∥ . (23) With ˆvracket , we can compute the corresponding quaternion 
+
+ˆoracket . The resulting tuple (ˆ pracket , ˆvracket , ˆoracket ) constitutes the high-level command sent to the policy as observation. 
+
+2) Reward Functions: Based on the high-level commands, our reward function is a weighted sum of three components: 
+
+r = wg rg + wcrc + wsrs (24) where wg , w c, w s are the corresponding reward weights. A dense grasp reward rg is used to minimize the distance between the fingers and the handle to prevent dropping during rapid movements. The command reward rc provides dense feedback for the target racket pose tracking and a sparse velocity term for precise hitting speeds. Finally, we introduced an additional sparse reward rs related to task completion. A sparse reward is granted when the ball makes contact with the racket. Immediately after bounce, we utilize the planner to predict the landing position on the other side, assigning a sparse reward if a successful return is predicted. 
+
+C. Extend to Dual Robot Rally 
+
+Building upon the successful implementation of single-serve returns, we further extend our framework to a con-tinuous dual-robot rally task to better approximate realistic, multi-round table tennis scenarios. A critical challenge in this transition is the compounding errors over multi-exchanges which causes the ball’s trajectory to gradually drift outside the initial distribution, eventually making it unreachable and terminating the rally. To address this challenge, we must ensure the policy con-sistently faces in-distribution incoming balls. As illustrated in Fig. 2(b), we constrain the ball’s trajectory distribution within identical spatial boundaries across distinct planes. Specifically, we first employ a heuristic serving method to restrict the ball distribution on the predefined striking plane within the serving range. Moreover, an additional sparse reward is triggered only when the returned ball reaches the opponent’s striking plane within identical spatial boundaries. MyoArm         
+
+> 63 muscle actuators
+> 38 joints
+> 27 DoFs
+> Pelvis
+> 2 position actuators
+> 2 joints
+> MyoTorso
+> 210 muscle actuators
+> 18 joints
+> 3DoFs
+> (a) (b)
+> (c)
+> Fig. 3. Musculoskeletal Model and Environment. (a) The muscu-loskeletal model consists of MyoArm (63 muscles, 27 DoF), MyoTorso (210 muscles, 3 DoF), and pelvis (2 actuators, 2DoF). (b) Single-robot environment to execute a single-serve ball return. (c) dual-robot rally environment.
+
+The extended framework prevents trajectory drift over mul-tiple rounds and effectively supports stable, long-horizon exchanges. V. EXPERIMENTS 
+
+A. Experimental Setup and Task Formulation 1) Musculoskeletal Model: We utilize the upper-body musculoskeletal model from the MyoSuite environment [19] to validate our proposed framework. As illustrated in Fig. 3(a), the robot is a highly complex, overactuated system comprising a total of 273 muscle actuators that control 58 joints . The model is primarily composed of the following components:  
+
+> •
+
+MyoArm : The arm consists of 63 muscles and 38 joints. With 11 dependent joints passively driven by the active ones, it provides 27 degrees of freedom (DoFs).  
+
+> •
+
+MyoTorso : The torso contains 210 muscles and 18 joints. Under equality constraints, it effectively operates with only 3 DoFs , representing a severely overactuated system where coordinating high-dimensional muscle redundancy is exceptionally challenging.  
+
+> •
+
+Pelvis : The pelvis is equipped with two position actua-tors, allowing the robot to translate across the horizontal plane ( x, y directions). 
+
+2) Task Definition and Environments: As shown in Fig. 3(b), our single-robot experimental environment is built upon the MyoChallenge 2025 table tennis track, where a musculoskeletal robot is required to execute high-speed table tennis returns. The task is formulated as a single-serve ball return problem with the following specifications:  
+
+> •
+
+Environment Initialization : At the beginning of each episode, a ball is initialized on the opponent’s side within a predefined spatial range. Its initial velocity is sampled to ensure a valid trajectory that lands on the agent’s side of the table. The agent is reset to a consistent initial posture, with the paddle placed at the grasping position of the hand. Crucially, the paddle is not rigidly attached to the hand, necessitating active grasping through muscle coordination.  
+
+> •
+
+Success Criteria : Each episode consists of a single serve. A trial is considered successful if and only if the ball is hit by the paddle exactly once and subsequently lands within the boundaries of the opponent’s court.  
+
+> •
+
+Control Objectives : The task demands coordination between the MyoArm and MyoTorso models. The agent must apply appropriate muscle forces to maintain a stable grasp of the paddle while executing high-speed, accurate strikes to return the ball to the opponent’s area. Furthermore, to evaluate our framework in a setting that more closely reflects real-world table tennis play, we build a dynamic dual-robot rally environment by extending the single-robot setup (Fig. 3(c)). Specifically, we replace the static ball server with a symmetric agent. Each episode begins with a randomized serve from either side, transition-ing into a continuous rally that terminates upon a missed hit or a rule violation. This setup shifts the task from a static distribution to a non-stationary distribution, where each incoming ball is inherently conditioned on the previous agent’s action. Consequently, the agent must not only master precision striking but also maintain stability after striking to be ready for the next rally. 
+
+B. Effectiveness of Kinematics-based Muscle Actuation Con-troller 
+
+This section evaluates the effectiveness of the proposed Kinematics-based Muscle Actuation Controller in mitigating the learning challenges inherent in high-dimensional mus-culoskeletal systems. To ensure a fair comparison across baselines, all experiments are conducted in the single-robot table tennis environment using consistent reward parameters and hyperparameters. All results are averaged across five random seeds to ensure statistical significance. 
+
+1) Baseline Selection and Evaluation Metrics: We com-pare our method against several state-of-the-art reinforce-ment learning methods for musculoskeletal control:  
+
+> •
+
+Muscle-PPO : A standard PPO algorithm where the policy directly outputs activation values for all 273 muscles and 2 pelvis actions.  
+
+> •
+
+Muscle-PD [22] : Inspired by MuscleVAE, this policy outputs target muscle lengths, which are subsequently mapped to muscle forces via a PD controller and finally converted into muscle activations.  
+
+> •
+
+DynSyn [8] : This algorithm derives muscle-grouping representations from system dynamics via random per-turbations and uses state-dependent weights for coordi-nated control. Our simulation is built on mjlab [23], which provides a simulation wrapper around GPU-accelerated physics simu-lation MuJoCo Warp with CUDA Graph optimization. All algorithms adopt PPO as the basic algorithm. We conduct 1000 independent test episodes for each trained policy. To evaluate the experiment performance, we utilize three primary metrics: hit rate is defined as the                     
+
+> Fig. 4. Learning curve. Diff-Muscle exhibits the most rapid improvement in reward and achieves the highest overall performance among all evaluated methods. Mean ±Std is computed across 5 random seeds. TABLE I COMPARISON WITH EXISTING METHODS ON THE SINGLE -ROBOT ENVIRONMENT .
+> Method Hit(%) Success(%) Effort Muscle-PPO 76.4 43.0 0.035 DynSyn [8] 84.5 62.6 0.0310 Muscle-PD [22] 90.5 72.9 0.0365
+> Diff-Muscle (ours) 95.1 80.3 0.0278
+
+ratio of successful contact between ball and racket over all independent test episodes, while success rate corresponds to the ratio of valid return to the opponent’s side. And effort 
+
+is used to quantify control efficiency. We define effort as the average normalized muscle activations across all evaluated episodes: 
+
+Effort = 1
+
+N
+
+> N
+
+X
+
+> e=1
+
+1
+
+TeTeX
+
+> t=1
+
+∥ae,t ∥2
+
+na
+
+!
+
+(25) where ae,t represents the muscle activation vector at time step t of episode e, na denotes the number of actuators, 
+
+Te is the duration of episode e, and N is the total number of episodes. Lower effort values indicate more efficient and energy-conscious control strategies. 
+
+2) Learning Efficiency in High-dimensional System: 
+
+Fig. 4 illustrates the training progress of Diff-Muscle and baselines in terms of mean episode reward curves. As de-picted, Diff-Muscle exhibits the most rapid rise and achieves the highest converged reward of approximately 2100. These results demonstrate that Diff-Muscle possesses significantly higher exploration efficiency, enabling both efficient and stable policy learning. In contrast, the baselines struggle to achieve comparable performance due to the complexities of exploring in a high-dimensional space. Notably, the end-to-end Muscle-PPO baseline fails to discover effective action patterns, suffering from a catastrophic performance collapse after its initial progress. Additionally, the Dynsyn baseline suffers from a slower learning efficiency and inferior final reward, suggesting that learned synergies are less effective than our kinematic priors for such a dynamic task. Diff-Muscle      
+
+> Diff-Muscle Fig. 5. Ablation results. Diff-Muscle exhibits the most rapid improvement in reward and achieves the highest overall performance among all evaluated methods. Mean ±Std is computed across 5 random seeds.
+
+3) Task Performance and Bio-mechanical Efficiency: 
+
+Table I presents the evaluation results of our Diff-Muscle and baselines. As illustrated, Diff-Muscle achieves the highest hit rate of 95.1% and success rate of 80.3%. From the test results, we find that Diff-Muscle exhibits superior stability and adaptability, consistently adopting appropriate striking postures to return difficult balls, such as some high-altitude balls. Even in extreme scenarios where a successful return is nearly impossible, the agent still prioritizes making contact with the racket. While other baselines fail when facing high-velocity serves or balls aimed at extreme positions, such as those aimed at the far backhand side. Furthermore, the third column of Table I demonstrates that Diff-Muscle realizes the lowest muscle activation energy. This bio-mechanical efficiency is primarily achieved through our kinematics-based muscle actuation controller by setting a relatively low proportional gain kp, while the other baselines exhibit substantially higher muscle activation levels, mani-festing their inefficiency in terms of energy consumption. 
+
+C. Impact of Predictive Planning 
+
+This section aims to validate the effectiveness of predictive planning of our framework in the table tennis task by ablating several modules. The experiments are similarly conducted in the single-robot environment, with results averaged across five random seeds. 
+
+1) Variants Settings: We designed three variants to indi-vidually evaluate the contributions of different modules:  
+
+> •
+
+Without-Planner : This variant drops the physics-based planner entirely, excluding its predicted commands from both the observation and the reward function.  
+
+> •
+
+Position-only : This variant solely utilizes the striking position ˆvracket predicted by the physics-based planner as the component for observations and reward function.  
+
+> •
+
+Without-Task : This variant excludes the sparse task reward rs associated with successful task completion. 
+
+2) Necessity of Predictive Planning on Reactive Tasks: As illustrated in Fig. 5, the Without-Planner variant completely fails to learn the task, with both its hit rate and success rate remaining near zero. Without trajectory prediction, the policy relies entirely on instantaneous observations, resulting   
+
+> Fig. 6. Distribution visualization. This scatter plot visualizes the y-z coordinates of 150 serves and corresponding returns.
+
+in delayed reactive behaviors that struggle to intercept fast-moving balls in time. Furthermore, the Position-only variant presents a com-pelling phenomenon. While it learns to intercept the ball exceptionally fast, achieving a nearly 100% hit rate early in training, its success rate severely plateaus around 40%. This indicates that lacking the proactive preparation of target racket velocity and orientation makes it difficult for the agent to explore the precise return trajectory. These results underscore that predicting the complete kinematic command is essential to bridge the gap between mere interception and a valid, successful return. 
+
+3) Importance of Task-oriented Reward: The Without-Task variant highlights the indispensability of the sparse task-related reward rs. As shown in Fig. 5, relying solely on the dense command tracking reward rc enables the agent to achieve a relatively high hit rate of approximately 85%, but its success rate is severely degraded, hovering merely around 10%. This proves that while tracking commands effectively guide the racket to the predicted spatial target, they are insufficient for mastering the complex contact dynamics. The sparse task reward provides critical feedback for fine-tuning the impact velocity and micro adjustments in orientation when contacting the ball. This fine-tuning is what ultimately transforms a simple collision into a successful return. 
+
+D. Dual-Robot Rally 
+
+To further evaluate our extended framework’s performance in the consecutive dual robot rally task, we conduct addi-tional experiments in the dual-robot environment. Firstly, to investigate the stability of the dual-robot rally, we analyzed the spatial trajectories of the balls as it returns the initial serve plane. As depicted in Fig. 6, the distribution of the returned balls (red) closely aligns with the initial serve distribution (blue) across 150 evaluated episodes. This overlap indicates that our policy consistently encounters in-distribution balls, effectively preventing the ”trajectory drift” that leads to early termination in multi-exchange scenarios. A representative sequence of these consecutive rallies is visualized in Fig. 7. In each round, the robot proactively coordinates its torso and arm to move the racket to the target hitting position and strike the ball with an appropriate speed, ensuring it returns to a position where the opponent can t=n+1 
+
+t=0 t=n t=n+m Fig. 7. Visualization of dual-robot rally. In a round of continuous rally, the robot actively moves to the target hitting position and hits the ball at a certain speed, returning it to a position where the opponent can receive it. 
+
+successfully receive it. However, despite the alignment of ball trajectories, failures still occur during extended rallies. We observed that while our policy effectively maintains the ball within the ’in-distribution’ spatial range, it does not guar-antee a 100% success rate for every individual strike, which terminates the rally. Finally, experimental results demonstrate that our approach empowers two musculoskeletal robots to successfully achieve up to 14 consecutive exchanges, through the maintenance of long-term trajectory consistency, making a meaningful step toward achieving athletic intelligence in complex robotic systems. VI. CONCLUSION We presented Diff-Muscle , an algorithm that enables ef-ficient learning for musculoskeletal systems. Through the conditional differential flatness of such systems, we refor-mulate the learning problem from high-dimensional muscle space to joint space. Besides, we integrate Diff-Muscle and develop a hierarchical reinforcement learning framework for musculoskeletal robotic table tennis. Experimental re-sults demonstrate that our framework outperforms current baselines and achieves up to 14 consecutive rallies in a challenging dual-robot setting, marking a substantial step toward bio-inspired athletic intelligence. REFERENCES [1] H. Liu, D. Guo, and A. Cangelosi, “Embodied intelligence: A synergy of morphology, action, perception and learning,” ACM Computing Surveys , vol. 57, no. 7, pp. 1–36, 2025. [2] C. Wang, C. K. Tan, B. K. Hodossy, S. Lyu, P. Schumacher, J. Heald, K. Biegun, S. Hromadka, M. Sahani, G. Park, et al. , “Myochallenge 2024: A new benchmark for physiological dexterity and agility in bionic humans,” in The Thirty-ninth Annual Conference on Neural Information Processing Systems Datasets and Benchmarks Track ,2025. [3] M. Hu, W. Chen, W. Li, F. Mandali, Z. He, R. Zhang, P. Krisna, K. Christian, L. Benaharon, D. Ma, et al. , “Towards versatile hu-manoid table tennis: Unified reinforcement learning with prediction augmentation,” arXiv preprint arXiv:2509.21690 , 2025. [4] I. A. Stokes and M. Gardner-Morse, “Quantitative anatomy of the lumbar musculature,” Journal of biomechanics , vol. 32, no. 3, pp. 311–316, 1999. [5] H. van Duinen and S. C. Gandevia, “Constraints for control of the human hand,” The Journal of physiology , vol. 589, no. 23, pp. 5583– 5593, 2011. [6] X. Zhang, F. K. Chan, T. Parthasarathy, and M. Gazzola, “Modeling and simulation of complex dynamic musculoskeletal architectures,” 
+
+Nature communications , vol. 10, no. 1, p. 4825, 2019. [7] A. V. Hill, “The heat of shortening and the dynamic constants of muscle,” Proceedings of the Royal Society of London. Series B-Biological Sciences , vol. 126, no. 843, pp. 136–195, 1938. [8] K. He, C. Zuo, C. Ma, and Y. Sui, “Dynsyn: Dynamical synergistic representation for efficient learning and control in overactuated em-bodied systems,” in Forty-first International Conference on Machine Learning , 2024. [9] C. Berg, V. Caggiano, and V. Kumar, “Sar: Generalization of phys-iological agility and dexterity via synergistic action representation,” 
+
+Robotics: Science and Systems , 2023. [10] L. H. Ting and J. L. McKay, “Neuromechanics of muscle synergies for posture and movement,” Current opinion in neurobiology , vol. 17, no. 6, pp. 622–628, 2007. [11] H. Sira-Ramirez and S. K. Agrawal, Differentially flat systems . Crc Press, 2018. [12] J. Zhao, Y. Yang, Y. Wang, S. Zhang, L. Huang, Y. Luo, and H. Liu, “Bayesian morphology optimization for musculoskeletal systems,” in 
+
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2025, pp. 17 665–17 671. [13] Y. Wei, S. Zhuang, V. Zhuang, and Y. Sui, “Motion control of high-dimensional musculoskeletal systems with hierarchical model-based planning,” arXiv preprint arXiv:2505.08238 , 2025. [14] P. Schumacher, D. H¨ aufle, D. B¨ uchler, S. Schmitt, and G. Martius, “Dep-rl: Embodied exploration for reinforcement learning in overactu-ated and musculoskeletal systems,” arXiv preprint arXiv:2206.00484 ,2022. [15] A. S. Chiappa, A. Marin Vargas, A. Huang, and A. Mathis, “Latent ex-ploration for reinforcement learning,” Advances in Neural Information Processing Systems , vol. 36, pp. 56 508–56 530, 2023. [16] R. Mahjourian, R. Miikkulainen, N. Lazic, S. Levine, and N. Jaitly, “Hierarchical policy design for sample-efficient learning of robot table tennis through self-play,” arXiv preprint arXiv:1811.12927 , 2018. [17] H. Ma, J. Fan, H. Xu, and Q. Wang, “Mastering table tennis with hierarchy: a reinforcement learning approach with progressive self-play training,” Applied Intelligence , vol. 55, no. 6, p. 562, 2025. [18] Z. Su, B. Zhang, N. Rahmanian, Y. Gao, Q. Liao, C. Regan, K. Sreenath, and S. S. Sastry, “Hitter: A humanoid table ten-nis robot via hierarchical planning and learning,” arXiv preprint arXiv:2508.21043 , 2025. [19] V. Caggiano, H. Wang, G. Durandau, M. Sartori, and V. Kumar, “Myosuite–a contact-rich simulation suite for musculoskeletal motor control,” arXiv preprint arXiv:2205.13600 , 2022. [20] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Proximal policy optimization algorithms,” arXiv preprint arXiv:1707.06347 , 2017. [21] E. Todorov, T. Erez, and Y. Tassa, “Mujoco: A physics engine for model-based control,” in 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems . IEEE, 2012, pp. 5026–5033. [22] Y. Feng, X. Xu, and L. Liu, “Musclevae: Model-based controllers of muscle-actuated characters,” in SIGGRAPH Asia 2023 Conference Papers , 2023, pp. 1–11. [23] K. Zakka, Q. Liao, B. Yi, L. L. Lay, K. Sreenath, and P. Abbeel, “mjlab: A lightweight framework for gpu-accelerated robot learning,” 
+
+arXiv preprint arXiv:2601.22074 , 2026.

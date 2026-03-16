@@ -1,0 +1,534 @@
+Title: Optimal-Horizon Social Robot Navigation in Heterogeneous Crowds
+
+URL Source: https://arxiv.org/pdf/2603.00507v1
+
+Published Time: Tue, 03 Mar 2026 01:50:26 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+> 1
+
+# Optimal-Horizon Social Robot Navigation in Heterogeneous Crowds 
+
+Jiamin Shi 1, Haolin Zhang 1, Chongfei Chen, Yuchen Yan 1, Shitao Chen †,1, Jingmin Xin 1, Nanning Zheng 1
+
+Abstract —Navigating social robots in dense, dynamic crowds is challenging due to environmental uncertainty and com-plex human-robot interactions. While Model Predictive Control (MPC) offers strong real-time performance, its reliance on a fixed prediction horizon limits adaptability to changing environments and social dynamics. Furthermore, most MPC approaches treat pedestrians as homogeneous obstacles, ignoring social hetero-geneity and cooperative or adversarial interactions, which often causes the Frozen Robot Problem in partially observable real-world environments. In this paper, we identify the planning horizon as a socially conditioned decision variable rather than a fixed design choice. Building on this insight, we propose an optimal-horizon social navigation framework that optimizes MPC foresight online according to inferred social context. A spatio-temporal Transformer infers pedestrian cooperation attributes from local trajectory observations, which serve as social priors for a reinforcement learning policy that optimally selects the predic-tion horizon under a task-driven objective. The resulting horizon-aware MPC incorporates socially conditioned safety constraints to balance navigation efficiency and interaction safety. Extensive simulations and real-world robot experiments demonstrate that optimal foresight selection is critical for robust social navigation in partially observable crowds. Compared to state-of-the-art baselines, the proposed approach achieves a 6.8% improvement in success rate, reduces collisions by 50%, and shortens naviga-tion time by 19%, with a low timeout rate of 0.8%, validating the necessity of socially optimal planning horizons for efficient and safe robot navigation in crowded environments. Code and videos are available at Under Review. 
+
+Index Terms —Social robot navigation, model predictive con-trol, reinforcement learning, human–robot interaction. 
+
+I. I NTRODUCTION 
+
+# SOCIAL robot navigation in densely populated and dy-namic environments is a critical capability for applications such as service robotics, autonomous delivery, and assistive technologies [1], [2]. Safe and efficient navigation among moving pedestrians requires not only prediction of complex and uncertain environmental dynamics but also understanding and respecting diverse social norms and interactions [3], [4]. This dual challenge remains a significant hurdle for existing navigation frameworks, particularly in partially observable and socially heterogeneous environments. 
+
+> 1
+
+J. Shi, H. Zhang, Y. Yan, S. Chen, J. Xin and N. Zheng are with National Key Laboratory of Human-Machine Hybrid Augmented Intelligence, Nation Engineering Research Center for Visual Information and Applications, and Institute of Artificial Intelligence and Robotics, Xi’an Jiaotong University, Xi’an, Shaanxi 710049, P.R. China; 3120105180@stu.xjtu.edu.cn; chenshitao@xjtu.edu.cn; jxin, nnzheng@mail.xjtu.edu.cn 
+
+> †
+
+S. Chen is the corresponding author. 
+
+Fig. 1: Navigation success rates under fixed MPC prediction horizons, averaged over 250 random trials. Solid lines indicate the average performance, while vertical error bars represent performance variations across different pedestrian behavior modes. Note that the low-interaction scenario lacks error bars as all pedestrians are consistently non-cooperative, resulting in a single behavior mode. Model Predictive Control (MPC) has been widely adopted in robot navigation due to its ability to generate dynamically feasible trajectories while respecting physical and safety con-straints [5]. Its inherent real-time replanning and controllability make it well suited for dynamic scenarios involving moving agents [6]. However, most MPC-based navigation methods rely on a fixed prediction horizon, limiting their flexibility to adapt to varying interaction densities and social complexities of the environment [7], [8]. This assumption implicitly treats future interaction complexity as stationary over time. While adaptive-horizon MPC has been studied in contexts such as autonomous racing primarily for computational efficiency [9], its potential role in social interaction reasoning remains largely unexplored. In socially interactive and partially observable environ-ments, a fixed planning horizon often leads to suboptimal behaviors. Short horizons tend to favor reactive and myopic decisions that fail to anticipate complex social interactions, whereas long horizons may induce overly conservative be-haviors in the presence of uncertain human dynamics. Such rigidity can significantly degrade navigation performance and constitutes a key underlying cause of the well-known Frozen Robot Problem [10], where robots become overly cautious and cease to move despite the existence of feasible navigation paths. These observations indicate that no single fixed hori-
+
+> arXiv:2603.00507v1 [cs.RO] 28 Feb 2026 2
+
+zon can adequately accommodate the non-stationary nature of human–robot interactions, and that the planning horizon should be treated as a socially conditioned decision variable, specifically in response to pedestrians’ cooperation tendencies. Navigation strategies further often treat pedestrians as ho-mogeneous dynamic obstacles, relying primarily on trajectory prediction rather than reasoning about underlying social be-haviors [8]. This simplification overlooks critical social hetero-geneity, such as differing pedestrian intents and cooperative or adversarial tendencies, which directly impact navigation safety and efficiency. Although some studies have introduced social cost functions or proxemics-based constraints to account for interpersonal comfort [11], explicit modeling of heterogeneous pedestrian social characteristics remains largely unexplored within MPC-based navigation frameworks. To address these challenges, we propose Optimal-Horizon Social Robot Navigation , a socially compliant MPC frame-work that explicitly treats the planning horizon as the primary control decision in response to latent social complexity. The core idea is to couple social attribute inference with opti-mal foresight control , where the MPC prediction horizon is treated as an optimization variable and selected online based on the inferred social context. A pretrained spatio-temporal Transformer infers pedestrian cooperation attributes from local trajectory observations, which are embedded into a hetero-geneous state representation and serve as social priors for a reinforcement learning policy that selects the prediction hori-zon. The resulting optimal-horizon MPC further incorporates socially conditioned safety constraints that modulate collision avoidance margins based on inferred pedestrian behaviors. By dynamically adjusting safety distances, the framework enables efficient interaction with cooperative pedestrians while maintaining conservative buffers around non-cooperative indi-viduals, effectively balancing navigation efficiency and long-term social safety. The main contributions of this work are summarized as follows:  
+
+> •
+
+We identify planning horizon selection as a socially conditioned decision variable in robot navigation and for-malize planning horizon selection as an optimal decision mechanism to resolve social deadlocks in heterogeneous crowds.  
+
+> •
+
+We develop an optimal-horizon MPC framework that integrates social attribute inference and reinforcement learning to determine the prediction horizon online ac-cording to social context.  
+
+> •
+
+We design socially conditioned safety constraints that dy-namically modulate collision avoidance strategies based on inferred pedestrian social attributes.  
+
+> •
+
+We validate the proposed approach through extensive simulations and real-world robot experiments, demon-strating improved safety, efficiency, and robustness over state-of-the-art baselines in crowded, partially observable environments. II. R ELATED WORK 
+
+A. MPC with Fixed Prediction Horizons 
+
+Model Predictive Control (MPC) has been widely adopted in robot navigation due to its ability to generate dynam-ically feasible trajectories under Control Barrier Functions (CBFs) [12], [13]. Adaptive MPC approaches have been ex-plored [14], but they mainly focus on tuning control objectives or constraints for general performance and do not explicitly address the non-stationary interaction complexity induced by heterogeneous human crowds. In practice, most MPC-based social navigation frameworks still rely on fixed prediction horizons [5], [8], implicitly assuming stationary interaction difficulty, which limits adaptability to varying crowd densities and social behaviors. In contrast, our method treats horizon selection as a decision variable and learns a dynamic horizon policy via reinforcement learning to adapt planning foresight to social complexity online. 
+
+B. MPC in Socially Compliant Robot Navigation 
+
+Socially compliant navigation requires robots to account for both physical feasibility and social expectations during human–robot interaction [1], [5]. Recent advances focus on human behavior modeling and trajectory prediction [15], [16], with transformer-based methods showing strong spatio-temporal representation capability. However, these approaches primarily rely on predicted trajectories and still model pedes-trians as homogeneous dynamic obstacles, lacking explicit rea-soning about social heterogeneity such as cooperative versus non-cooperative behaviors, and thus remain susceptible to the Frozen Robot Problem in partially observable environments. By contrast, our approach explicitly infers pedestrian social attributes using a pretrained Transformer and integrates them into a heterogeneous MPC state representation with socially conditioned safety constraints. 
+
+C. Learning-Augmented MPC Approaches 
+
+Learning-augmented MPC has been proposed to improve adaptability by incorporating learning-based components into classical control frameworks. Reinforcement learning has been used to tune MPC cost functions or constraint parameters in general control tasks [9], [17], [18], but adaptive selection of MPC prediction horizons remains largely unexplored, par-ticularly in social navigation contexts. Cooperative strategies in heterogeneous multi-agent navigation have also been stud-ied [19], yet these methods focus on robot–robot coordination rather than human–robot interaction and do not consider latent social attributes or planning foresight. The proposed framework fills this gap by jointly modeling pedestrian social attributes and horizon-adaptive planning within a unified, socially aware MPC formulation. III. M ETHOD 
+
+A. Overall Framework 
+
+To address social navigation challenges in dense and dy-namic environments, this paper proposes the Optimal-Horizon Social Robot Navigation framework, illustrated in Fig. 2. The 3Attention 
+
+> Dynamic Interaction
+> Selection
+> Node Feature
+> Encoder
+> Temporal RNN
+> FFN
+> Encoder
+
+Stage I  Stage II 
+
+Stage I 
+
+> Horizon Reward
+> Other Reward
+
+⨁                                    
+
+> 𝒄 𝒕
+> 𝒑
+> 𝒂 𝒕
+> 𝑬 𝒕
+> ൟ𝝉 𝟏
+> 𝒑 ={𝒑 𝟏 ,𝒑 𝟐 ,...,𝒑 𝒍 𝟏
+> ൟ𝝉 𝟐
+> 𝒑 ={𝒑 𝟏 ,𝒑 𝟐 ,...,𝒑 𝒍 𝟐
+> … ൟ𝝉 𝒏
+> 𝒑 ={𝒑 𝟏 ,𝒑 𝟐 ,...,𝒑 𝒍 𝒏
+> Pedestrian Trajectory
+> 𝑿 𝒕
+> Node Feature Encoder
+> Dynamic Interaction Selection
+> T
+> Sensor Raw Data
+> *0123456789
+> Linear Flattened Patches
+> Multi -Head
+> Attention QKV
+> Attention
+> Mask
+> Heterogeneous
+> Crowds
+> Cooperation
+> Classifier
+> ෡𝑯 𝒕
+> Temporal
+> Aggregation
+> 𝑯 𝒕
+> 𝒄 𝒕
+> 𝒑
+
+Stage III Stage II     
+
+> [Cooperation]
+> [Non -Cooperation]
+> 𝑮 𝒕 =(𝑽 𝒕 ,𝑬 𝒕
+> 𝑺 ,𝑬 𝒕
+> 𝑻 )
+> 𝒆 𝒕 −𝟐
+> 𝑻
+> 𝒆 𝒕 −𝟏
+> 𝒔
+> 𝒆 𝒕 −𝟏
+> 𝑻
+> 𝒔 𝒕
+> 𝒓
+> 𝒆 𝒕
+> 𝒔
+
+Node 
+
+Encoder   
+
+> Temporal
+> RNN
+> Spatial
+> RNN
+> Node RNN
+> Action: 𝒂 𝒕
+> Value: 𝒗 𝒕
+> Spatial RNN
+> Attention
+> Node RNN
+> Actor Critic
+> Node Encoder
+
+𝑽 𝒕 
+
+𝑬 𝒕 
+
+> 𝑺
+
+𝑬 𝒕  
+
+> 𝑻
+> 𝒂 𝒕
+> 𝒉 Actor
+> 𝒗 𝒕
+> Critic
+> Socisal Reward
+
+⨁
+
+Stage III               
+
+> Classifier
+> Socially -Aware CBFs
+> Socially -Aware
+> CBFs
+> Optimal
+> Formulation
+> Optimal Trajectory
+> Generator
+> ℎ𝐶𝐵𝐹
+> 𝑖 =( 𝑥 𝑡 +𝑘 |𝑡 ,𝑢 𝑡 +𝑘 |𝑡 ,𝑐 𝑡 ,𝑖 )≥0
+> 𝑢 𝑡 +ℎ𝑡 −1|𝑡
+> ∗=arg min
+> 𝑢 {
+> Optimal Horizon MPC
+> +෍
+> 𝑘 =0
+> ℎ𝑡
+> 𝑞 (𝑥 𝑡 |𝑘 ,𝑢 𝑡 |𝑘 ,𝑐 𝑡 ,𝑖 )]}
+> 𝐸 𝑐 𝑡 ,𝑖 [𝑝 𝑥 𝑡 ,𝑐 𝑡 ,𝑖
+> Gated
+> Attention
+> Temporal
+> Aggregation
+
+Fig. 2: Overview of the Optimal-Horizon Social Robot Navigation framework. Stage I: The Spatio-Temporal Transformer infers pedestrian cooperation attributes cpt from trajectory history. Stage II: The RL policy determines the optimal prediction horizon 
+
+ht based on the inferred social graph Gt . Stage III: The DTCBF-constrained MPC generates safe, socially-compliant control commands u∗
+
+t by adapting its look-ahead depth and safety margins. framework explicitly models heterogeneous social interactions, enabling the robot to collaborate with cooperative pedestrians while cautiously avoiding non-cooperative ones, mitigating the Frozen Robot Problem under partial observability. It comprises three interrelated components: Spatio-Temporal Transformer for Pedestrian Cooperation Prediction, Reinforcement Learn-ing for Dynamic Horizon Decision, and Optimal-Horizon MPC with Social Awareness. 
+
+Stage I: A spatio-temporal transformer takes pedestrian tra-jectories as input, constructs a multirelational spatio-temporal structure that captures both direct spatial proximity and indi-rect social influence patterns, and infers cooperation attributes 
+
+cpt . The predicted attributes are embedded into individual pedestrian states, enabling the robot to distinguish between cooperative and non-cooperative pedestrians for socially aware navigation. 
+
+Stage II: The spatio-temporal graph Gt = ( Vt , ESt , ETt ) is fed into a RL policy πθ that dynamically determines the socially conditioned MPC prediction horizon ht . Leveraging spatial and social information, the policy enables context-sensitive horizon decisions that adapt to crowd density and social dynamics in real time, improving planning flexibility and efficiency. 
+
+Stage III: The MPC receives the predicted cooperation attributes cpt and the optimal prediction horizon ht to generate collision-free trajectories τt . Socially-Aware CBFs adapt safety distances based on the inferred cooperation attributes cpt , while ensuring safe execution in heterogeneous social contexts. To deploy in real-world scenarios, full observability is not assumed. Only pedestrians within the robot’s sensor range are considered, and their positions and velocities are transformed into the robot coordinate system, with occlusions further constraining observations. 
+
+B. Spatio-Temporal Transformer for Pedestrian Cooperation Prediction 
+
+This stage introduces an interaction-aware transformer to capture spatial interactions and temporal dynamics of pedes-trian trajectories. The architecture comprises a multi-layer transformer encoder and a lightweight cooperation classifier. Unlike standard transformers, this model employs a dy-namic interaction selection mechanism to determine relevant pedestrian relationships. At time t, the i-th pedestrian trajec-tory τ pi = {p1, . . . , pL} is a sequence of past L positions where 
+
+p ∈ R2. These trajectories are embedded into features xt,i;stacking M visible pedestrians yields Xt ∈ RM×d , where d is the feature dimension. Interaction representation It = ( Xt , At )
+
+utilizes an adjacency matrix At derived from raw sensor data. The learnable selector computes interaction probabilities from At and samples connections via the Gumbel-Softmax estimator [ ?]: 
+
+Et = Gumbel-Softmax (log (At + ε), Tc) (1) 
+
+where Tc is the temperature parameter, ε is a stability constant, and Et represents the resulting sparse interaction edge matrix. The attention mechanism operates on this structure Et :
+
+InterAttention (Q, K,V, Et ) = softmax 
+
+ QK ⊤
+
+√dk
+
+
+
+⊙ Et ·V (2) 
+
+Ht = FFN  Xt + InterAttention (XtWQ, XtWK , XtWV , Et ) (3) 
+
+where ⊙ denotes element-wise multiplication, dk is the scaling dimension, and WQ,WK ,WV are weight matrices. Temporal aggregation yields a pedestrian descriptor ¯Hi =
+
+1
+
+L ∑L
+
+ℓ=1 Hℓ, i. A multilayer perceptron fcoop subsequently pre-dicts cooperation probabilities: ˆ ct,i = softmax ( fcoop ( ¯Hi)) . The 4
+
+model is trained using cross-entropy loss over pedestrians and batches:    
+
+> Lcoop =−1
+> B
+> B
+
+## ∑
+
+> b=1
+> M
+
+## ∑
+
+> i=1
+
+## ∑    
+
+> j∈{ 0,1}
+> yb,i,jlog ˆ cb,i,j(4)
+
+where B is the batch size and yb,i, j denotes the ground-truth label. Cooperation labels are automatically generated in simulation based on pedestrians’ reactive behaviors during interaction, without manual annotation. 
+
+C. Reinforcement Learning for Dynamic Horizon Decision 1) Observation: At time step t, human–robot interactions in heterogeneous crowds are formalized as a spatio-temporal graph Gt = ( Vt , ESt , ETt ), comprising agent nodes Vt , spatial edges ESt , and temporal edges ETt . The graph incorporates the predicted cooperation attributes ct,i from Stage I, enabling the RL policy to reason about social heterogeneity. 
+
+Agent Nodes Vt : The node set is defined as Vt =
+
+{srt , spt,1, ..., spt,n}, where srt represents the robot state and spt,i=1: n
+
+denotes the observable state of the n pedestrians within range. 
+
+srt = ( prt , vrt , θt , g, vref , r), (5) where prt = ( prx,t , pry,t ) is the robot position at time t, vrt =(vrx,t , vry,t ) is the robot velocity, θt is the heading, g = ( gx, gy)
+
+is the goal position, vref is the reference velocity, and r is the robot radius. The pedestrian state spt,i is represented in the robot-relative coordinate frame and is augmented with the predicted cooper-ation attribute ct,i from Stage I to capture social heterogeneity: 
+
+spt,i = ( ∆pt,i, ∆vt,i, ct,i), (6) where ∆pt,i = ( ∆xt,i, ∆yt,i) is the position of pedestrian i
+
+relative to the robot at time t, ∆vt,i = ( ∆vx,t,i, ∆vy,t,i) is the velocity of pedestrian i relative to the robot, and ct,i ∈ { 0, 1}
+
+indicates the predicted cooperation attribute from the spatio-temporal transformer. 
+
+Spatial Edges ESt : Spatial edges encode interactions among visible agents, ESt = {eSi j | sit , s jt ∈ Vt , i̸ = j}, with eSi j captur-ing visibility-based adjacency. This design emphasizes salient local relations critical for navigation. 
+
+Temporal Edges ETt : Temporal edges ETt = {eTi,t |
+
+(sit−1, sit ), sit ∈ Vt } connect the same agent across consecutive time steps, preserving motion continuity and encoding dy-namic information such as velocity for long-horizon reasoning. 
+
+2) Action: The RL policy πθ operates in a discrete action space and decides the MPC prediction horizon. At each time step, the action ht ∈ H = {1, 2, . . . , hmax }, where hmax denotes the maximum allowable horizon. 
+
+3) Reward: The reward rt balances safety, efficiency, and social awareness. In addition to standard terminal, potential, and kinematic rewards, two task-specific signals are intro-duced: a visibility social reward incorporating predicted coop-eration from Stage I, and a prediction horizon reward aligning the MPC horizon decision in Stage II. 
+
+rt = rterm  
+
+> t
+
++ rpot  
+
+> t
+
++ rkin  
+
+> t
+
++ rhorizon  
+
+> t
+
++ rvis_social  
+
+> t
+
+. (7) 
+
+Prediction Horizon Reward: To align with Stage II, the policy is encouraged to decide an appropriate MPC prediction horizon ht :
+
+rhorizon  
+
+> t
+
+= −λh(hmax − ht ), (8) where λh is the weight coefficient for the horizon reward. This term is balanced by the visibility social reward, which penal-izes aggressive long-horizon decisions in the presence of non-cooperative pedestrians. The horizon decision balances effi-ciency with social compliance: longer horizons provide greater foresight, while the visibility social reward constrains aggres-sive actions when non-cooperative pedestrians are present. 
+
+Visibility Social Reward: The robot is rewarded for con-sidering the cooperation of visible pedestrians: 
+
+rvis_social  
+
+> t
+
+=
+
+(
+
+λhigh · hηhigh  
+
+> t
+
+· ρno-coop , if ρno-coop > 0.5,
+
+λlow · hηlow  
+
+> t
+
+· (1 − ρno-coop ), otherwise ,
+
+(9) where ρno-coop is the fraction of non-cooperative pedestrians within the robot’s sensor view. The coefficients λhigh , λlow are scaling factors, and the exponents ηhigh , ηlow modulate the sensitivity of the reward to the MPC horizon. 
+
+Terminal Reward: Collisions, timeout, and goal achieve-ment are unified into a single terminal reward: 
+
+rterm  
+
+> t
+
+=
+
+
+
++10 , goal reached ,
+
+−20 , collision or timeout ,
+
+0, otherwise .
+
+(10) 
+
+Potential Reward: To incentivize efficient progress toward the goal, a potential-based reward is defined: 
+
+rpot  
+
+> t
+
+= −λpot (Φt − Φt−1) , (11) where Φt = ∥prt − g∥ denotes the robot’s distance to the goal at time t, and λpot is a constant scaling factor. 
+
+Kinematic Reward: To discourage aggressive or backward motions, a kinematic penalty is applied: 
+
+rkin  
+
+> t
+
+= −λrw2 
+
+> t
+
+− λv max (0, −vt ), (12) where wt and vt denote the rotational and translational control commands, and λr, λv are positive weight coefficients. 
+
+4) Algorithm: The method employs Proximal Policy Op-timization (PPO) [20] for training. The policy determines the prediction horizon for MPC optimization, thereby better accommodating varying environments. 
+
+D. Optimal-Horizon MPC with Social Awareness 
+
+This stage integrates predicted cooperation attributes ct,i and the optimal horizon ht into a socially-aware MPC framework. By adapting safety distances and cost penalties, the robot maintains social compliance while navigating among hetero-geneous pedestrians. 5
+
+1) MPC Formulation: The MPC problem is formulated to account for pedestrian cooperation uncertainty: 
+
+u∗  
+
+> t:t+ht−1|t
+
+= arg min  
+
+> ut:t+ht −1|t
+
+(
+
+Ect,i
+
+h
+
+p(xt+ht |t , ct,i)+ 
+
+> ht−1
+
+# ∑
+
+> k=0
+
+q(xt+k|t , ut+k|t , ct,i)
+
+i)
+
+(13) s.t. xt+k+1|t = f (xt+k|t , ut+k|t ), k = 0, . . . , ht − 1,
+
+xt+k|t ∈ X , ut+k|t ∈ U , k = 0, . . . , ht − 1,
+
+xt|t = xt , xt+ht |t ∈ X f ,
+
+hi
+
+> CBF
+
+(xt+k|t , ct,i) ≥ 0, ∀i, k.
+
+where p(·), q(·), and f (·) denote terminal cost, stage cost, and robot dynamics, respectively. The expectation Ect,i [·] is taken over the cooperation probabilities P(ct,i) predicted in Stage I. 
+
+2) Cost Functions: The stage cost balances goal-reaching, control effort, and social interaction: 
+
+q(xt+k|t , ut+k|t , ct,i) = ( xt+k|t − xgoal )⊤Q(xt+k|t − xgoal )+ u⊤ 
+
+> t+k|t
+
+Ru t+k|t
+
++ ∑
+
+> i
+
+φ (xt+k|t , pi, ct,i),
+
+(14) where Q and R are weighting matrices. The cooperation-aware social cost φ (·) is defined as: 
+
+φ (x, pi, ct,i) = ηi · exp − ∥pr − pi∥2
+
+σ 2
+
+> ct,i
+
+!
+
+(15) where ηi is a scaling factor and σct,i modulates the influence range. A smaller σ is assigned to cooperative pedestrians (ct,i = 1) to allow closer interaction, while a larger σ for non-cooperative agents ensures conservative avoidance. 
+
+3) Safety Constraints via Discrete-time Control Barrier Functions: To ensure the forward invariance of the safe set 
+
+C , we employ the Discrete-time Control Barrier Function (DTCBF) framework. For each pedestrian i, we enforce the following linear constraint on the evolution of hi:
+
+hi(xt+k+1|t , ct,i) − hi(xt+k|t , ct,i) ≥ − γhi(xt+k|t , ct,i) (16) where γ ∈ (0, 1] modulates the permissiveness of the safe set boundary. The barrier function hi is defined as: 
+
+hi(xt+k|t , ct,i) = ∥pr − pi∥ −  rr + ri + di
+
+> safety
+
+(ct,i) (17) where di
+
+> safety
+
+(ct,i) = d0 + ct,i dcoop + ( 1 − ct,i) dnon-coop . Note that pedestrian positions pi over the horizon are linearly projected based on current velocities, while the margin di
+
+> safety
+
+dynamically adapts to inferred social attributes. System sta-bility is preserved through these DTCBF constraints, ensuring safe state transitions even under dynamic planning horizon adjustments. IV. E XPERIMENTAL RESULTS 
+
+A. Experimental Setup 1) Simulation Environment: We extend the CrowdNav [21] environment to a realistic 2D pedestrian simulation. The robot is equipped with a limited 5 m circular sensing range and a 360° field of view, instead of assuming full observability. To reflect real-world uncertainty, pedestrians may be partially oc-cluded. Social diversity is introduced by modeling cooperative pedestrians whose trajectories adapt to the robot, and non-cooperative pedestrians whose behaviors remain unaffected and non-visible to the robot. All pedestrians follow the ORCA strategy under speed and curvature constraints. This setup re-quires the robot to reason about occlusions and heterogeneous social behaviors. 
+
+2) Comparative and Ablation Experiments: We benchmark 4 classic methods: reaction-based methods ORCA and SF, the trajectory-based method GST-RL, and the learning-based methods DS-RNN. To assess the contribution of each component, two abla-tion experiments are performed: (i) Removing the RL-based horizon decision by adopting a fixed prediction horizon while keeping other modules unchanged; (ii) Removing the cooper-ation prediction module, which excludes pedestrian behavior classification, similar to prior methods. 
+
+3) Evaluation Metrics: Performance is assessed across sce-narios with low, medium, and high interaction levels, charac-terized by varying ratios of cooperative and non-cooperative pedestrians. Each model is tested on 250 random unseen cases and evaluated based on success rate (SR%), collision rate (CR%), timeout rate (OR%), average navigation time (ANT s), average trajectory length (ATL m), and average intrusion ratio (AIR%). AIR measures the percentage of timesteps during which the robot comes closer than the safety distance to any pedestrian. A lower AIR indicates that the robot maintains better social comfort distances with pedestrians and achieves more natural social navigation behavior. 
+
+B. Comparative Experiments 1) Quantitative Evaluation: We evaluated the baseline methods and our proposed approach across multiple interac-tion scenarios based on the aforementioned metrics, as shown in Table I. ORCA demonstrates strong performance with SR of 66.4% to 84.8% and the shortest ANT, but suffers from a higher CR of 7.2% to 24.4% and AIR of 24.24% to 28.19%. Note that ORCA falls short of a 100% success rate as the reciprocity assumption is often violated by non-cooperative pedestrians, leading to local minima or frozen states in dense crowds [25]. SF performs poorly across all scenarios with a low SR of 18.0% to 42.0% and a high CR of 45.2% to 72.4%. Among learning-based methods, GST-RL achieves the best performance with SR of 82.8% to 89.6% and low CR of 5.6% to 10.0%, while DS-RNN shows moderate performance with good OR but limited SR. Our approach outperforms all baselines, achieving the high-est SR of 87.6% to 96.4% and shortest ANT of 9.88s to 10.99s while maintaining low CR of 2.8% to 11.6%. Compared to the best baseline method GST-RL, our ap-proach improves SR by 6.8% from 89.6% to 96.4%, reduces ANT by 2.33 s from 12.21s to 9.88s, and decreases OR by 4.0% from 4.8% to 0.8%. These improvements validating that integrating latent social inference with optimal horizon control 6
+
+TABLE I: Comparison of state-of-the-art methods in multiple navigation scenarios with varying degrees of interactivity. 
+
+Method Low Interaction Scenarios Mid Interaction Scenarios High Interaction Scenarios SR ↑ CR ↓ OR ↓ ANT ↓ AIR ↓ SR ↑ CR ↓ OR ↓ ANT ↓ AIR ↓ SR ↑ CR ↓ OR ↓ ANT ↓ AIR ↓
+
+ORCA [22] 66.4 24.4 9.2 12.18 28.19 75.6 15.2 9.2 12.66 25.75 84.8 7.2 8.0 12.21 24.24 SF [23] 18.0 72.4 9.6 14.69 26.80 30.4 56.4 13.2 14.16 24.23 42.0 45.2 12.8 14.64 22.51 DS-RNN [24] 51.2 42.4 6.4 12.60 21.54 56.4 36.8 6.8 13.06 20.97 70.0 21.2 8.8 12.42 18.79 
+
+GST-RL [25] 82.8 10.0 7.2 13.78 12.54 84.8 7.2 8.0 13.30 12.09 89.6 5.6 4.8 12.42 11.51 Ours 87.6 11.6 0.8 10.99 25.84 92.0 7.2 0.8 10.33 23.25 96.4 2.8 0.8 9.88 20.40 
+
+- 1Low Interaction Scenarios: 0 coop. peds. and 20 non-coop. peds. 2Mid Interaction Scenarios: 5 coop. peds. and 15 non-coop. peds. 3High Interaction Scenarios: 10 coop. peds. and 10 non-coop. peds. -The best performance for each metric is highlighted in green, while the second-best performance is shown in bold. 
+
+Collision Collision Timeout Timeout Success 
+
+(a) SF (b) DS-RNN (c) ORCA (d) GST-RL (e) Ours Fig. 3: Trajectories of all methods in low-interaction scenarios. All pedestrians in low-interaction scenarios are non-cooperative. The golden solid circles represent robot trajectories with timestamps. The hollow circles in different colors represent pedestrians, with pedestrian IDs shown at start and end points. 
+
+⋆ Goal Robot Cooperative pedestrian Non-cooperative pedestrian Radar rays — Robot trajectory Human future trajectory     
+
+> t=0s t=5.75s t=7.5s t=11.25s Collision
+
+(a) ORCA     
+
+> t=0s t=5.75s t=7.5s t=13.5s Success
+
+(b) Ours 
+
+Fig. 4: Illustration of the navigation trajectory of ORCA and our proposed method in mid-interaction scenarios. is essential for resolving social deadlocks in non-stationary crowd environments. 
+
+2) Qualitative Experiments: The superiority of our ap-proach is further demonstrated through qualitative experi-ments. In low-interaction scenarios, where the number of non-cooperative pedestrians increases and the drivable area decreases, SF [23] performs poorly due to lack of effective obstacle avoidance strategies and frequently experiences colli-sions in complex environments. DS-RNN [24], despite being learning-based, attempts to avoid pedestrians but struggles with complex crowd dynamics and frequently experiences collisions due to inadequate handling of non-cooperative     
+
+> t=0s t=6s t=8s t=9s Collision
+
+(a) GST-RL     
+
+> t=0s t=6s t=8s t=10.75s Success
+
+(b) Ours 
+
+Fig. 5: Illustration of the navigation trajectory of GST-RL and our proposed method in high-interaction scenarios. interactions. ORCA [22] tends to make small movements, often leading to timeouts. GST-RL [25] predicts pedestrian trajectories to avoid collisions, but becomes overly cautious and frequently experiences timeouts in challenging scenarios. In contrast, our method dynamically adjusts the prediction horizon based on crowd density and complexity, enabling optimal navigation strategies for different pedestrian densities and safely reaching the goal as shown in Fig. 3. In mid-interaction scenarios, where some pedestrians be-come cooperative, ORCA [22] demonstrates improved perfor-mance compared to low-interaction scenarios, but reacts too late to dynamic scenarios, leading to entrapment within crowds 7
+
+and subsequent collisions. Our method accelerates through dense crowds by circumventing non-cooperative pedestrians, thereby reaching the goal and mitigating the Frozen Robot Problem, as shown in Fig. 4. In high-interaction scenarios, GST-RL [25] still treats co-operative pedestrians as dynamic obstacles. To avoid them, its trajectory becomes distorted and falls into local minima, leading to collisions. Our method coordinates with cooperative pedestrians, avoiding unnecessary yielding and searching for the fastest and smoothest collision-free trajectory, as shown in Fig. 5. V. C ONCLUSIONS 
+
+In this paper, we proposed a socially compliant robot navi-gation framework for dynamic and heterogeneous crowds, ad-dressing the Frozen Robot Problem in partially observable en-vironments. By inferring pedestrian cooperation attributes via a spatio-temporal Transformer and treating the MPC prediction horizon as a socially conditioned decision variable optimized through reinforcement learning, the proposed method adapts planning foresight to varying crowd density and interaction complexity in real time. Extensive experiments demonstrate that optimal horizon control significantly improves navigation performance, achieving higher success rates, lower collision rates, and shorter navigation time compared to state-of-the-art methods, while maintaining safety and social compliance in crowded environments. Additional ablation studies and extended analyses will be provided in a subsequent version. REFERENCES [1] M. Everett, Y. F. Chen, and J. P. How, “Motion planning among dynamic, decision-making agents with deep reinforcement learning,” in 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2018, pp. 3052–3059. [2] Y. F. Chen, M. Everett, M. Liu, and J. P. How, “Socially aware motion planning with deep reinforcement learning,” in 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2017, pp. 1343–1350. [3] H. Kretzschmar, M. Spies, C. Sprunk, and W. Burgard, “Socially compliant mobile robot navigation via inverse reinforcement learning,” 
+
+International Journal of Robotics Research , vol. 35, no. 11, pp. 1289– 1307, 2016. [4] Y. Kong, X. Gong, Y. Wang, J. Yu, B. Lu, W. Chi, and L. Sun, “Socially conscious navigation of mobile robots based on deep reinforcement learning,” IEEE Transactions on Industrial Electronics , vol. 72, no. 12, pp. 13 542–13 550, 2025. [5] S. Samavi, J. R. Han, F. Shkurti, and A. P. Schoellig, “Sicnav: Safe and interactive crowd navigation using model predictive control and bilevel optimization,” IEEE Transactions on Robotics , vol. 41, pp. 801–818, 2025. [6] V.-A. Le, V. Tadiparthi, B. Chalaki, H. N. Mahjoub, J. D’Sa, E. Moradi-Pari, and A. A. Malikopoulos, “Multi-robot cooperative navigation in crowds: A game-theoretic learning-based model predictive control approach,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , 2024, pp. 4834–4840. [7] K. Ryu and N. Mehr, “Integrating predictive motion uncertainties with distributionally robust risk-aware control for safe robot navigation in crowds,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , 2024, pp. 2410–2417. [8] A. Shamsah, K. Agarwal, N. Katta, A. Raju, S. Kousik, and Y. Zhao, “Socially acceptable bipedal robot navigation via social zonotope network model predictive control,” IEEE Transactions on Automation Science and Engineering , vol. 22, pp. 10 130–10 148, 2024. [Online]. Available: https://api.semanticscholar.org/CorpusID:270711502 [9] J. Kabzan, L. Hewing, A. Liniger, and M. N. Zeilinger, “Learning-based model predictive control for autonomous racing,” IEEE Robotics and Automation Letters , vol. 4, no. 4, pp. 3363–3370, 2019. [10] A. J. Sathyamoorthy, U. Patel, T. Guan, and D. Manocha, “Frozone: Freezing-free, pedestrian-friendly navigation in human crowds,” IEEE Robotics and Automation Letters , vol. 5, no. 3, pp. 4352–4359, 2020. [11] C. Chen, S. Hu, P. Nikdel, G. Mori, and M. Savva, “Relational graph learning for crowd navigation,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2020, pp. 10 007– 10 013. [12] P. Mestres, C. Nieto-Granda, and J. Cortés, “Distributed safe navigation of multi-agent systems using control barrier function-based controllers,” 
+
+IEEE Robotics and Automation Letters , vol. 9, no. 7, pp. 6760–6767, 2024. [13] X. Tan and D. V. Dimarogonas, “Distributed implementation of con-trol barrier functions for multi-agent systems,” IEEE Control Systems Letters , vol. 6, pp. 1879–1884, 2022. [14] S. Soman, M. Zanon, and A. Bemporad, “Learning-based stochastic model predictive control for autonomous driving at uncontrolled in-tersections,” IEEE Transactions on Intelligent Transportation Systems ,vol. 26, no. 2, pp. 1538–1546, 2025. [15] V.-A. Le, B. Chalaki, V. Tadiparthi, H. N. Mahjoub, J. D’Sa, and E. Moradi-Pari, “Social navigation in crowded environments with model predictive control and deep learning-based human trajectory prediction,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2024, pp. 4793–4799. [16] S. Liu, H. Xia, F. C. Pouria, K. Hong, N. Chakraborty, Z. Hu, J. Biswas, and K. Driggs-Campbell, “HEIGHT: Heterogeneous interaction graph transformer for robot navigation in crowded and constrained environ-ments,” IEEE Transactions on Automation Science and Engineering ,vol. 23, pp. 1211–1230, 2026. [17] M.-N. Nguyen, M. Van, S. McIlvanna, Y. Sun, J. Close, K. Olayemi, and Y. Jin, “Model-free safety critical model predictive control for mobile robot in dynamic environments,” IEEE Transactions on Intelligent Vehicles , vol. 9, no. 11, pp. 6830–6842, 2024. [18] E. Stefanini, L. Palmieri, A. Rudenko, T. Hielscher, T. Linder, and L. Pallottino, “Efficient context-aware model predictive control for human-aware navigation,” IEEE Robotics and Automation Letters , vol. 9, no. 11, pp. 9494–9501, 2024. [19] H. Zhang, X. Zhang, Z. Feng, and X. Xiao, “Heterogeneous multi-robot cooperation with asynchronous multi-agent reinforcement learning,” 
+
+IEEE Robotics and Automation Letters , vol. 9, no. 1, pp. 159–166, 2024. [20] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Proximal policy optimization algorithms,” 2017. [Online]. Available: https://arxiv.org/abs/1707.06347 [21] C. Chen, Y. Liu, S. Kreiss, and A. Alahi, “Crowd-robot interaction: Crowd-aware robot navigation with attention-based deep reinforcement learning,” in 2019 International Conference on Robotics and Automation (ICRA) , 2019, pp. 6015–6022. [22] J. van den Berg, S. Guy, M. Lin, and D. Manocha, Reciprocal n-Body Collision Avoidance , 04 2011, vol. 70, pp. 3–19. [23] D. Helbing and P. Molnar, Social force model for pedestrian dynamics ,05 1995. [24] S. Liu, P. Chang, W. Liang, N. Chakraborty, and K. Driggs-Campbell, “Decentralized structural-rnn for robot crowd navigation with deep reinforcement learning,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) , 2021, pp. 3517–3524. [25] S. Liu, P. Chang, Z. Huang, N. Chakraborty, K. Hong, W. Liang, D. L. McPherson, J. Geng, and K. Driggs-Campbell, “Intention aware robot crowd navigation with attention-based interaction graph,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) , 2023, pp. 12 015–12 021.

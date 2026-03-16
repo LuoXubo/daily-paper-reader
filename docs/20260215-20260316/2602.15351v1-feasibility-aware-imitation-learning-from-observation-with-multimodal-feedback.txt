@@ -1,0 +1,1017 @@
+Title: Feasibility-aware Imitation Learning from Observation with Multimodal Feedback
+
+URL Source: https://arxiv.org/pdf/2602.15351v1
+
+Published Time: Wed, 18 Feb 2026 01:29:05 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+> 1
+
+# Feasibility-aware Imitation Learning from Observation with Multimodal Feedback 
+
+Kei Takahashi, Hikaru Sasaki, Member, IEEE , and Takamitsu Matsubara, Member, IEEE 
+
+Abstract —Imitation learning frameworks for learning robot control policies from demonstrators’ motions via hand-mounted demonstration interfaces have attracted increasing attention. However, due to differences in physical characteristics between demonstrators and robots, this approach faces two limitations: i) demonstration data do not include robot actions, and ii) demonstrated motions may be infeasible for robots. These lim-itations increase the difficulty of policy learning, so we address them by proposing Feasibility-Aware Behavior Cloning from Observation (FABCO). FABCO integrates behavior cloning from observation, which complements robot actions using models of robot dynamics, with feasibility estimation. In feasibility estimation, demonstrated motions are evaluated with a robot-dynamics model, learned from the robot’s execution data, to assess reproducibility under the robot’s dynamics. This estimated feasibility is used for multimodal feedback and feasibility-aware policy learning to improve demonstrator motions and learn robust policies. Multimodal feedback provides feasibility through the demonstrator’s visual and haptic senses to promote feasible demonstrated motions. Feasibility-aware policy learning reduces the influence of demonstrated motions that are infeasible for robots, facilitating the learning of policies that robots can execute stably. Experiments with 15 participants on two tasks confirm that FABCO improves imitation learning performance by more than 3.2 times compared with learning without feasibility feedback. 
+
+Note to Practitioners —This study aims to enable non-expert demonstrators without specialized robotics knowledge to intu-itively perform robot-feasible motions using a hand-mounted demonstration interface. In imitation learning, natural demon-strations may include motions that are infeasible for robots, such as excessively quick movements. If such infeasible motions are used to learn policies, robots may fail to imitate them, leading to task failure or instability. To address this issue, we propose Feasibility-Aware Behavior Cloning from Observation (FABCO). FABCO estimates the feasibility of each demonstrated motion using robot dynamics models during or after demonstration and provides both visual and haptic feedback to encourage intuitive corrections. The visual feedback system visualizes the demon-strated motion and color-codes it based on feasibility, allowing the demonstrator to review the motion after performing it. The haptic feedback system vibrates the handle of the hand-mounted demonstration interface when velocity or pose constraints are exceeded as the motion is being performed, prompting on-the-spot corrections. These feedback mechanisms enable non-expert demonstrators to perform motions that satisfy the robot’s constraints, ensuring safe and practical data collection. Our approach is useful in settings where tasks change frequently, such as chemical experiments and food processing, by supporting rapid policy updates and improving on-site adaptability. 
+
+This work was supported by JSPS KAKENHI Grant Numbers JP24KJ1702 and JP24K03018. Kei Takahashi, Hikaru Sasaki, and Takamitsu Matsubara are with the Division of Information Science, Graduate School of Science and Technology, Nara Institute of Science and Technology (NAIST), Ikoma-shi, Nara 630-0192, Japan, (e-mail: takahashi.kei.tl5@is.naist.jp, sasaki.hikaru@is.naist.jp, and takam-m@is.naist.jp). Demonstration Robot execution 
+
+> by learned policy
+> Demonstrator
+> Infeasible
+> demo
+> Undesired
+> motions
+
+(a) Conventional imitation learning framework Robot execution by 
+
+> feasibility -aware learned policy
+> Demonstrator
+> Feasibility
+> feedback
+> Feasible
+> demo
+> Desired
+> motion
+> Feasibility -aware
+> Demonstration
+
+(b) Proposed imitation learning framework 
+
+Fig. 1. Comparison between conventional and proposed feasibility-aware imitation learning frameworks. (a) In demonstrations performed with a hand-mounted interface, feasibility constraints are not reflected in demonstrations, resulting in learned policies that may produce unpredictable or undesirable motions. (b) Proposed framework incorporates feasibility in both demonstra-tion and learning, promoting feasible demonstrations and improving perfor-mance of learned policy toward desired motions. 
+
+Index Terms —Imitation learning from observation, hand-mounted demonstration interface, feasibility, action chunking and temporal ensembling 
+
+I. I NTRODUCTION 
+
+# IMITATION learning is an approach to acquiring robot control policies using demonstration data [1], and many frameworks using it have been proposed [2]–[9]. Conventional imitation learning approaches assume that demonstration data are collected through robot teleoperation with an expert robot demonstrator who understands the robot’s geometric and mo-tion constraints. In contrast, recent approaches have explored the strategy of collecting demonstration data from non-expert demonstrators as they perform demonstrations with their own hands. Among these, demonstration-based approaches using hand-mounted demonstration interfaces have attracted much attention [10]–[17]. However, these demonstration approaches have two limita-tions because they do not implement a robot in the demonstra-tion: i) Demonstration data obtained through a hand-mounted demonstration interface do not include data about robot control commands. ii) Demonstrated motions may not be feasible for real robots due to the different dynamics between human demonstrators and typical robots. These limitations make it difficult to learn policies for a given task, and the learned policies produce unstable or infeasible motions (Fig. 1 (a)). 
+
+> arXiv:2602.15351v1 [cs.RO] 17 Feb 2026 2
+
+These limitations arise because the robot’s dynamics are not used in demonstrations with a hand-mounted demonstra-tion interface. For teleoperation-based demonstration [18]– [23], the demonstration data are collected as the demonstrator interacts with the robot’s dynamics during robot operation. A teleoperation-based demonstration not only allows the collec-tion of robot actions but also constrains demonstrated motions to feasible robot motions. However, a hand-mounted interface-based demonstration does not benefit from the advantages of a teleoperation-based demonstration. We aim to achieve an imitation learning framework that enables even novice demonstrators, without expert knowledge of robots, to learn appropriate policies (Fig. 1 (b)). Therefore, we introduce a robot’s dynamics into imitation learning using a hand-mounted demonstration interface with the intention of predicting the robot’s actions and thus improving the feasibility of the demonstrator’s motion. In this study, we propose Feasibility-Aware Behavior Cloning from Observation (FABCO) as an imitation learning framework incorporating a hand-mounted demonstration inter-face. FABCO is based on behavior cloning from observation (BCO) [7], an imitation learning method that uses a robot dynamics model to supplement action in demonstration data, and it uses the feasibility estimated by this model for both demonstration and policy learning. The estimated feasibility is fed back multimodally to the demonstrator’s visual and tactile senses to guide feasible motion demonstration, and it is used for policy learning based on feasible demonstration data. Here, feasibility is estimated using both the robot’s forward dynamics model (FDM) and its inverse dynamics model (IDM). Preliminary results of using FABCO were presented pre-viously [24]. Building upon and significantly extending this preliminary work, this study extends FABCO by enhancing both the feasibility feedback and the policy model, as well as by conducting more comprehensive experimental evaluations. The feasibility feedback is designed to present feasibility both during and after demonstrations to the demonstrator, guiding them in revising and improving their motions. Specifically, in addition to the conventional visual feedback that presents feasibility information as images after a demonstration, we introduce haptic feedback to convey feasibility as vibrations during the demonstration. These two feedback methods thus provide true multimodal feedback. The performance of poli-cies learned by FABCO depends heavily on the accuracy of the inverse dynamics model (IDM), and policy performance can degrade significantly due to the IDM’s modeling errors. To achieve policy learning that is robust to modeling error, we incorporate action chunking and temporal ensemble (ACTE) [23] into the policy model. Experiments were conducted with 15 participants and two tasks having distinct characteristics to clarify the generality and reproducibility of FABCO. To evaluate the workload experienced by demonstrators during demonstration with feedback, we administered a questionnaire using the NASA Task Load Index (NASA-TLX) [25]. The contributions of this work can be summarized as follows:  
+
+> •
+
+We propose FABCO, a framework that estimates demon-strated motion feasibility and integrates it into multimodal feedback and policy learning.  
+
+> •
+
+We clarify the advantages and disadvantages of each of two feedback methods based on their characteristics and the task characteristics.  
+
+> •
+
+We evaluate the effectiveness and generality of FABCO through experiments with two robot tasks and 15 subjects. II. R ELATED WORK 
+
+A. Demonstration methods in imitation learning 
+
+In imitation learning, previous studies have reported demon-stration methods for collecting data conveniently to learn im-itation policies. Representative demonstration methods can be categorized into two types: teleoperation-facilitating demon-strations and robot-free demonstrations. Among those of the first type, various teleoperation methods have been attempted [18]–[23]. Wong et al. proposed a system for operating a mobile robot while checking images from an onboard camera via a smartphone [18]. As a state-of-the-art leader–follower demonstration approach, Mobile Aloha has been proposed and widely used, facilitating demonstrations not only for a robot hand but also for base locomotion [19]. A key advan-tage of teleoperation-facilitating demonstrations is the ability to collect robot-feasible demonstration data, since the robot physically executes motions during the demonstration. For robot-free demonstrations, demonstration data are collected without the use of a robot. Among the robot-free demon-strations, in some approaches humans demonstrate motions with their own hands [26]–[32], while in others humans hold a hand-mounted demonstration interface to demonstrate and learn a policy from the collected data [10]–[17]. Qin et al. built a system that collects data by capturing human hand motions with a camera and converting them into robot hand motions in a simulator [28]. Chi et al. designed a hand-mounted demonstration interface that shares the end-effector structure with robots, permitting data collection and policy learning from intuitively demonstrated motion [12]. A key advantage of the robot-free type is that demonstrators can provide demonstrations by moving their own hands or a hand-mounted demonstration interface without operating a robot, which makes the demonstration process intuitive. Conventional methods have achieved neither intuitive col-lection of demonstrated motions nor any guarantee that robots can execute them. In this study, we construct a method that succeeds in both of these complementary goals. Specifically, a hand-mounted demonstration interface enables demonstrators to provide demonstrated motions without robot operation, while dynamics-based feasibility estimation and feedback sup-port the demonstration of motions that real robots can execute. 
+
+B. Applying feasibility to imitation learning 
+
+Using feasibility for imitation learning makes a policy more likely to generate stable motions, leading to higher task success rates and improved safety. Therefore, recent studies have increasingly focused on leveraging robot feasibility in imitation learning. 3
+
+Feasibility-aware imitation learning methods can be broadly grouped into two directions. One direction provides feasibility feedback to the demonstrator during data collection to promote the collection of highly feasible demonstration data [11], [33]. Chen et al. defined feasibility as satisfying robot con-straints, such as workspace and velocity limits, and provided visual feedback by presenting these constraints via AR as the demonstrated motions are performed [11]. Their results show improved task success rates for learned policies, showing the effectiveness of feasibility feedback during demonstration. The other direction uses feasibility during policy learning [34]– [36]. Cao et al. considered a cross-robot transfer setting, where demonstration data collected on a high-DOF robot are applied to a lower-DOF robot. In this setting, feasibility is defined as cross-robot imitability, and their method learns a policy by discarding low-feasibility data during training [34], [35]. Providing feasibility feedback during motion demonstra-tion can improve the quality of the demonstrated motions, but policy performance can still degrade if low-feasibility demonstration data remain in the policy learning data. In contrast, incorporating feasibility during policy learning im-proves robustness by excluding low-feasibility data, but it may reduce the effective data available for policy learning and thus risk decreased policy performance. To address these limitations, this study constructs a learning framework that leverages feasibility in both demonstration and policy learning, improving demonstrated motion quality and the quality of the learned policy. Specifically, FABCO collects highly feasible demonstration data through feasibility feedback during mo-tion demonstration and performs data selection based on the estimated feasibility for policy learning. III. P RELIMINARIES 
+
+A. Behavior Cloning from Observation 
+
+BCO learns a control policy from only the states observed in a demonstration [7]. Specifically, to compensate for the lack of action in the demonstration data, BCO learns an inverse dynamics model (IDM) of the robot and predicts the robot’s actions from the observed states to learn the policy. 
+
+1) Problem setting: BCO assumes a Markov decision pro-cess. The initial state s1 follows initial state probability p(s1),and given a state st and an action at at time t, the next state 
+
+st+1 follows state transition probability p(st+1 | st, at). Let the policies of the demonstrator and the robot be πe(at | st)
+
+and πrϕ(at | st), respectively. The demonstrated motions are generated according to the policy πe(at | st), and we assume that only the demonstrated state sequence Se = {set }Tt=1 is available for policy learning. 
+
+2) IDM learning and action estimation: To obtain an IDM, BCO collects a state sequence Sr = {srt }Tt=1 and an action sequence Ar = {art }Tt=1 by executing a robot according to an arbitrary tracking policy. The IDM f IDM  
+
+> θ
+
+is a model that predicts an action at from a pair of consecutive states st and 
+
+st+1 . Assuming that the collected state and action sequence 
+
+Sr , Ar are sampled from the distribution p(Sr , Ar | πtrack ),the IDM parameters θ are optimized as 
+
+θ∗ = arg min 
+
+> θ
+
+Jθ , (1) 
+
+Jθ = Ep(Sr ,Ar |πtrack )
+
+"T −1X
+
+> t=1
+
+art − f IDM  
+
+> θ
+
+(srt , srt+1 ) 1
+
+#
+
+. (2) With the optimized parameters θ∗, actions for the demonstra-tion are estimated as ˜aet = f IDM  
+
+> θ∗
+
+(set , set+1 ).
+
+3) Policy learning: The agent policy πrϕ is learned from the demonstration state sequence Se using the IDM. Assuming 
+
+Se = {set }Tt=1 is generated by the demonstrator policy πe and follows p(Se | πe), the policy parameters ϕ are optimized as 
+
+ϕ∗ = arg min 
+
+> ϕ
+
+Jϕ, (3) 
+
+Jϕ = Ep(Se|πe)
+
+"T −1X
+
+> t=1
+
+f IDM  
+
+> θ∗
+
+(set , set+1 ) − πrϕ(set ) 1
+
+#
+
+. (4) 
+
+B. Action Chunking and Temporal Ensembling 
+
+ACTE [23] is a method that combines action chunking, which treats actions as a short-horizon sequence, and temporal ensembling, which integrates chunked action predictions over time. The use of ACTE is expected to mitigate compounding errors, a common issue in imitation learning. In action chunk-ing, the policy predicts an action chunk of length k at time t,
+
+ach  
+
+> t
+
+= [ at|t, · · · , at+k|t], as ach  
+
+> t
+
+= πch  
+
+> ϕ
+
+(st), where at′|t denotes the action at time t′ predicted at time t.Temporal ensembling TE( ·, ·) determines the executed ac-tion at by taking a weighted average of the past k action predictions with weights wch = [ wch 1 , · · · , w ch  
+
+> k
+
+]:
+
+at = TE( wch , ach 
+
+> t:t−k
+
+) = 
+
+Pki=1 wch  
+
+> i
+
+at|t−i
+
+Pki=1 wch 
+
+> i
+
+. (5) Here, the weights wch are manually designed in advance. IV. F EASIBILITY -A WARE BEHAVIOR CLONING FROM 
+
+OBSERVATION 
+
+In this section, we introduce FABCO, an imitation learning framework that provides feasibility feedback and learns a policy based on feasibility (Fig. 2). FABCO is a learning algorithm based on BCO that estimates feasibility using a robot’s IDM and FDM learned in advance and that leverages feasibility for both demonstration and policy learning. 
+
+A. Problem Statement 
+
+A state st in the state sequence S = {st}Tt=1 consists of the robot’s end-effector pose pt and an environmental observation ot. The end-effector pose is represented by a six-dimensional vector of position and orientation, pt =
+
+{pt,x , p t,y , p t,z , p t, roll , p t, pitch , p t, yaw }. To learn an FDM and an IDM, we assume that robot actions can be inferred from transitions in the end-effector pose sequence {pt}Tt=1 . Based on this assumption, the IDM predicts the action from end-effector pose transitions, while the FDM predicts the next end-effector pose given the current pose and action. For training 4Demo using interface         
+
+> Feasibility feedback
+> How can I
+> improve
+> feasibility?
+> Demo improvement
+> Feasibility estimation
+> IDM FDM
+> 𝑠 𝑎 !
+> Haptic feedback Visual Feedback
+> Feasibility
+> 𝑠
+> 𝑠 𝑠 ′
+> Demo
+> state 𝑠
+> Feasibility
+> estimation
+> Demo state s
+> Human demonstration with feasibility feedback
+> Feasibility 0 1
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+
+(a) Demonstration with feasibility feedback Action estimation Policy learning                     
+
+> IDM
+> 𝒔 =𝐬 !,𝐬 !"#,⋯,𝐬 $
+> Demo state
+> A(=𝒂 *%,𝒂 *!"#,⋯,𝒂 *&
+> Estimated action
+> 𝒔 A(
+> Robust policy: 𝜋
+> 𝜋 𝒂 !,…,𝒂 "𝒔 #
+> k: Chunk size
+
+Policy learning 
+
+(b) Feasibility-aware policy learning 
+
+Fig. 2. Overview of FABCO framework. This framework incorporates feasibility into both demonstration and policy learning in imitation learning using a hand-mounted demonstration interface. (a) The demonstrator receives feasibility feedback on demonstrated motions, which is computed using FDM and IDM, and refines the demonstration based on this feedback. (b) Policy learning uses the feasibility of the demonstration data, permitting the learned policy to generate feasible robot motions. 
+
+the FDM and IDM, random reference trajectories are prepared within the robot workspace, and the robot follows them using a tracking policy πtrack . During trajectory tracking, we collect a pose sequence Pr = {prt }Tt=1 and an action sequence 
+
+Ar = {art }Tt=1 . For policy learning, we infer actions from pose transitions in the demonstration data using the learned IDM. 
+
+B. Demonstration interface 
+
+To collect demonstration data with an end-effector structure shared between the robot and the human, we developed a hand-mounted demonstration interface that matches a two-fingered parallel robot hand (Fig. 3). This interface is inspired by the work of Hamaya et al. [13], and it allows a demonstrator to open and close the fingers by manipulating a handle. The finger opening width is measured by an encoder attached to the interface, and the interface pose is tracked using a motion capture system. To provide feasibility feedback, we mounted two cylindrical vibration motors (KPD7C-0716) on the interface handle (Fig. 3 (b)). Each motor has a rated speed of 7500 rpm, and the vibration intensity is controlled by pulse-width modulation (PWM) of the two motors. 
+
+C. Learning of forward and inverse dynamics models 
+
+We learn the FDM and IDM from robot motion data collected while the robot tracks randomly prepared reference trajectories in the workspace. For this data collection, tra-jectories are prepared within the robot workspace, and the robot follows them using a tracking policy πtrack . During trajectory tracking, we collect a pose sequence Pr and an Encoder 
+
+> Motion capture marker
+
+(a) Overview 65 [ mm]   
+
+> Vibration motor
+> (21.7 ×7 [mm])
+> 40 [ mm]
+
+Handle (b) Internal structure 
+
+Fig. 3. Hand-mounted demonstration interface. (a) Overview of interface. An encoder is attached to measure finger position. Motion-capture markers are attached to track the interface pose. (b) Internal structure of handle. It is equipped with two vibration motors. 
+
+action sequence Ar . We assume that these pose and action sequences are distributed according to p(Pr , Ar | πtrack ).The IDM f IDM  
+
+> θ
+
+(pt, pt+1 ) takes consecutive robot poses pt
+
+and pt+1 as input and predicts the action at that induces this pose transition. The FDM f FDM  
+
+> ψ
+
+(pt, at) predicts the next pose pt+1 from the current pose pt and action at. Let θ and 
+
+ψ denote the parameters of the IDM and FDM, respectively. These are optimized as 
+
+θ∗ = arg min 
+
+> θ
+
+Jθ , (6) 
+
+Jθ = Ep(Pr ,Ar |πtrack )
+
+"T −1X
+
+> t=1
+
+art − f IDM  
+
+> θ
+
+(prt , prt+1 ) 1
+
+#
+
+, (7) 
+
+ψ∗ = arg min 
+
+> ψ
+
+Jψ , (8) 
+
+Jψ = Ep(Pr ,Ar |πtrack )
+
+"T −1X
+
+> t=1
+
+prt+1 − f FDM  
+
+> ψ
+
+(prt , art ) 1
+
+#
+
+. (9) With the optimized parameters θ∗ and ψ∗, the IDM predicts the action ˜at = f IDM  
+
+> θ∗
+
+(pt, pt+1 ), and the FDM predicts the next pose ˜pt+1 = f FDM  
+
+> ψ∗
+
+(pt, ˜at).
+
+D. Feasibility estimation 
+
+Feasibility is estimated from the end-effector pose sequence 
+
+Pe = {pet }Tt=1 in the demonstration data Se collected with the hand-mounted demonstration interface, together with the IDM and FDM. Using the IDM and FDM, feasibility is defined as 
+
+ft,d = exp 
+
+
+
+− | ˜pet+1 ,d − pet+1 ,d |
+
+σf
+
+
+
+, (10) 
+
+ft = 16
+
+X
+
+> d∈P
+
+ft,d , (11) where ft,d denotes the feasibility for the d-th pose component, 
+
+ft denotes the overall feasibility at time step t, ˜pet+1 ,d and 
+
+pet+1 ,d denote the d-th dimensional component of the predicted end-effector pose and the demonstrated end-effector pose at time t+1 , respectively, σf controls the scale of feasibility, and 
+
+P = {x, y, z, roll , pitch , yaw } is the set of pose components. By using the exponential function, ft,d and ft are represented as values that smoothly vary between 0 and 1. 
+
+E. Multimodal feasibility feedback 
+
+Multimodal feasibility feedback encourages demonstrators to provide motions that robots can readily imitate. We employ 5
+
+two types of feedback: visual feedback and haptic feedback. The visual feedback presents the feasibility of an entire demonstrated motion after the motion is performed, whereas the haptic feedback evaluates feasibility as the motion is performed and delivers immediate feedback by vibrating the handle of the hand-mounted demonstration interface. The visual feedback provides offline feasibility information by displaying the end-effector position sequence Pe on a screen and color-coding it according to feasibility. Specifically, this visualization uses ft,d computed by Eq. 10 and ft com-puted by Eq. 11 to show pose-level and overall feasibility, respectively. The haptic feedback system evaluates feasibility for the end-effector pose pet at time step t and provides online feedback by driving vibration motors mounted on the hand-mounted demonstration interface (Fig. 3). Using the overall feasibility 
+
+ft computed by Eq. 11, the PWM signal sPWM is computed as 
+
+sPWM =
+
+(
+
+0 (1 − ft < τ ),
+
+1 − ft (otherwise ), (12) where τ denotes the threshold for the haptic feedback to generate vibration. Accordingly, no vibration is generated when feasibility is sufficiently high, and the vibration intensity increases as feasibility decreases. 
+
+F. Feasibility-aware policy learning 
+
+For policy learning, we use the demonstrated motion Se =
+
+{set }Tt=1 , the feasibility Fe = {ft}Tt=1 for the demonstrated motion obtained via the dynamics models, and the estimated actions ˜Ae = {˜at}Tt=1 . To learn a policy robustly from low-feasibility demonstrated data, we extend the objective function using weights We = {wet }Tt=1 for policy learning. To compute the weights used for policy learning, we use a step-wise evaluation estep  
+
+> t
+
+based on feasibility and an episode-wise evaluation eepisode . The step-wise evaluation is computed as follows: 
+
+estep  
+
+> t
+
+=
+
+(
+
+1 (ft ≥ κ),
+
+0 (otherwise ), (13) where κ is the step-wise threshold that determines whether the demonstration data at time t is used for learning. The episode-wise evaluation uses the step-wise evaluations and prohibits using an episode when low-feasibility data continues for a certain duration. It is computed using the following function: 
+
+eepisode =
+
+(
+
+0  fMaxRun 
+
+ [estep  
+
+> t
+
+]Tt=1 
+
+ ≥ γ ,
+
+1 (otherwise ), (14) where fMaxRun returns the maximum length of consecutive zeros in the step-wise evaluations estep  
+
+> t
+
+and γ is the episode-wise threshold that determines whether to use the entire episode for learning. The weight for the demonstration data at each time step is computed as the product of the step-wise evaluation estep  
+
+> t
+
+and the episode-wise evaluation eepisode :
+
+wet = eepisode · estep  
+
+> t
+
+. (15) 
+
+Algorithm 1: Learning process of FABCO  
+
+> 1
+
+Initialize IDM f IDM  
+
+> θ
+
+, FDM f FDM  
+
+> ψ
+
+, policy πϕ, and chunk size k 
+
+> 2
+
+Let st and at denote the state and action at time step t,respectively  
+
+> 3
+
+# Learning process of FDM and IDM  
+
+> 4
+
+Generate robot’s trajectories Dr = {Srn, Arn}Nn=1 using trajectory tracking policy πtrack  
+
+> 5
+
+Learn IDM f IDM  
+
+> θ
+
+using data D by Eq. (7)  
+
+> 6
+
+Learn FDM f FDM  
+
+> ψ
+
+using data D by Eq. (9)  
+
+> 7
+
+# Feasibility-aware demonstration process  
+
+> 8
+
+for m = 1 to M do  
+
+> 9
+
+Collect demonstrated motion Sem 
+
+> 10
+
+Predict action ˜Aem for robot pose Pem using IDM  
+
+> 11
+
+Predict the transition of robot pose ˜Pem for predicted action ˜Aem and robot pose Pem using FDM  
+
+> 12
+
+Calculate feasibility Fem using Pem and ˜Pem by Eqs. (10) and (11)  
+
+> 13
+
+Feasibility feedback Fem to the demonstrator  
+
+> 14
+
+end  
+
+> 15
+
+# Feasibility-aware policy learning  
+
+> 16
+
+Learn policy πϕ using data Dπ = {Sem, ˜Aem, Fem}Mm=1 that consists of demonstration data and predicted actions and feasibilities by Eq. (17) 
+
+For policy learning, we designed a feasibility-weighted objective function to implement feasibility-aware policy learn-ing. The policy model uses action chunking and outputs an action sequence up to k steps ahead, and it is estimated by minimizing the following feasibility-weighted objective: 
+
+ϕ∗ = arg min 
+
+> ϕ
+
+Jch  
+
+> ϕ
+
+, (16) 
+
+Jch  
+
+> ϕ
+
+= Ep(Se|πe)
+
+"T −kX
+
+> t=1
+
+wet ⊙ { ˜ach  
+
+> t
+
+− πch  
+
+> ϕ
+
+(set )}
+
+#
+
+, (17) where ⊙ denotes the Hadamard product, ˜ach  
+
+> t
+
+= [˜ at+i]k−1
+
+> i=0
+
+denotes a k-step chunked action vector by predicted actions ˜at,and wet = [ wei ]t+ki=t denotes the weight vector corresponding to the chunked action vector. When the learned policy πch  
+
+> ϕ∗
+
+is applied, the action at is determined using temporal ensembling as given in Eq. 5. 
+
+G. FABCO’s learning algorithm 
+
+FABCO is an imitation learning framework that estimates the feasibility of demonstrated motions using a robot’s FDM and IDM, encourages demonstrators to provide robot-feasible motions by feeding back this feasibility to the demonstrator, and finally uses the feasibility for policy learning. The learning algorithm of FABCO is shown in Algorithm 1. V. E XPERIMENTS 
+
+To evaluate FABCO, we conducted a human-subject exper-iment with an actual robot and 15 subjects. As a baseline, we used BCO, which does not use feasibility in either demon-strated motion feedback or policy learning. We tackled two tasks, a peg-insertion task requiring precise position control and a circle-tracing task requiring velocity 6
+
+control. Using the collected demonstration data and the learned policies, we investigated the following: RQ1: Does feasibility feedback improve the feasibility of demonstrated motions? RQ2: How does each feedback method affect the demonstra-tor’s workload? RQ3: Does the demonstration data collected with feasibility feedback improve policy performance? RQ4: To what extent does feasibility-aware policy learning improve policy performance? 
+
+A. Experimental settings 1) Comparison methods: In this experiment, we evalu-ated the effectiveness of feasibility feedback and feasibility-aware policy learning by comparing FABCO with the baseline method BCO. In BCO, demonstration data are collected under the no-feedback (No FB) demonstration, and policies are learned without feasibility. FABCO collects demonstration data by three demonstration methods: visuo-haptic feedback demonstration, which presents feasibility using both visual and haptic feedback systems; visual feedback demonstration, which presents feasibility using only the visual feedback system; and haptic feedback demonstration, which presents feasibility using only the haptic feedback system. Using the demonstration data collected under each demonstration method, we compared the feasibility of the demonstrated motion and the performance of the learned policies. The threshold for triggering the haptic feedback was set to τ = 0 .7.
+
+2) Experimental Procedure: We recruited 15 subjects and randomly assigned them to one of three demonstration meth-ods (visual, haptic, or visuo-haptic), with five subjects per demonstration method. Each subject performed both tasks under two demonstration settings: No FB and the assigned demonstration method. Before each task, subjects received instructions on the task setup, the hand-mounted demonstration interface, and the feedback method, followed by one minute of practice. For all subjects, the No FB demonstration was performed first, followed by demonstrations under the assigned demonstration method. After each task was carried out by each demonstration method, subjects completed questionnaires on workload and method preference. 
+
+3) Verification method: We conducted human-subject ex-periments and policy learning experiments on two tasks to investigate RQ1–RQ4. All the experiments were conducted under the approval of the institutional ethics committee. For RQ1, we computed the feasibility of each subject’s demonstrated motions and evaluated how much each feedback method improved the demonstrated motion’s feasibility. For the peg-insertion task, each subject performed 30 demon-strated motions under each demonstration method. For the circle-tracing task, each subject performed eight demonstrated motions under each demonstration method, and each demon-strated motion consisted of tracing a circle for five laps. For RQ2, we evaluated subjects’ workload and preferences using NASA-TLX and a preference questionnaire. In the pref-erence questionnaire, subjects who performed the visuo-haptic feedback demonstration rated “Which is more beneficial, the Visual feedback              
+
+> Robot
+> Motion capture camera
+> Haptic
+> feedback
+> Demonstration interface
+> (a) Experimental environment 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> XYZ
+> Roll Pitch Yaw
+> Pose -level feasibility visualization
+> Overall feasibility visualization
+> Feasibility :  𝑓 !
+> 0
+> 1(b) Visual feasibility feedback
+> Fig. 4. Experimental setup for human-subject experiment. (a) Experimental environment: In this environment, the workspace on the desk is shared with a demonstrator and the robot. The motion is captured by a motion-capture camera. The demonstrator receives the feasibility through the monitor and the interface. (b) Visual feasibility feedback system: This system provides two types of visualizations: pose-level feasibility visualization and overall feasibility visualization.
+
+visual feedback system or haptic feedback system?” on a 20-point scale, and subjects who performed the visual or visuo-haptic feedback demonstration rated “Which is more beneficial, pose-level visualization or overall visualization?” also on a 20-point scale. For RQ3, we learned a policy for each subject using the demonstration data collected for RQ1 under each feedback method, and we compared policy performance using robot task success rates. For the peg-insertion task, we conduct 10 trials per policy, resulting in 150 total trials for No FB and 50 total trials for each of the other feedback methods. For the circle-tracing task, we conducted five trials per policy, where each trial consists of tracing five circles, resulting in 75 total trials for No FB and 25 total trials for each of the other feedback methods. For RQ4, we investigated the impact of feasibility-aware policy learning by comparing performance with and without feasibility-aware policy learning. Using demonstration data collected in the visuo-haptic feedback demonstration, we con-sidered two learning conditions: with full data and first-half data. In the full data condition, each policy was learned from all demonstrated motions, which were 30 motions for the peg-insertion task and eight motions for the circle-tracing task. In the first-half data condition, each policy was learned using only the demonstrated motions collected in the first half of the data collection. For each learning condition, we executed the task with policies learned with and without feasibility-aware policy learning and compared their success rates and Hausdorff distances to the demonstration data. 
+
+4) Hardware: The experimental environment is shown in Fig. 4. The hardware devices of the manipulator, the motion-capture system, the robot hand, and the controller use the same control-frequency and acceleration settings as those in the preliminary study [24]. Compared to the preliminary study, however, we used an improved hand-mounted demonstration interface (Fig. 3) to implement haptic feedback. 
+
+5) Peg-insertion task: The environment for the peg inser-tion task is shown in Fig. 5 (a). The goal of the task is to transfer a peg from the vial on the right to the vial on 7500 mm  
+
+> workspace
+> 300 mm
+> Goal
+> Start
+> 230 mm
+> X
+> Y
+> Z
+> Peg -passing area
+> Desired motion
+
+(a) Peg-insertion task 250 mm  
+
+> workspace
+> 250 mm
+> 250 mm
+> X
+> Y
+> Z
+> Desired motion
+> Target circle
+
+(b) Circle-tracing task 
+
+Fig. 5. Task environments. (a) The peg-insertion task requires moving a grasped peg from start to goal while avoiding obstacles. (b) The circle-tracing task requires tracing a circular path on a table. In each task, the green region denotes the workspace in which the robot must complete motions. 
+
+the left while avoiding the obstacle. The peg is 130 mm long with a 3 mm × 3 mm square cross-section, and it has a 30 mm × 30 mm × 40 mm rectangular grasping block attached to the top. The state is the six-dimensional end-effector pose st = pt, and the action is the six-dimensional target end-effector velocity at. The relative positioning of the peg and the end-effector remains fixed during demonstration and execution. We define task success as inserting the peg without deviating from the workspace and without contact-ing the obstacle. Successful demonstrated motions must pass through the red region in Fig. 5 (a). This task is designed to evaluate whether FABCO can suppress demonstrated motions that deviate from the workspace. 
+
+6) Circle-tracing task: The environment for the circle trac-ing task is shown in Fig. 5 (b). We define success in the task as completing five laps while tracing the target circle on the table with the tip of the grasped peg, keeping the Hausdorff distance [37] to the demonstrated motions within 30 mm. The definitions of the state and action are the same as those in the peg-insertion task. The relative positioning of the peg and the end-effector also remains fixed during demonstration and execution. This task evaluates how effectively each feedback method suppresses demonstrated motions that exceed the robot’s end-effector speed limit, which is a primary factor reducing feasibility in this task. 
+
+7) Learning: The FDM and IDM were modeled by neural networks with five fully connected layers and then learned using data collected as the robot tracked random reference trajectories within each task workspace. Random reference trajectories were prepared by sampling waypoints in the workspace and connecting them with spline trajectories. The FDM estimates the next end-effector pose pt+1 from the current end-effector pose pt and action at. In this experiment, the FDM is implemented as six independent models that separately predict the six components of pt+1 . The IDM takes the end-effector poses at three time steps, from t − 1 to t + 1 ,as input and estimates the action at at time t.The policy is also modeled by a neural network with five fully connected layers. For ACTE, we set the action chunk length to k = 8 and use weights wch = [8 , 7, 6, 5, 4, 3, 2, 1] .For feasibility-aware policy learning, we set the step-wise ー： Visuo -haptic ー： Haptic ー： Visual ー：No FB 1 3 5 7 9 11 13 15 
+
+> Demonstration Index
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Feasibility
+
+(a) Peg-insertion task 1 2 3 4
+
+> Demonstration Index
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Feasibility
+
+(b) Circle-tracing task 
+
+Fig. 6. Transitions of estimated feasibility during demonstration: (a) transition in the peg-insertion task and (b) transition in the circle-tracing task. Horizontal axis represents number of demonstrated motions, and vertical axis represents mean feasibility of demonstrated motions. Each plot shows mean and standard deviation of feasibility transitions. For No FB, statistics are computed across a single experiment by 15 subjects. For the other methods, statistics are computed across a single experiment by five subjects each. ー： 1st demo ー： 5th demo ー： 10th demo ■： Workspace        
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(a) Visuo-haptic demo         
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(b) No FB demo 
+
+Fig. 7. Transitions of demonstrated motions collected under each demonstra-tion method in peg-insertion task. Demonstrated motions were collected using (a) visuo-haptic feedback demonstration and (b) No FB demonstration. 
+
+threshold κ = 0 .7 and the episode-wise threshold γ = 10 .
+
+B. Experimental results 1) Improving demonstrated motions via feasibility feed-back: For RQ1, we analyzed the feasibility of demonstrated motions in the peg-insertion and circle-tracing tasks. Fig. 6 shows the feasibility transitions for each task. In both tasks, feasibility is low in the No FB demonstration, whereas fea-sibility feedback improves the feasibility of the demonstrated motions. Fig. 7 shows the demonstrated motion’s change in the peg-insertion task, and Fig. 8 shows the changes in demon-strated speed in the circle-tracing task. In the peg-insertion task, the No FB demonstration often included motions that moved outside the workspace, whereas the demonstration with feasibility feedback gradually shifted toward motions that stayed within the workspace as subjects provided more demonstrated motions. This trend was consistently observed across feedback modalities, indicating that feasibility feedback helped subjects refine their demonstrated motions to remain within the workspace. In the circle-tracing task, demonstrated motions under the No FB demonstration often exceeded the robot’s end-effector speed limit, whereas the demonstrated 8ー： Visuo -haptic ー： Haptic ー： Visual ー：No FB - -：Speed limit  
+
+> Fig. 8. Transitions of demonstrated motions collected under each demon-stration method in circle-tracing task. Horizontal axis represents number of demonstrated motions, and vertical axis represents mean speed of demon-strated motions. Each plot shows mean and standard deviation of the demon-strated motion’s speed. For No FB, statistics are computed across a single experiment by 15 subjects. For the other methods, statistics are computed across a single experiment by five subjects each.
+
+* * *   
+
+> Fig. 9. NASA-TLX performance subscale in peg-insertion task for all demonstration methods. “*” indicates a statistically significant difference with
+> p < 0.05 in t-test.
+
+motions with feedback stayed within the speed limit. In particular, demonstration methods that include haptic feedback markedly suppressed overspeed motions, likely because the online haptic feedback provided during motion performance enabled subjects to adjust their motion generation immediately. Overall, feasibility feedback improved demonstrated mo-tions’ feasibility in both tasks. It promotes demonstrations that increasingly remain within the workspace in the peg-insertion task and within the speed limit in the circle-tracing task, indicating that FABCO’s feasibility feedback is effective across tasks with different control characteristics. 
+
+2) Comparison of workloads and preferences of subjects for each feedback method: For RQ2, we investigated the workload induced by feasibility feedback for the 15 subjects in the peg-insertion and circle-tracing tasks. Among the six NASA-TLX subscales, we presented Performance for the peg-insertion task (Fig. 9) and Effort and Frustration for the circle-tracing task (Fig. 10), since these subscales showed the most notable differ-ences among the demonstration methods. In the peg-insertion task, the performance subscale indicates that visual feedback demonstration yields a significantly lower workload than the other methods. This is likely because visual feedback presents feasibility after each demonstrated motion, making it easier to review and improve motions, which is particularly helpful for a task requiring high positioning accuracy. In contrast, in the circle-tracing task, haptic feedback demonstration yields a significantly higher workload in the Effort and Frustration subscales. Because haptic feedback provides online feasibility *
+
+> (a) Effort
+
+* (b) Frustration                       
+
+> Fig. 10. Results of NASA-TLX for all demonstration methods in circle-tracing task: (a) effort and (b) frustration subscales. “*” indicates a statistically significant difference with p < 0.05 in t-test.
+> (a) Overall vs. pose-level (b) Visual vs. haptic
+> Fig. 11. Results of questionnaire on subjects’ preferences for demonstration methods. (a) Questionnaire results evaluating whether overall visualization or pose-level visualization was more beneficial for subjects using visuo-haptic and visual feedback demonstrations. Lower values indicate a stronger preference for pose-level visualization, while higher values indicate a stronger preference for overall visualization. (b) Questionnaire results evaluating whether visual feedback or haptic feedback was more beneficial for subjects using a visuo-haptic feedback demonstration. Lower values indicate a stronger preference for visual feedback, while higher values indicate astronger preference for haptic feedback. In both questionnaires, responses were rated on a 20-point scale.
+
+information, subjects must continuously check whether their motions satisfy the robot’s constraints, which likely increases workload in a task that requires continuous speed control. Al-though the visuo-haptic feedback demonstration also includes haptic feedback, its workload is lower than that of the haptic feedback demonstration, suggesting that visual feedback helps reduce cognitive demand during motion performance. Fig. 11 (a) shows preferences between pose-level and overall feasibility visualization in visual feedback. In both tasks, subjects tended to prefer pose-level visualization. Since feasibility is presented after each demonstrated motion is performed, subjects have time to review the pose-level visual-ization in detail, and thus the richer visualization is perceived as beneficial. Fig. 11 (b) shows the questionnaire results on subjects’ preferences between visual and haptic feedback. In both tasks, subjects tended to prefer haptic feedback over visual feedback. In the peg-insertion task, however, we also observed a subset of subjects who preferred visual feedback. This may be because, for tasks requiring high positioning accuracy, some subjects found it easier to understand their performance by visualizing the demonstrated motion. In contrast, in the circle-tracing task, where speed control is particularly important, the haptic feedback was highly valued because it allowed online adjustment during motion performance, suggesting that haptic 9                                     
+
+> (a) Peg-insertion task (b) Circle-tracing task
+> Fig. 12. Robot motions using the policy learned by FABCO with visuo-haptic feedback demonstration in (a) peg-insertion task and (b) circle-tracing task. TABLE I PAIRWISE SIGNIFICANCE COMPARISON OF SUCCESS RATES AMONG DEMONSTRATION METHODS IN PEG -INSERTION TASK . P AIRWISE T -TEST RESULTS ARE SHOWN FOR FABCO, WITH VISUO -HAPTIC ,HAPTIC ,AND VISUAL FEEDBACK ,AND FOR BCO. “+” INDICATES THAT THE METHOD IN THE ROW ACHIEVES A HIGHER SUCCESS RATE THAN THE METHOD IN THE COLUMN ,WHILE “–” INDICATES THE OPPOSITE . “*” DENOTES STATISTICAL SIGNIFICANCE (p < 0.05 ). B OTTOM ROW SHOWS THE SUCCESS RATE (%) FOR EACH METHOD .FABCO with FABCO FABCO visuo-haptic with haptic with visual BCO FABCO with visuo-haptic +∗+∗+∗
+> FABCO with haptic -∗-∗+∗
+> FABCO with visual -∗+∗+∗
+> BCO -∗-∗-∗
+> Success rate 90.0 66.0 78.0 0.0
+
+feedback is well suited to the task characteristics. These questionnaire results indicate that the choice of demonstration method affects subjects’ workload and prefer-ences, and that the effect depends on the task characteristics. Specifically, a demonstration method that includes haptic feedback was preferred by many subjects, especially when continuous speed control was important, but it also tended to increase workload. In contrast, a demonstration method that includes visual feedback was preferred by some subjects when high positioning accuracy was required, and it was also associated with a stronger sense of accomplishment. These results suggest that selecting the demonstration method based on task characteristics can support an imitation learning frame-work that improves demonstrated motions without excessively increasing subjects’ workload. 
+
+3) Influence of feasibility feedback on learned policy perfor-mance: For RQ3, we evaluated task success rates of policies learned from data collected under each demonstration method. Fig. 12 shows robot motions when executing the peg-insertion task and the circle-tracing task with the policy learned by FABCO from demonstration data collected by the visuo-haptic feedback demonstration method. For both tasks, we confirmed that the learned policies could execute successful motions that complete the task. Table I presents success rates of the peg-insertion task  "   
+
+> !
+> !  " 
+> 
+> 
+> 
+> 
+> 
+>  !
+
+*  
+
+> Fig. 13. Dynamic Time Warping (DTW) distances between mean demon-strated motion and each demonstrated motion for each subject in peg-insertion task. Mean demonstrated motion is computed by averaging positions at each time step across subjects’ temporally normalized demonstrated motions. Statistical significance of DTW differences among methods is evaluated using pairwise t-tests across all combinations of demonstration methods, where “*” indicates a statistically significant difference ( p < 0.05 ).
+
+and Wald test results. Success rates are highest for FABCO with visuo-haptic feedback demonstration, followed by visual feedback demonstration, haptic feedback demonstration, and BCO, with statistically significant differences for all pairs of demonstration methods. BCO learned on No FB demonstration data achieves the lowest success rate, consistent with the demonstration feasibility results shown in Fig. 6 (a). However, although the feasibility results indicate that data collected by haptic feedback demonstration exhibit higher feasibility than those collected with visuo-haptic and visual feedback demonstration, the learned policy success rate is lower than those of the visuo-haptic and visual feedback demonstrations. To clarify this discrepancy, Fig. 13 analyzes demonstrated mo-tion variability across demonstration methods. Haptic feedback demonstration results in greater variability in demonstrated motions, which likely degrades policy performance. In con-trast, visuo-haptic feedback demonstration and visual feedback demonstration increase feasibility while also facilitating more consistent motion refinement, contributing to improved policy performance. Table II reports success rates of the circle-tracing task and Wald test results. Success rates are highest for FABCO with visuo-haptic feedback demonstration, followed by haptic feedback demonstration, visual feedback demonstration, and BCO; moreover, statistically significant differences are ob-served for all pairs except visuo-haptic vs. haptic. In the circle-tracing task, exceeding the end-effector speed limit is the primary factor reducing feasibility; therefore, haptic feedback demonstration and visuo-haptic feedback demonstration can immediately inform subjects when their motion exceeds the speed limit, which efficiently promotes motion refinement and improves policy performance. Across both tasks, FABCO with visuo-haptic feedback demonstration achieves the highest success rate, indicating that combining the visual and hap-tic modalities of feedback supports the learning of higher-performing policies. Fig. 14 and Fig. 15 show robot motions generated by the learned policies for peg insertion and circle tracing, respec-tively. In both tasks, policies learned on data collected with feedback demonstration execute motions stably without large deviations from the demonstrated motions. In contrast, the 10 
+
+TABLE II PAIRWISE SIGNIFICANCE COMPARISON OF SUCCESS RATES AMONG DEMONSTRATION METHODS IN CIRCLE -TRACING TASK . P AIRWISE T -TEST RESULTS ARE SHOWN FOR FABCO, WITH VISUO -HAPTIC , HAPTIC , AND VISUAL FEEDBACK , AND FOR BCO. “+” INDICATES THAT THE METHOD IN THE ROW ACHIEVES A HIGHER SUCCESS RATE THAN THE METHOD IN THE COLUMN , WHILE “–” INDICATES THE OPPOSITE . “*” DENOTES STATISTICAL SIGNIFICANCE (p < 0.05 ). T HE BOTTOM ROW SHOWS THE SUCCESS RATE (%) FOR EACH METHOD .FABCO with FABCO FABCO visuo-haptic with haptic with visual BCO FABCO with visuo-haptic n.s. +∗ +∗
+
+FABCO with haptic n.s. +∗ +∗
+
+FABCO with visual -∗ -∗ +∗
+
+BCO -∗ -∗ -∗
+
+Success rate 88.0 80.0 60.0 26.7 ー：Robot motion ■： Workspac e       
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(a) FABCO with visuo-haptic demo        
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(b) FABCO with haptic demo        
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(c) FABCO with visual demo         
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(d) BCO with No FB demo 
+
+Fig. 14. Robot motion trajectories of policies learned in peg-insertion task. Policies learned by (a) FABCO with visuo-haptic demonstration, (b) FABCO with haptic demonstration, (c) FABCO with visual demonstration, and (d) BCO with No FB demonstration. Red lines and green areas indicate robot motion trajectories and the workspace, respectively. 
+
+policy learned by BCO learns motions that gradually drift away from the demonstrated motion over time. This is likely because the No FB demonstration used for BCO includes many low-feasibility motions, which makes accurate action estimation difficult and leads to covariate shift, causing the policy to progressively deviate from the demonstrated motions. Overall, feasibility feedback improves policy performance. Across both tasks, FABCO with visuo-haptic feedback demon-stration achieved the highest success rates, indicating that combining visual and haptic feedback enables the collection of demonstration data that is more suitable for policy learning. Moreover, comparing feedback modalities suggests comple-mentary roles: haptic feedback is effective for on-the-spot motion refinement, whereas visual feedback is effective for improving the overall quality of demonstrated motions. 
+
+4) Ablation study on feasibility-aware policy learning: 
+
+For RQ4, we compared success rates and Hausdorff distances between robot executions and the demonstration data for poli-cies learned with and without feasibility-aware policy learning ー： Robot motion ・：Teaching data        
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(a) FABCO with visuo-haptic demo        
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(b) FABCO with haptic demo        
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(c) FABCO with visual demo         
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(d) BCO with No FB demo 
+
+Fig. 15. Robot motions of learned policies in circle-tracing task. Policies learned by (a) FABCO with visuo-haptic demonstration, (b) FABCO with haptic demonstration, (c) FABCO with visual demonstration, and (d) BCO with No FB demonstration. Red lines and green points indicate robot motion and demonstrated motion, respectively. TABLE III COMPARISON OF SUCCESS RATES FOR POLICIES LEARNED BY FABCO 
+
+> FROM VISUO
+
+-HAPTIC DEMONSTRATIONS , WITH AND WITHOUT FEASIBILITY -AWARE POLICY LEARNING (FPL), IN PEG -INSERTION AND CIRCLE -TRACING TASKS . V ARIANT LEARNED WITHOUT FPL DENOTED AS 
+
+FABCO W/O FPL. “ †” AND “‡” INDICATE A STATISTICALLY SIGNIFICANT DIFFERENCE WITH p < 0.05 IN PAIRWISE T -TEST .Peg-insertion task Circle-tracing task FABCO FABCO w/o FPL FABCO FABCO w/o FPL First-half 76.0 † 32.0 † 64.0 ‡ 36.0 ‡
+
+Full 90.0 88.0 88.0 88.0 
+
+(FPL). We evaluated two learning conditions: with full data and first-half data, which were collected with the visuo-haptic feedback demonstration. Table III summarizes the success rates for each task with and without feasibility-aware policy learning. The results show that, under the full data condition, both tasks achieve high success rates regardless of whether feasibility-aware policy learning is applied. In contrast, under the first-half data condition, feasibility-aware policy learning improves success rates for both tasks. Fig. 16 shows the peg-insertion trajectories with and with-out feasibility-aware policy learning, and Fig. 17 shows the corresponding trajectories for the circle-tracing task. In the peg-insertion task, feasibility-aware policy learning suppresses behaviors that leave the workspace. In the circle-tracing task, policies learned with full data exhibit little difference, whereas with first-half data, feasibility-aware policy learning reduces deviations from the demonstrated motions. Fig. 18 presents the Hausdorff distances between the demonstrated motions and the robot executions for each task. Under both full and first-half data conditions, feasibility-11 ー：Robot motion ■： Workspac e       
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(a) FABCO using first-half data         
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(b) FABCO w/o FPL using first-half data        
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(c) FABCO using full data         
+
+>   
+> 
+>  
+> 
+>  
+> 
+>  
+> Start Goal
+
+(d) FABCO w/o FPL using full data 
+
+Fig. 16. Robot motion of learned policies in peg-insertion task. Policies learned by (a) FABCO using first half of demonstration data, (b) FABCO w/o feasibility-aware policy learning (FPL) using first half of demonstration data, (c) FABCO using full demonstration data, and (d) FABCO w/o FPL using full demonstration data. Red lines and green areas indicate robot motion trajectories and the workspace, respectively. ー： Robot motion ・：Teaching data        
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(a) FABCO using first-half data         
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(b) FABCO w/o FPL using first-half data        
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(c) FABCO using full data         
+
+> 
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+
+(d) FABCO w/o FPL using full data 
+
+Fig. 17. Robot motion trajectories of learned policies in circle-tracing task. Policies learned by (a) FABCO using first half of demonstration data, (b) FABCO w/o feasibility-aware policy learning (FPL) using first half of demonstration data, (c) FABCO using full demonstration data, and (d) FABCO w/o FPL using full demonstration data. Red lines and green points indicate robot motion trajectories and demonstration data, respectively. 
+
+aware policy learning yields significantly smaller Hausdorff distances, indicating that the learned policies produce motions more similar to the demonstrated motions. Even in the full data condition, although the success-rate difference is not sta-tistically significant, feasibility-aware policy learning reduces the Hausdorff distance. These results indicate that feasibility-aware policy learning :First half data :Full data      
+
+> "
+>    
+> "
+> 
+> 
+> 
+> 
+> 
+> 
+> ! 
+
+*
+
+(a) Peg-insertion task        
+
+> !
+>  
+> !
+> 
+> 
+> 
+> 
+>   
+
+* (b) Circle-tracing task 
+
+Fig. 18. Comparison of Hausdorff distance between demonstrated and robot motions generated by learned policies with and without feasibility-aware policy learning (FPL). (a) Results for peg-insertion task. (b) Results for circle-tracing task. “*” indicates a statistically significant difference with p < 0.05 
+
+in pairwise t-test. 
+
+improves policy stability and performance by emphasizing high-feasibility demonstration data collected through demon-stration with feasibility feedback. In particular, it provides a larger performance gain when the amount of demonstration data are limited. Moreover, the evaluation of Hausdorff dis-tance suggests that feasibility-aware policy learning suppresses motions that leave the workspace and large deviations from the demonstrated motions, leading to executions that better match the demonstrated motions. VI. D ISCUSSIONS 
+
+A. Limitations of feedback methods and possible improve-ments 
+
+In this study, we developed FABCO to estimate the feasi-bility of demonstrated motions and presented the estimated feasibility to subjects through two feedback modalities to encourage refinement of demonstrated motions. However, the current approach is limited to indicating which parts of a demonstrated motion are infeasible, and subjects must decide how to modify their motions on their own. As a result, refining demonstrated motions can depend on subjects’ knowledge of robots and the task, and subjects without specialized knowledge may require substantial trial-and-error experience to produce robot-feasible motions. To mitigate this limitation, we consider two directions for improving the feedback: (i) directly constraining infeasible motions during demonstration and (ii) explicitly indicating the degree of improvement across demonstrations. For direction (i), the hand-mounted demonstration interface could incorporate an arm-worn exoskeleton frame that applies resistance or constraints to motions that are difficult for the robot to execute, helping the subject to intuitively understand the feasibility for each of the six-dimensional end-effector pose components [38], [39]. For direction (ii), we could compare the feasibility of the most recent demonstrated motion with the feasibilities of previously collected demonstrated motions to indicate whether the motion has improved, helping subjects to refine their motions more efficiently. 12 
+
+B. Constraints and improvements for dynamics learning 
+
+A key practical challenge in FABCO is the cost of collect-ing robot motion data for learning the forward and inverse dynamics models. Because feasibility evaluation and action estimation rely on these models, achieving sufficient accuracy can require operating a real robot for long periods and across a wide range of motions to gather sufficient data. Reducing this data collection time while maintaining dynamics accuracy is thus an important direction for improvement. One approach for learning a dynamics model more effi-ciently is to incorporate robot kinematics as prior knowledge into the model. Concretely, forward kinematics and the Jaco-bian could be used to constrain the model inputs and outputs, embedding structures such as rigid-body motion and joint lim-its into the dynamics model so that a consistent approximation can be obtained even with limited data [40], [41]. Another pos-sible approach is to carry out offline pretraining in simulation and then fine-tune the model using a small amount of real-world data [42]. In addition, supplementing the method with an active data-collection strategy—for example, prioritizing exploration of regions with sparse sampling density based on model uncertainty—could improve data efficiency compared with uniform and uninformed exploration of the workspace. By combining these directions, it might be possible to both reduce the real-robot time required for dynamics learning and improve model accuracy, thus increasing the reliability of feedback and potentially improving policy performance as well. 
+
+C. Limitations of FABCO and possible improvements 
+
+In this study, we built an imitation learning framework based on behavior cloning (BC), where a policy is learned after collecting demonstration data. While BC enables a simple and practical learning pipeline, it is prone to performance degradation due to compounding errors, and FABCO shares this limitation. A possible way to mitigate this issue is to incorporate interactive imitation learning (IIL) into FABCO. IIL allows a demonstrator to intervene during robot exe-cution and sequentially incorporates the resulting information into the training data to improve the policy. Representative approaches include DART, which improves robustness by collecting demonstrations under injected perturbations [43]– [47], and DAgger, in which the demonstrator provides cor-rective actions for states visited by the learner to prevent task failures [48]–[51]. In our setting, similar to DAgger, we could use the FDM and IDM to simulate policy rollouts and identify end-effector poses that are likely to lead to task failure. By asking the demonstrator to initiate a demonstration from such failure-prone poses, we could collect demonstra-tion data more efficiently and more directly improve policy performance. Therefore, integrating an IIL framework into FABCO may create a closed-loop data collection and learning cycle that improves imitation performance more directly and continuously. In addition, future work should consider the feasibility of gripper opening and closing. Due to differences in dynamics between the hand-mounted demonstration interface and the robot gripper, demonstrated opening/closing motions may not be feasible for the robot to execute as intended. In our experiments, it was difficult to provide feasibility feedback for both end-effector motion and finger opening and closing while keeping the feedback easy to interpret. Therefore, we focused on the end-effector motion’s feasibility. In future work, we will improve the interface by introducing a mechanism that provides feasibility-dependent force resistance to the fingers during demonstration. Furthermore, by leveraging a finger dynamics model to estimate the feasibility of demonstrated gripper motions and applying force resistance based on the estimated feasibility, we aim to build a system that permits imitation of entire demonstrated motions, including gripper opening and closing. VII. C ONCLUSION 
+
+In this study, we proposed FABCO, an imitation learning framework that provides feasibility feedback during motion performance to encourage demonstrators to provide robot-feasible motions. To compare feasibility feedback modalities and to evaluate the effectiveness of feasibility-aware policy learning, we conducted a human-subject experiment with 15 subjects on two tasks: a peg-insertion task and a circle-tracing task. The results confirm that introducing feasibility feedback improves policy performance by more than 3.2 times compared with a No FB demonstration, that the most effective feedback modality depends on task characteristics, and that feasibility-aware policy learning improves policy performance, particularly when the amount of demonstration data is lim-ited. In addition, the questionnaire results suggest that visual feedback fosters a stronger sense of task accomplishment among demonstrators, that haptic feedback is often preferred because it is easy to understand and supports on-the-spot motion refinement, and that visuo-haptic feedback offers much promise by combining the advantages of both modalities. REFERENCES [1] T. Osa, J. Pajarinen, G. Neumann, J. A. Bagnell, P. Abbeel, and J. Peters, “An algorithmic perspective on imitation learning,” Foundations and Trends in Robotics , vol. 7, no. 1-2, pp. 1–179, 2018. [2] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , vol. 44, pp. 1684–1704, 2024. [3] M. Janner, Y. Du, J. Tenenbaum, and S. Levine, “Planning with diffusion for flexible behavior synthesis,” in International Conference on Machine Learning (ICML) , 2022, pp. 9902–9915. [4] H. Bharadhwaj, J. Vakil, M. Sharma, A. Gupta, S. Tulsiani, and V. Ku-mar, “Roboagent: Generalization and efficiency in robot manipulation via semantic augmentations and action chunking,” in International Conference on Robotics and Automation (ICRA) , 2024, pp. 4788–4795. [5] S. Schaal, “Learning from demonstration,” in Conference on neural information processing systems(NeurIPS) , 1996, pp. 1040–1046. [6] B. D. Argall, S. Chernova, M. Veloso, and B. Browning, “A survey of robot learning from demonstration,” Robotics and autonomous systems ,vol. 57, no. 5, pp. 469–483, 2009. [7] F. Torabi, G. Warnell, and P. Stone, “Behavioral cloning from observa-tion,” in International Joint Conference on Artificial Intelligence (IJCAI) ,2018, pp. 4950–4957. [8] B. Baker, I. Akkaya, P. Zhokov, J. Huizinga, J. Tang, A. Ecoffet, B. Houghton, R. Sampedro, and J. Clune, “Video pretraining (vpt): Learning to act by watching unlabeled online videos,” in Conference on Neural Information Processing Systems (NeurIPS) , 2022, pp. 24 639– 24 654. 13 
+
+[9] F. Torabi, G. Warnell, and P. Stone, “Adversarial imitation learning from state-only demonstrations,” in Proceedings of the 18th International Conference on Autonomous Agents and MultiAgent Systems , 2019, pp. 2229–2231. [10] C. Wang, H. Shi, W. Wang, R. Zhang, L. Fei-Fei, and C. K. Liu, “Dex-cap: Scalable and portable mocap data collection system for dexterous manipulation,” in Robotics: Science and Systems(RSS) , 2024. [11] S. Chen, C. Wang, K. Nguyen, L. Fei-Fei, and C. K. Liu, “Arcap: Collecting high-quality human demonstrations for robot learning with augmented reality feedback,” in International Conference on Robotics and Automation (ICRA) , 2025, pp. 8291–8298. [12] C. Chi, Z. Xu, C. Pan, E. Cousineau, B. Burchfiel, S. Feng, R. Tedrake, and S. Song, “Universal manipulation interface: In-the-wild robot teach-ing without in-the-wild robots,” in Robotics: Science and Systems (RSS) ,2024. [13] M. Hamaya, F. von Drigalski, T. Matsubara, K. Tanaka, R. Lee, C. Nakashima, Y. Shibata, and Y. Ijiri, “Learning soft robotic assembly strategies from successful and failed demonstrations,” in International Conference on Intelligent Robots and Systems (IROS) , 2020, pp. 8309– 8315. [14] S. Young, D. Gandhi, S. Tulsiani, A. Gupta, P. Abbeel, and L. Pinto, “Vi-sual Imitation Made Easy,” in Conference on Robot Learning (CoRL) ,2021, pp. 1992–2005. [15] M. Seo, H. A. Park, S. Yuan, Y. Zhu, and L. Sentis, “Legato: Cross-embodiment imitation using a grasping tool,” IEEE Robotics and Au-tomation Letters , vol. 10, no. 3, pp. 2854–2861, 2025. [16] H. Ha, Y. Gao, Z. Fu, J. Tan, and S. Song, “Umi-on-legs: Making manipulation policies mobile with manipulation-centric whole-body controllers,” in Conference on Robot Learning (CoRL) , 2025, pp. 5254– 5270. [17] Q. Zeng, C. Li, J. S. John, Z. Zhou, J. Wen, G. Feng, Y. Zhu, and Y. Xu, “Activeumi: Robotic manipulation with active perception from robot-free human demonstrations,” 2025. [18] J. Wong, A. Tung, A. Kurenkov, A. Mandlekar, L. Fei-Fei, S. Savarese, and R. Mart´ ın-Mart´ ın, “Error-aware imitation learning from teleopera-tion data for mobile manipulation,” in Conference on Robot Learning (CoRL) , 2022, pp. 1367–1378. [19] Z. Fu, T. Z. Zhao, and C. Finn, “Mobile aloha: Learning bimanual mobile manipulation with low-cost whole-body teleoperation,” in Con-ference on Robot Learning (CoRL) , 2025, pp. 4066–4083. [20] T. Z. Zhao, J. Tompson, D. Driess, P. Florence, S. K. S. Ghasemipour, C. Finn, and A. Wahid, “Aloha unleashed: A simple recipe for robot dexterity,” in Conference on Robot Learning (CoRL) , 2025, pp. 1910– 1924. [21] X. Cheng, J. Li, S. Yang, G. Yang, and X. Wang, “Open-television: Teleoperation with immersive active visual feedback,” in Conference on Robot Learning (CoRL) , 2024, pp. 2729–2749. [22] C. Cuan, A. Okamura, and M. Khansari, “Leveraging haptic feedback to improve data quality and quantity for deep imitation learning models,” 
+
+IEEE Transactions on Haptics , vol. 17, no. 4, pp. 984–991, 2024. [23] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware,” in Robotics: Science and Systems (RSS) , 2023. [24] K. Takahashi, H. Sasaki, and T. Matsubara, “Feasibility-aware imitation learning from observations through a hand-mounted demonstration inter-face,” in International Conference on Robotics and Automation (ICRA) ,2025, pp. 7822–7828. [25] S. G. Hart and L. E. Staveland, “Development of nasa-tlx (task load index): Results of empirical and theoretical research,” in Human Mental Workload , 1988, vol. 52, pp. 139–183. [26] Y. Liu, A. Gupta, P. Abbeel, and S. Levine, “Imitation from observation: Learning to imitate behaviors from raw video via context translation,” in International Conference on Robotics and Automation (ICRA) , 2018, pp. 1118–1125. [27] L. Smith, N. Dhawan, M. Zhang, P. Abbeel, and S. Levine, “Avid: Learning multi-stage tasks via pixel-level translation of human videos,” in Robotics: Science and Systems (RSS) , 2020. [28] Y. Qin, H. Su, and X. Wang, “From one hand to multiple hands: Imitation learning for dexterous manipulation from single-camera tele-operation,” IEEE Robotics and Automation Letters , vol. 7, no. 4, pp. 10 873–10 881, 2022. [29] Q. Zhang, Z. Peng, and B. Zhou, “Learning to drive by watching youtube videos: Action-conditioned contrastive policy pretraining,” in European Conference on Computer Vision (ECCV) , 2022, pp. 111–128. [30] S. Bahl, A. Gupta, and D. Pathak, “Human-to-robot imitation in the wild,” in Robotics: Science and Systems (RSS) , 2022. [31] H. Karnan, G. Warnell, X. Xiao, and P. Stone, “Voila: Visual-observation-only imitation learning for autonomous navigation,” in In-ternational Conference on Robotics and Automation (ICRA) , 2022, pp. 2497–2503. [32] H. Sikchi, C. Chuck, A. Zhang, and S. Niekum, “A dual approach to imitation learning from observations with offline datasets,” in Conference on Robot Learning (CoRL) , 2025, pp. 1125–1147. [33] F. Sukkar, V. H. Moreno, T. Vidal-Calleja, and J. Deuse, “Guided learning from demonstration for robust transferability,” in International Conference on Robotics and Automation (ICRA) , 2023, pp. 5048–5054. [34] Z. Cao, Y. Hao, M. Li, and D. Sadigh, “Learning feasibility to imi-tate demonstrators with different dynamics,” in Conference on Robot Learning (CoRL) , 2022, pp. 363–372. [35] Z. Cao and D. Sadigh, “Learning from imperfect demonstrations from agents with varying dynamics,” IEEE Robotics and Automation Letters ,vol. 6, no. 3, pp. 5231–5238, 2021. [36] T. Betz, H. Fujiishi, and T. Kobayashi, “Behavioral cloning from obser-vation with bi-directional dynamics model,” in International Symposium on System Integration (SII) , 2021, pp. 184–189. [37] P. Jungeblut, L. Kleist, and T. Miltzow, “The complexity of the hausdorff distance,” Discrete & Computational Geometry , vol. 71, no. 1, pp. 177– 213, 2024. [38] P. Wu, Y. Shentu, Z. Yi, X. Lin, and P. Abbeel, “Gello: A general, low-cost, and intuitive teleoperation framework for robot manipulators,” in International Conference on Intelligent Robots and Systems (IROS) ,2024, pp. 12 156–12 163. [39] H. Y. Fang, Hongjie and Fang, J. Ren, J. Chen, R. Zhang, W. Wang, and C. Lu, “Low-cost exoskeletons for learning whole-arm manipulation in the wild,” in Conference on Robot Learning (CoRL) , 2023, pp. 1121– 1133. [40] M. Lutter, K. Listmann, and J. Peters, “Deep lagrangian networks for end-to-end learning of energy-based control for under-actuated systems,” in International Conference on Intelligent Robots and Systems (IROS) ,2019, pp. 7718–7725. [41] J. Wong, V. Makoviychuk, A. Anandkumar, and Y. Zhu, “Oscar: Data-driven operational space control for adaptive and robust robot manipulation,” in International Conference on Robotics and Automation (ICRA) , 2022, pp. 10 519–10 526. [42] X. Li, W. Shang, and S. Cong, “Offline reinforcement learning of robotic control using deep kinematics and dynamics,” IEEE/ASME Transactions on Mechatronics , vol. 29, no. 4, pp. 2428–2439, 2023. [43] M. Laskey, J. Lee, R. Fox, A. Dragan, and K. Goldberg, “Dart: Noise injection for robust imitation learning,” in Conference on Robot Learning (CoRL) , 2017, pp. 143–156. [44] H. Tahara, H. Sasaki, H. Oh, B. Michael, and T. Matsubara, “Disturbance-injected robust imitation learning with task achievement,” in International Conference on Robotics and Automation (ICRA) , 2022, pp. 2466–2472. [45] H. Tahara, H. Sasaki, H. Oh, E. Anarossi, and T. Matsubara, “Distur-bance injection under partial automation: Robust imitation learning for long-horizon tasks,” IEEE Robotics and Automation Letters , vol. 8, no. 5, pp. 2724–2731, 2023. [46] H. Oh, H. Sasaki, B. Michael, and T. Matsubara, “Bayesian disturbance injection: Robust imitation learning of flexible policies for robot manip-ulation,” Neural Networks , vol. 158, pp. 42–58, 2023. [47] H. Oh and T. Matsubara, “Leveraging demonstrator-perceived precision for safe interactive imitation learning of clearance-limited tasks,” IEEE Robotics and Automation Letters , vol. 9, no. 4, p. 3387–3394, 2024. [48] S. Ross, G. J. Gordon, and J. A. Bagnell, “A reduction of imitation learning and structured prediction to no-regret online learning,” in Inter-national Conference on Artificial Intelligence and Statistics (AISTATS) ,2011, pp. 627–635. [49] M. Laskey, S. Staszak, W. Y. Hsieh, J. Mahler, F. T. Pokorny, A. D. Dragan, and K. Goldberg, “Shiv: Reducing supervisor burden in dagger using support vectors for efficient learning from demonstrations in high dimensional state spaces,” in International Conference on Robotics and Automation (ICRA) , 2016, pp. 462–469. [50] M. Kelly, C. Sidrane, K. Driggs-Campbell, and M. J. Kochenderfer, “Hg-dagger: Interactive imitation learning with human experts,” in 
+
+International Conference on Robotics and Automation (ICRA) , 2019, pp. 8077–8083. [51] K. Menda, K. Driggs-Campbell, and M. J. Kochenderfer, “Ensembledag-ger: A bayesian approach to safe imitation learning,” in International Conference on Intelligent Robots and Systems (IROS) , 2019, pp. 5041– 5048.

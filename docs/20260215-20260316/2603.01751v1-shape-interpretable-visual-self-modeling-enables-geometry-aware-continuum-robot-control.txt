@@ -1,0 +1,609 @@
+Title: Shape-Interpretable Visual Self-Modeling Enables Geometry-Aware Continuum Robot Control
+
+URL Source: https://arxiv.org/pdf/2603.01751v1
+
+Published Time: Tue, 03 Mar 2026 03:46:30 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+> 1
+
+# Shape-Interpretable Visual Self-Modeling Enables Geometry-Aware Continuum Robot Control 
+
+Peng Yu, Xin Wang, and Ning Tan* 
+
+Abstract —Continuum robots possess high flexibility and re-dundancy, making them well suited for safe interaction in complex environments, yet their continuous deformation and nonlinear dynamics pose fundamental challenges to perception, modeling, and control. Existing vision-based control approaches often rely on end-to-end learning, achieving shape regulation without explicit awareness of robot geometry or its interaction with the environment. Here, we introduce a shape-interpretable visual self-modeling framework for continuum robots that en-ables geometry-aware control. Robot shapes are encoded from multi-view planar images using a B´ ezier-curve representation, transforming visual observations into a compact and physically meaningful shape space that uniquely characterizes the robot’s three-dimensional configuration. Based on this representation, neural ordinary differential equations are employed to self-model both shape and end-effector dynamics directly from data, enabling hybrid shape-position control without analytical models or dense body markers. The explicit geometric structure of the learned shape space allows the robot to reason about its body and surroundings, supporting environment-aware behaviors such as obstacle avoidance and self-motion while maintaining end-effector objectives. Experiments on a cable-driven continuum robot demonstrate accurate shape-position regulation and track-ing, with shape errors within 1.56% of image resolution and end-effector errors within 2% of robot length, as well as robust performance in constrained environments. By elevating visual shape representations from two-dimensional observations to an interpretable three-dimensional self-model, this work establishes a principled alternative to vision-based end-to-end control and advances autonomous, geometry-aware manipulation for contin-uum robots. 
+
+Index Terms —Continuum robots, self-modeling, shape/position control 
+
+I. I NTRODUCTION 
+
+Continuum robots represent a distinct class of robotic systems whose motion is generated not through discrete rigid joints but via continuous deformation of flexible back-bones. This morphological paradigm enables motions reminis-cent of biological appendages such as octopus tentacles [1], snakes [2], and elephant trunks [3], endowing continuum robots with high kinematic redundancy, intrinsic compliance, and remarkable adaptability to unstructured environments. These properties make them particularly attractive for tasks that demand safe, smooth, and dexterous interaction within confined, complex, or uncertain spaces, including minimally invasive surgery [4], disaster response [5], inspection of 
+
+* Corresponding author. All the authors are with the School of Computer Science and Engineering, Sun Yat-sen University, Guangzhou 510006, China. (e-mail: yupeng6@mail2.sysu.edu.cn; wangx767@mail2.sysu.edu.cn; tann5@mail.sysu.edu.cn) 
+
+complex pipelines and industrial equipment [6], and human-robot collaboration [7]. Yet, the very characteristics that grant continuum robots their versatility, i.e., continuous deforma-tion, structural flexibility, and high redundancy, also introduce pronounced nonlinearity, strong coupling, and significant para-metric uncertainty. As a result, achieving reliable perception, modeling, and control of continuum robots remains a funda-mental and open challenge. Over the past decades, extensive research has been de-voted to the end-effector control of continuum robots. Both model-based and data-driven strategies have been explored, including inverse kinematics solvers under constant-curvature assumptions [8], finite-element-based dynamic models [9], and Cosserat-rod-based kinetostatic formulations [10]. While these approaches have demonstrated impressive performance, their effectiveness is often limited by the strong nonlinearity, high coupling, and parametric uncertainty inherent to con-tinuum robots. To mitigate modeling inaccuracies, a growing body of work has shifted toward model-free and data-driven control [11]. Early studies exploited online Jacobian estima-tion [12], [13], while more recent efforts leveraged Koopman operator [14]–[18] and neural ordinary differential equation (NODE) [19], [20] to learn robot dynamics directly from data. These learning-based approaches significantly simplify controller design and improve data efficiency, enabling accu-rate end-effector control even in the presence of substantial uncertainties [21]. However, end-effector control alone is insufficient for many real-world tasks involving continuum robots. Due to their extended and deformable bodies, safe and effective operation in cluttered or confined environments often requires the robot to actively regulate its body shape [22]–[24], rather than merely positioning its tip. Consequently, shape control has emerged as a critical capability complementary to end-effector control. Existing shape control approaches for continuum robots can be broadly classified into three categories according to their shape representation paradigms: model-based methods, data-driven methods based on discrete shape points, and vision-based end-to-end learning methods. Model-based methods typ-ically rely on explicit physical and geometric models, where shape is represented through analytical constructs, such as piecewise constant curvature models [25], beam theories [26], [27], or Cosserat rod formulations. These models have been successfully integrated with optimization or predictive con-trol frameworks to regulate robot shape and avoid obsta-cles. Nevertheless, in practice, accurately modeling contin-uum robots remains extremely challenging due to material   
+
+> arXiv:2603.01751v1 [cs.RO] 2 Mar 2026 2Robot
+> Time
+> Actuator input
+> Camera 1 Camera 2
+> Neural network training
+> View 1 View 2
+> Shape-interpretable encoding
+> Time
+> Actuator input
+> View 1
+> View 2
+> Predict shape dynamics
+> Muscle actuation
+> Visual feedback
+> Self-learning
+> Mental simulation
+> Self-learning mechanism in biological systems
+> Robot self-modeling
+
+A
+
+B  
+
+> 生物启发的自建模机制概念图。 (a) 生物系统的自学习机制。大象通过肌肉控制象鼻运动并通过双眼获取对应的象鼻形态反馈，以学习二者之间的关系， 然后可以预见自己的肌肉运动能带来的象鼻形态变化，以此为基础控制象鼻完成各种复杂操作。 (b) 训练完成后，连续体机器人可以利用训练好的网络， 在给定的输入时序信号情况下，自行预测不同视角的视觉形状动态。
+
+Fig. 1. Conceptual illustration of the bio-inspired self-modeling mechanism. (A) Self-learning mechanism in biological systems. An elephant controls the motion of its trunk through muscular actuation and acquires corresponding trunk shape feedback via binocular vision, thereby learning the relationship between muscle activation and trunk morphology. Based on this learned internal model, the elephant can anticipate the shape changes induced by its own motor commands and accordingly control the trunk to perform complex manipulation tasks. (B) The continuum robot is actuated using arbitrary temporal input signals, while image data of the robot are recorded at each time instant from two different views. The image data are parameterized and encoded together with the actuation signals to form a dataset for neural network training. After training, the continuum robot can exploit the learned network to autonomously predict the visual shape dynamics from different views under given input temporal signals. 
+
+nonlinearities, friction, hysteresis, and unmodeled external interactions. As a result, purely model-driven approaches often suffer from limited robustness and degraded performance in real-world scenarios. To alleviate modeling dependence, data-driven shape control methods based on discrete feature points have been proposed [28]–[35]. These methods represent the robot shape using a set of labeled points distributed along the backbone and regulate their positions jointly. While effective, such approaches typically require dense physical markers [36], careful camera calibration, or expensive depth sensors. These requirements increase system complexity, interfere with the robot’s intrinsic compliance, and limit practical deployment. More recently, vision-based end-to-end learning methods have attracted increasing attention. By directly mapping images to control commands using deep neural networks [22], [37], [38], these approaches eliminate the need for explicit shape modeling or marker placement. Although they exhibit strong robustness to visual disturbances, most existing methods are restricted to planar shape control and suffer from fundamental limitations: (i) The learned shape representations are implicit, providing no explicit geometric awareness of the robot body or its distance to the environment; (ii) single-view representa-tions suffer from non-unique mappings, where different three-dimensional shapes can produce identical two-dimensional projections. As a consequence, such methods struggle to support flexible operations such as obstacle avoidance or self-motion through shape regulation. Despite their differences, existing shape control paradigms share a common limitation: they lack a principled, inter-pretable, and learnable representation of the robot’s full three-dimensional shape. In previous works, shape is either over-constrained by inaccurate models, under-represented by sparse measurements, or implicitly encoded in black-box models, hindering generalization, interpretability, and flexible reuse across tasks. This observation motivates a fundamentally dif-ferent perspective: rather than prescribing or bypassing shape 3
+
+models, can a continuum robot learn its own three-dimensional shape dynamics directly from multi-view observations, and exploit it for control? Biological systems provide compelling evidence that ex-plicit analytical models are not a prerequisite for controlling highly deformable bodies. For instance, an elephant can dex-terously manipulate objects, avoid obstacles, and reconfigure its trunk despite its extreme redundancy and compliance. Such capabilities emerge through experience-driven self-learning, whereby the animal acquires an internal representation of the relationship between actuation and body deformation through efferent action signals and afferent visual feedback [37]. Inspired by this self-modeling paradigm, as shown in Fig. 1, this work investigates a vision-based self-modeling approach for continuum robot shape control under minimal sensing assumptions. Instead of relying on analytical models, physical markers, or camera calibration, the proposed method enables a robot to autonomously learn its own shape dynamics purely from multi-view visual observations. While each single view provides only a two-dimensional representation, the combina-tion of multiple distinct views establishes a unique correspon-dence to the robot’s three-dimensional shape without explicit 3D reconstruction. The detailed self-modeling and control framework are shown in Fig. 2. The robot backbone in each view is parameterized using B´ ezier curves, yielding a compact, geometry-aware, and interpretable shape representation. Based on the representation, an NODE model is employed to learn the shape dynamics in visual spaces, forming an implicit self-model of the robot’s three-dimensional shape evolution. In par-allel, a separate NODE-based model is learned for end-effector position dynamics. Building upon the learned models, a unified Jacobian-based shape-position hybrid control framework is developed. Within this framework, shape regulation naturally enables flexible behaviors such as obstacle avoidance and self-motion, while maintaining accurate end-effector positioning. Compared with existing approaches, the proposed method advances continuum robot control along several critical dimen-sions. (i) Unlike model-based strategies that rely on accurate analytical descriptions, the proposed framework eliminates the need for explicit physical modeling through vision-based self-modeling. (ii) In contrast to data-driven shape control methods that depend on sparse or densely labeled body points, the proposed approach achieves marker-free shape representation using only low-cost monocular visual observations. (iii) Un-like vision-based end-to-end control methods that implicitly encode shape in opaque latent spaces and are typically limited to planar control, the proposed framework explicitly represents robot shape in a geometrically meaningful form and naturally extends shape regulation from two-dimensional visual projec-tions to consistent three-dimensional shape control. The main contributions of this work are threefold. (i) We propose a shape-interpretable visual self-modeling framework that enables a continuum robot to autonomously learn its own shape dynamics directly from multi-view visual observations, without requiring analytical models, physical markers, or camera calibration. (ii) We develop a geometry-aware shape-position control strategy that explicitly exploits the learned shape representation to regulate body deformation, supporting flexible behaviors such as obstacle avoidance and self-motion. (iii) We validate the effectiveness of the proposed approach through comprehensive experiments on a cable-driven contin-uum robot, demonstrating accurate shape-position regulation, reliable environment interaction, and clear performance ad-vantages over a representative vision-based end-to-end control method. II. P RELIMINARY 
+
+This section presents essential background knowledge on the shape-position dynamics of continuum robots and B´ ezier curve for shape characterization. 
+
+A. Shape-Position Dynamics 
+
+For a continuum robot with m actuators, its shape dynamics can be formulated as 
+
+˙xs(t) = fs(xs(t), u(t)) (1) where xs(t) ∈ Rk denotes a k-dimensional shape state vector of the robot at time t, which is obtained by encoding robot images from different views, ˙xs(t) represents the first-order time derivative of xs(t), u(t) ∈ Rm is the actuation input vector, and fs is a nonlinear function that characterizes the shape dynamics. Likewise, its end-effector dynamics is typically formulated as 
+
+˙xp(t) = fp(xp(t), u(t)) (2) where xp(t) ∈ Rn denotes the end-effector state (which corresponds to the end-effector position in this work) in the n-dimensional task space, ˙xp(t) represents the first-order time derivative of xp(t), and fp is a nonlinear function that characterizes the end-effector dynamics. The objective of this work is to identify an appropriate method for encoding the three-dimensional shape of the robot to facilitate visual shape-dynamics self-modeling, and to learn the aforementioned unknown shape dynamics (1) and end-effector dynamics (2), thereby enabling the design of a hybrid shape-position control strategy. 
+
+B. B´ ezier Curve 
+
+This paper attempts to determine a unique three-dimensional configuration of continuum robots using their multi-view pla-nar images. The planar shape of a continuum robot is typically represented as a piecewise curve. To describe the shape of the continuum robot in the plane, B´ ezier curves are adopted in this work due to their explicit geometric interpretation and simple polynomial form. As illustrated in Fig. 2, the curve shape can be directly controlled by only a few control points [36], which facilitates intuitive modeling and efficient enforcement of continuity constraints between adjacent seg-ments, making B´ ezier curves particularly suitable for compact and interpretable modeling of planar multi-segment curves. Consider a planar curve to be represented by M quadratic B´ ezier segments, each defined on a local parameter s ∈ [0 , 1] .4𝐩𝐩 0
+
+𝐩𝐩 1
+
+𝐩𝐩 2
+
+𝐩𝐩 3
+
+𝐩𝐩 4𝐩𝐩 5
+
+𝐩𝐩 6
+
+Control points 
+
+Bézier curve 
+
+Image space A B
+
+Color image  Grayscale image  Binary image  Clean robot image 
+
+Robot region Skeleton curve Bézier curve Shape parameters 
+
+Warning distance 
+
+Obstacle 
+
+𝐩𝐩 obs  𝐩𝐩 c
+
+Escape direction 
+
+Closest point 
+
+DC Self-modeling 
+
+Multi-view color images 
+
+Action 𝐮𝐮 (𝑡𝑡 )
+
+Position state 
+
+𝐱𝐱 p(𝑡𝑡 )
+
+Shape state 
+
+𝐱𝐱 s(𝑡𝑡 )
+
+Shape-interpretable encoding 
+
+Camera 1  Camera 2 
+
+Position sensor 
+
+Segment 1 
+
+Segment 3 
+
+Segment 2 
+
+Continuum robot 
+
+Shape-interpretable encoding 
+
+> ∫
+> ∫
+> ∫
+
+Position NODE 
+
+Loss function 
+
+𝑙𝑙 p,NN 
+
+Loss function 
+
+𝑙𝑙 s,NN 
+
+Shape NODE 
+
+> ∫
+> ∫
+> ∫
+
+Obstacle avoidance strategy 
+
+Network training  Network training 
+
+Position Jacobian �Jp(𝑡𝑡 )
+
+Shape Jacobian �Js(𝑡𝑡 )
+
+Escape velocity 𝐯𝐯 c(𝑡𝑡 )
+
+Reference position 𝐱𝐱 pd(𝑡𝑡 )
+
+Reference shape 𝐱𝐱 sd(𝑡𝑡 )
+
+Bézier Jacobian Jc(𝑡𝑡 )
+
+E
+
+Controller deployment 
+
+Position controller �̇ 𝐮𝐮 p(𝑡𝑡 )
+
+Shape controller �̇ 𝐮𝐮 s(𝑡𝑡 )
+
+Obstacle avoidance controller  ̇ 𝐮𝐮 o(𝑡𝑡 )
+
+Hybrid controller  ̇ 𝐮𝐮 (𝑡𝑡 )
+
+> View 1 View 2
+
+Experiment setup  Shape-position regulation 
+
+Shape-position tracking 
+
+Obstacle-aware regulation  Selfmotion 
+
+F
+
+Actual position 𝐱𝐱 p(𝑡𝑡 )
+
+Actual shape 
+
+𝐱𝐱 s(𝑡𝑡 )
+
+形状可解释的连续体机器人视觉自建模与形状感知的控制框架。 (a) ) 利用三段式贝塞尔曲线可拟合机器人形状并通过少量控制点的信息刻画全局形状特 征。 (b) 通过图像处理算法获取机器人区域并利用形态学操作提取机器人骨干曲线，然后利用贝塞尔曲线拟合骨干曲线，将贝塞尔曲线控制点作为形状参 数，从而实现形状可解释编码。  (c)  通过采集的形状、位置、驱动信息训练位置 NODE 和形状 NODE ，从而实现形状位置自建模。  (d) 当环境障碍位于警 告距离以内时激活避障功能，向机器人躯体上离障碍最近的点施加反向逃逸速度，并将该点逃逸速度映射为整体形状的变化趋势，从而利用形状控制实 现避障的策略。  (e) 利用位置 NODE 和形状 NODE 可以估算机器人位置雅可比和形状雅可比，将位置控制器、形状控制器和避障控制器融合得到混合控 制器。 (f) 所提出的控制框架在三段式连续体机器人上得到验证，该框架可以用于执行形状位置调节、跟踪、障碍感知的调节和自运动等任务。 
+
+Fig. 2. Shape-interpretable visual self-modeling and geometry-aware control framework for continuum robots. (A) The robot shape is represented using a piecewise B´ ezier curve, which captures global shape characteristics with a small number of control points. (B) The robot region is first extracted using image processing techniques, and the skeleton curve is obtained via morphological operations. The skeleton is then fitted by B´ ezier curves, and the resulting control points are used as shape parameters, enabling an interpretable shape encoding. (C) Position NODE and shape NODE models are trained using the collected shape, position, and actuation data to achieve shape-position self-modeling. (D) When an environmental obstacle enters a predefined warning distance, the obstacle avoidance mechanism is activated. A repulsive escape velocity is applied at the point on the robot body closest to the obstacle, and this local escape velocity is mapped to a global shape variation, thereby realizing obstacle avoidance through shape control. (E) The trained position NODE and shape NODE are used to estimate the position Jacobian and shape Jacobian, respectively. A hybrid controller is then constructed by integrating the position controller, shape controller, and obstacle avoidance controller. (F) The proposed control framework is validated on a three-segment continuum robot and is capable of performing shape-position regulation, shape-position tracking, obstacle-aware regulation, and self-motion tasks. 5
+
+A single quadratic B´ ezier curve is defined by three control points p0, p1, p2 ∈ R2, and is parameterized as 
+
+b(s) = (1 − s)2p0 + 2(1 − s)sp1 + s2p2 (3) where b(s) describes the planar coordinates of an arbitrary point on the curve with s = 0 and s = 1 corresponding to the strat point p0 and the end point p2, respectively. Accordingly, for an M -segment B´ ezier curve, the i-th segment is defined by 
+
+bi(s) = (1 − s)2p2i + 2(1 − s)sp2i+1 + s2p2i+2 (4) where i = 0 , · · · , M − 1.III. M ETHOD 
+
+This section elaborates the proposed method for visual shape-dynamics self-modeling and hybrid shape-position con-trol of continuum robots. 
+
+A. Shape Encoding 
+
+In this work, the complex planar configuration of the robot is parameterized using a small number of control points. There-fore, the first challenge is how to encode a two-dimensional image into control-point coordinates. As illustrated in Fig. 2, the color image is first converted into a grayscale image and then binarized. For simplicity, we assume that the binarization results for the robot region and the background are opposite, and that the robot region corresponds to the largest connected foreground component. Under this assumption, the image can be filtered to retain only the robot region. Then, a morpho-logical closing operation is applied to obtain a clean robot region. Alternatively, more advanced semantic segmentation algorithms could be employed to directly identify the robot region and remove this assumption, which is, however, not the focus of this work. Next, a thinning operation is performed to extract the skeleton curve of the robot region [39]. These steps can be easily implemented using the relevant functions available in MATLAB. Subsequently, the skeleton curve is fitted using a B´ ezier curve via a least-squares approach, from which the control-point coordinates are obtained. The skeleton can be repre-sented by an ordered set of points Q = {qj ∈ R2|j =1, · · · , N }, where qj denotes the coordinate of j-th pixel representing the skeleton in the image space. We take a three-segment B´ ezier curve as an example to illustrate how to fit the robot skeleton curve. This procedure can be easily extended to cases with fewer or more segments. According to the definition of quadratic B´ ezier curve (4), a three-segment quadratic B´ ezier curve is fully determined by seven control points {pj ∈ R2|j = 0 , · · · , 6}. The point set Q is uniformly divided into three ordered subsets Q = Q1 ∪ Q 2 ∪ Q 3, each corresponding to one B´ ezier segment. The endpoint control points are directly determined from the data: 
+
+p0 = Q(1) 1 , p2 = Q(end) 1 , p4 = Q(end) 2 , p6 = Q(end) 3 (5) where Q(1) 1 denotes the first point of the first subset, Q(end) 1 ,
+
+Q(end) 2 and Q(end) 3 denote the last points of the three subsets, respectively. For each quadratic B´ ezier segment, only the intermediate control point is unknown. Consider the generic segment defined by (4), where p2i and p2i+2 are known endpoints, and p2i+1 is the intermediate control point to be estimated. Given the corresponding skeleton points Qi =
+
+{qij }ni 
+
+> j=1
+
+of the i-th segment, where qij is the j-th skeleton point in the i-th segment and ni is the number of skeleton points in the segment, a normalized parameter is assigned as 
+
+sj = j − 1
+
+ni − 1 , j = 1 , · · · , n i. (6) Rearranging the B´ ezier equation yields a linear relation with respect to p2i+1 :
+
+2(1 − sj )sj p2i+1 = qij − (1 − sj )2p2i − s2 
+
+> j
+
+p2i+2 
+
+| {z }
+
+> rj
+
+. (7) Stacking all skeleton points of the i-th segment leads to a linear least-squares problem: 
+
+min 
+
+> p2i+1
+> ni
+
+X
+
+> j=1
+
+∥2(1 − sj )sj p2i+1 − rj ∥2. (8) The optimal intermediate control point p2i+1 is obtained by solving this linear least-squares problem. Applying this procedure independently to the three segments yields the control points p1, p3 and p5.After fitting the robot shape using B´ ezier curves and ob-taining the control-point coordinates, the next issue is how to define the shape parameter vector xs. As shown in Fig. 2, the starting point p0 corresponding to the robot base is fixed. therefore, only the remaining control points need to be con-sidered as dynamic variables. Accordingly, the planar shape feature matrix of a robot image is defined as the concatenation of the coordinate vectors of the remaining control points: 
+
+S = [ p1, · · · , p2M ] ∈ R2×2M . (9) Since the three-dimensional shape of the robot is uniquely determined in this work using planar images from K different views, the robot’s three-dimensional shape feature can be represented by 
+
+¯S = [ S1, · · · , SK ]T ∈ R2M K ×2 (10) where S1 and SK denote the planar shape feature matrices of the robot obtained from view 1 and view K, respectively. Finally, the three-dimensional shape feature vector of the robot can be expressed as 
+
+xs = vec( ¯S) ∈ R4M K (11) where vec( ·) denotes the vectorization operation that stacks the columns of a matrix into a single vector. Since a minimum of two views is sufficient to uniquely determine the robot’s three-dimensional shape, we set K = 2 in this study. In practical applications, additional views can be incorporated to address occlusions or limited visibility in certain views, thereby enhancing the robustness of the proposed method. Through the above procedure, robot images captured from different views can be encoded into a shape feature vector, which facilitates subsequent learning and control. 6
+
+B. Data-Driven Self-Modeling 
+
+We next introduce how the robot’s shape dynamics and position dynamics can be learned in a data-driven manner. This work primarily adopts neural ordinary differential equations (NODEs) to achieve self-modeling. Existing studies have demonstrated that this framework is more data-efficient [19], [21], requiring much fewer training samples, than traditional neural network-based approaches [11] or the more recently developed Koopman-operator-based methods [14], which is particularly advantageous for learning high-dimensional shape features. To model the shape dynamics (1), a time-dependent neural network (NN) is utilized to solve the following initial value problem: 
+
+
+
+∂xs(t)
+
+∂t = fs, NN (xs(t), u(t), t ), t ≥ t0
+
+xs(t0) = xs,0
+
+u(t0) = u0
+
+(12) where fs,NN is the NN-based approximation of fs, xs,0 and 
+
+u0 are initial values of xs(t) and u(t) at the initial time t0,respectively. Given that we have the knowledge of fs,NN and initial values, the estimated solution to the unknown shape dynamics (1) at any time instant t+ ≥ t0 is computed as 
+
+ˆxs(t+) = xs(t0) + 
+
+Z t+
+
+> t0
+
+fs,NN (xs(t), u(t), t )d t (13) which can be computed using standard numerical ordinary differential equation solvers (ODES) like the Runge-Kutta or Adams-Bashforth families of algorithms [19]. Therefore, the estimated solution is also denoted as 
+
+ˆxs(t+) = ODES  fs,NN , xs(t0), u(t0), [t0, t +] . (14) To train the neural network fs,NN , the loss function is defined as 
+
+ls,NN = ∥ˆxs(t+) − xs(t+)∥. (15) To perform the training, we need to collect data pairs of the form {xs(t0), u(t0), xs(t+)}. For simplicity, we assume that the control input u(t) remains constant over a small time interval [t0, t +].Likewise, the estimated solution to the unknown end-effector dynamics (2) at any time instant t+ ≥ t0 is computed as 
+
+ˆxp(t+) = ODES  fp,NN , xp(t0), u(t0), [t0, t +] (16) where fp,NN is the NN-based approximation of fp. To train the neural network fp,NN , the loss function is defined as 
+
+lp,NN = ∥ˆxp(t+) − xp(t+)∥. (17) 
+
+C. Jacobian-Based Shape-Position Hybrid Controller 
+
+We next address the problem of hybrid shape-position control, starting with shape control. Given a reference shape state xds (t), the shape control error is defined as es(t) =
+
+xds (t) − xs(t). We require the error dynamics to satisfy 
+
+˙es(t) + λses(t) = 0 (18) where λs > 0 is a constant parameter. The above condition implies that the error es(t) converges to zero exponentially. Substituting the error function into (18) yields 
+
+˙xds (t) − ˙xs(t) + λs
+
+ xds (t) − xs(t) = 0. (19) To derive the controller and obtain an explicit expression for the actuation input, we also approximate the shape dynamics using a first-order Jacobian-based model: 
+
+˙xs(t) = Js(t) ˙ u(t) (20) where Js(t) = ∂xs(t)/∂ u(t) is the shape-state Jacobian of the continuum robot. Substituting (20) into (19) leads to the shape controller: 
+
+˙us(t) = J† 
+
+> s
+
+(t)   ˙xds (t) + λs
+
+ xds (t) − xs(t) (21) where J† 
+
+> s
+
+(t) denotes the pseudo-inverse of Js(t).For the end-effector position control problem, given a refer-ence position state xdp(t), the position control error is defined as ep(t) = xdp(t) − xp(t). Following the above procedure for shape control, we obtain the following position controller 
+
+˙up(t) = J†
+
+> p
+
+(t)   ˙xdp(t) + λp
+
+ xdp(t) − xp(t) . (22) where Jp(t) is the position Jacobian of the robot and λp > 0
+
+is also a constant parameter. For the above shape and position controllers, the reference shape and position are typically specified by the user, whereas the shape-state Jacobian and the position Jacobian remain un-known because the analytical model of the robot is unavailable. Our objective is therefore to estimate the Jacobian matrices based on the self-modeling results. Specifically, according to its definition, the estimation of the j-th column of the shape-state Jacobian can be expressed as 
+
+ˆJ(j)s (t) = ∆xs
+
+2∆ u = x+s − x−
+
+> s
+
+2∆ u (23) where ∆u > 0 is a sufficiently small incremental amount, 
+
+x+s = ODES ( fs,NN , xs(t), u(t) + Ej ∆u, [t, t +]) and x− 
+
+> s
+
+=ODES ( fs,NN , xs(t), u(t) − Ej ∆u, [t, t +]) with Ej being a vector where the j-th element is 1 and all other elements are 0. Similarly, the estimation of the j-th column of the position Jacobian can be expressed as 
+
+ˆJ(j)p (t) = ∆xp
+
+2∆ u = x+p − x−
+
+> p
+
+2∆ u (24) where x+p = ODES ( fp,NN , xp(t), u(t) + Ej ∆u, [t, t +]) and 
+
+x− 
+
+> p
+
+= ODES ( fp,NN , xp(t), u(t) − Ej ∆u, [t, t +]) . Therefore, the estimated shape Jacobian and position Jacobian are, re-spectively, obtained as 
+
+ˆJs(t) = 
+
+hˆJ(1) s (t), · · · , ˆJ(m)s (t)
+
+i
+
+(25) and ˆJp(t) = 
+
+hˆJ(1) p (t), · · · , ˆJ(m)p (t)
+
+i
+
+. (26) Finally, by combining (21) and (22), we propose the fol-lowing shape-position hybrid controller 
+
+˙u(t) = ˆ˙us(t) + ˆ˙up(t) (27) where ˆ˙us(t) and ˆ˙up(t) are obtained by replacing the shape-state Jacobian in (21) and the position Jacobian in (22) with 
+
+ˆJs(t) and ˆJp(t), respectively. 7
+
+D. Obstacle Avoidance Strategy 
+
+As shown in Fig. 2, the position of the obstacle is denoted by pobs (t). Using the fitted B´ ezier curve, we then identify the point pc(t) on the curve that is closest to the obstacle. For computational convenience, the B´ ezier curve is uniformly discretized into K points O(t) = {o1(t), · · · , oK (t)} where the values of these points are calculated based on (4), yielding 
+
+pc(t) = arg min  
+
+> oj(t)∈O (t)
+
+∥oj (t) − pobs (t)∥2. (28) When the distance d(t) = ∥pc(t) − pobs (t)∥2 between the obstacle and the closest point falls below a predefined warning distance dw, the obstacle avoidance function is activated. In this case, our strategy is to apply the following escape velocity to the closest point: 
+
+vc(t) = pc(t) − pobs (t)
+
+∥pc(t) − pobs (t)∥2
+
+(29) which drives the point in the direction opposite to the obstacle until the distance d(t) exceeds the warning threshold dw. To induce motion of the closest point along the escape direction, it is necessary to determine the required rate of change of the robot’s shape state (i.e., the control points). To this end, we define a B´ ezier Jacobian matrix associated with the closet point: 
+
+Jc(t) = ∂xs(t)
+
+∂pc(t) (30) which can be computed directly from the definition of the B´ ezier curve (4). Consequently, the escape velocity of the shape state can be obtained as follows: 
+
+vs(t) = Jc(t)vc(t) (31) which further leads to the following escape controller: 
+
+˙ue(t) = α(dw − d(t)) ˆJs(t)vs(t) (32) where α > 0 is a paremeter used to balance obstacle avoidance and shape-position control. In the above formulation, only the escape velocity from a single view is considered. Since this work addresses three-dimensional shape control, we next propose the obstacle-avoidance controller considering escape controllers of two different views: 
+
+˙uo(t) = 
+
+
+
+˙u(1) e (t), if d1(t) > d 2(t)˙u(2) e (t), else (33) where ˙u(1) e (t) denotes the escape controller from view 1, d1(t)
+
+is the distance between the obstacle and the closest point from view 1, ˙u(2) e (t) is the escape controller from view 2, and d2(t)
+
+is the distance between the obstacle and the closest point from view 2. Finally, the overall controller that integrates shape-position control and obstacle avoidance is given as follows: 
+
+˙u(t) = 
+
+
+
+ˆ˙us(t) + ˆ˙up(t), if d1(t) > d w or d2(t) > d w
+
+˙uo(t) + ˆ˙up(t), else 
+
+.
+
+(34) One can also directly add the escape controllers from the two views to construct the obstacle avoidance controller. How-ever, this strategy may slow down the execution of the primary shape-position control task, since the controller must ensure that the robot in both views moves away from the obstacle before resuming the main task. In contrast, the obstacle-avoidance controller (33) only requires the robot in one view to escape beyond the warning distance in order to continue executing the primary task. IV. R ESULTS 
+
+In this section, we introduce the continuum robot platform used for method evaluation. We then assess the performance of our approach across four different tasks: shape-position regula-tion, shape-position tracking, shape-position regulation in the presence of obstacles, and robot self-motion, and compare it with a representative vision-based data-driven control method. 
+
+A. Experimental Platform 
+
+The experimental validation platform used in this work is illustrated in Fig. 2(F). It consists of a cable-driven, three-segment, fixed-length backbone continuum robot with a total length of 0.3 m, where the bending of each segment is actuated by four servo motors. Since the backbone length of the robot is fixed, the two opposing actuation cables within each segment are coupled, i.e., when one cable is pulled, the other is released. The proposed controller is implemented in MATLAB, and the control commands are transmitted to the motors via an Arduino Mega 2560 development board. Two monocular cameras from different views (each costing only USD 11) are employed to capture images of the robot, with the image resolution set to 256 × 256 . For end-effector position measurement, a MicronTracker H3-60 system is used to track a marker attached to the robot tip. The robot is commanded to explore its workspace to collect 1000 data samples, which are used to train the NODE models. 
+
+B. Task 1: Shape-Position Regulation 
+
+We first consider the shape-position regulation task, in which the robot is driven to reach a specified shape state and end-effector position using the proposed shape-position con-troller (27). As shown in Fig. 3(A), the red solid curves denote the reference shapes, while the blue dashed curves represent the robot’s actual shapes at different time instants (i.e., the results of B´ ezier curve fitting). The reference shapes from two different views (View 1 and View 2) uniquely determine the robot’s three-dimensional shape. It can be observed that, in both views, the actual robot shapes smoothly converge to the reference shapes. As illustrated in Fig. 3(B), the end effector simultaneously moves from its initial position to the reference position. Figs. 3(C) and 3(D) show that both the shape state error and the end-effector position error converge to nearly zero within the first 6 s. At the end of the task (i.e., at 10 s), the maximum shape error is 4 pixels (1.56% of the image resolution), and the maximum position error is 0.003 m (1% of the total robot length). 8View 1 View 2 
+
+Time 0 s  1 s  2 s  3 s  4 s  5 s  6 s  7 s 
+
+A
+
+CB D
+
+E
+
+本文方法实现连续体机器人形状 /位置调节实验结果。 (a)  所提出的 NODE -ZNN 方法调节机器人至期望形状和末端位置地过程中两个视角的实验截图。 
+
+(b) 机器人末端位置从起始点移动至参考点。  (c)  形状状态调节误差收敛至零。  (d) 末端位置调节误差收敛至零。  (e) 四组不同的性状 /位置调节任务均顺 
+
+利完成。 
+
+Reference shape  Actual shape 
+
+View 1 
+
+View 2 
+
+View 1 
+
+View 2 
+
+View 1 
+
+View 2 
+
+View 1 
+
+View 2 
+
+Fig. 3. Experimental results of continuum robot shape-position regulation using the proposed method. (A) Experimental snapshots from two different views during the process in which the proposed method regulates the robot to the reference shape and end-effector position. (B) The robot end-effector moves from the initial position to the reference position. (C) Convergence of the shape-state regulation error to zero. (D) Convergence of the end-effector position regulation error to zero. (E) Four different shape-position regulation tasks are all successfully accomplished. 9View 1       
+
+> Reference shape Actual shape
+> View 1 View 2
+> Time 5 s 10 s 15 s 20 s 25 s 30 s
+
+A B
+
+DCView 2 
+
+E F   
+
+> 本文方法实现连续体机器人形状 /位置同时跟踪控制实验结果。 (a ）跟踪无穷大形状末端轨迹过程中两个视角的实验截图及机器人形状。（ b）跟踪无穷 大形状末端轨迹过程中机器人末端位置变化。 (c) 跟踪 8形状末端轨迹过程中两个视角的实验截图及机器人形状。 (d) 跟踪 8形状末端轨迹过程中机器人末 端位置变化。 (d) 跟踪控制过程中不同视角的形状误差分布。 (e) 跟踪控制过程中不同坐标轴的误差分布。
+> Fig. 4. Experimental results of simultaneous shape-position tracking control of a continuum robot using the proposed method. (A) Experimental snapshots from two different views during tracking of the ∞-shaped end-effector trajectory. (B) Profile of the robot end-effector trajectory during tracking of the
+> ∞-shaped trajectory. (C) Experimental snapshots from two different views during tracking of the 8-shaped end-effector trajectory. (D) Profile of the robot end-effector trajectory during tracking of the 8-shaped trajectory. (E) Distribution of shape tracking errors from different views. (F) Distribution of tracking errors along different coordinate axes.
+
+To further validate the proposed method, four sets of reference shapes and positions are randomly selected within the robot task space, as shown in Fig. 3(E). In all cases, the proposed approach successfully drives the robot to the reference shapes and positions within 10 s. In this work, the shape controller and the position controller are directly added. For scenarios where task priority must be considered (e.g., when position control has a higher priority), a hierarchical hybrid controller with task prioritization can be designed using the null space of the Jacobian matrix [40]. Such extensions are beyond the scope of this paper. 
+
+C. Task 2: Shape-Position Tracking 
+
+We next consider the shape-position tracking task, in which the robot is required to track time-varying reference shapes and end-effector positions using the proposed shape-position controller (27). Two sets of shape-position tracking tasks are evaluated. In the first set, the end-effector follows the ∞-shaped trajectory, while in the second set it follows the 8-shaped trajectory. The total duration of each task is 30 s. As shown in Fig. 4(A), for the ∞-shaped trajectory, the actual robot shapes observed from the two different views remain consistent with the reference shapes throughout the task. As illustrated in Fig. 4(B), the actual end-effector trajec-tory closely follows the reference trajectory. Similar results are obtained for the 8-shaped trajectory tracking task, as shown in Figs. 4(C) and 4(D). The statistical results of the shape tracking errors and end-effector position errors for both tasks are presented in Figs. 4(E) and 4(F). It can be observed that, across different tasks and views, the distributions of shape tracking errors are highly consistent, with no significant differences. The maximum shape error does not exceed 2.5 pixels (i.e., less than 1% of the image resolution). For the two tasks, the distributions of end-effector position errors are also similar. However, noticeable differences can be observed among dif-ferent coordinate axes. This is mainly because the Y-axis of 10 0 5 10 15 
+
+Time (s)                 
+
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> Obstacle distance  (pixel ) Minimum visual distance
+> Warning distance
+> Collision distance
+> 0510 15
+> Time (s)
+> -100
+> -50
+> 0
+> 50
+> 100
+> Shape state error  (pixel )
+> 0510 15
+> Time (s)
+> -0.15
+> -0.1
+> -0.05
+> 0
+> 0.05
+> 0.1
+> 0.15
+> Position error  (m)
+> X-axis
+> Y-axis
+> Z-axis
+> Time
+> I
+> II III IV V
+> VI
+> Obstacle avoidance activated
+> Reference shape Actual shape
+> View 1 View 2
+> III III IV VVI
+> Keep distance from the obstacle
+> Move toward the reference shape
+> Move to the reference shape
+> Obstacle
+
+A B
+
+DC E
+
+> View 1 View 2
+
+F           
+
+> Dynamic obstacle
+> Dynamic obstacle Start position of the obstacle
+> Keep distance from the obstacle
+> Keep end-effector position unchanged
+> Keep end-effector position unchanged
+> Time 0 s 3 s 6 s 9 s 12 s 15 s 18 s 20 s
+> 本文方法实现连续体机器人在有障碍物环境中实现形状 /控制实验结果。 (a ）有障碍环境形状 /位置调节实验中两个视角的实验截图及机器人形状。（ b）有障碍环境形状 /位置调节实验中机器人末端位置变化。 (c) 机器人躯体与障碍物的最小视觉距离。 (d) 有障碍环境形状 /位置调节实验中形状状态误差。
+> (d) 有障碍环境形状 /位置调节实验中末端位置误差。 (e) 机器人在保持末端位置不变的同时利用形状控制来规避环境中的动态障碍。
+
+Fig. 5. Experimental results of shape-position control of a continuum robot in an environment with obstacle using the proposed method. (A) Experimental snapshots from two different views during shape-position regulation in the obstacle environment. (B) Evolution of the robot end-effector position during the shape-position regulation task in the presence of obstacle. (C) Minimum visual distance between the robot body and the obstacle. (D) Shape-state regulation error during the shape-position regulation task in the obstacle environment. (E) End-effector position regulation error during the shape-position regulation task in the obstacle environment. (F) The robot avoids a dynamic obstacle by shape control while keeping the end-effector position unchanged. 
+
+the coordinate frame is aligned with the vertically downward direction of the robot. Since the backbone length of the robot is fixed, its range of motion along this axis is relatively limited, resulting in smaller tracking errors compared to the other two axes. Nevertheless, the average position tracking error along the other two axes is approximately 0.003 m (1% of the robot length), and the maximum error does not exceed 0.006 m (2% of the robot length). 
+
+D. Task 3: Obstacle-Aware Shape-Position Regulation 
+
+The proposed framework not only enables the robot to reach the desired whole-body shape and end-effector position, but also allows additional functionalities to be realized through shape control. In this paper, obstacle avoidance is taken as an illustrative example to introduce the corresponding strategy. We evaluate the performance of the controller (34) in a shape-position regulation task under the presence of environ-mental obstacles. Specifically, the controller is required to regulate the robot toward the reference shape and end-effector position while exploiting shape control to avoid an obstacle. The underlying principle of the obstacle avoidance strategy is that as long as the robot body in at least one view (or both views) does not collide with the obstacle, it can be ensured that the robot does not collide with the obstacle in three-dimensional space. Figs. 5(A) and 5(B) respectively illustrate the evolution of the robot shape and the end-effector position during task exe-11 
+
+cution. Fig. 5(C) shows the minimum visual distance between the robot and the obstacle. It can be observed that during phase I-II, the visual distance remains larger than the warning distance, and the obstacle avoidance function is not activated. The robot therefore moves toward the reference shape and end-effector position. Around time instants II, III, IV, and V, the minimum visual distance falls below the warning distance, triggering the obstacle avoidance mechanism. During phase II-V, the robot in View 1 continues to approach the reference shape normally, whereas in View 2, the obstacle avoidance controller applies an opposing escape velocity, ensuring that the robot body maintains a safe distance from the obstacle. During phase V-VI, since the robot body in View 1 is sufficiently far from the obstacle (i.e., beyond the warning distance), the robot in View 2 resumes moving toward the reference shape. Ultimately, the robot successfully reaches the reference shape and end-effector position while effectively avoiding the obstacle. As shown in Figs. 5(D) and 5(E), both the shape state error and the end-effector position error converge to zero. 
+
+E. Task 4: Shape-Position Control for Self-Motion 
+
+The final task is robot self-motion, in which the proposed controller (34) is used to adjust the robot’s shape while keeping the end-effector position fixed. As shown in Fig. 5(F), a dynamic obstacle approaching the robot body is considered. In both views, the red obstacle starts from its initial position and moves to the right. It can be observed that, as the obstacle approaches the robot, the obstacle avoidance function is activated, and the robot gradually adapts its shape. Although an overlap between the obstacle and the robot is observed in View 1, the robot body in View 2 always maintains a safe distance from the obstacle, indicating that no collision occurs in three-dimensional space. More importantly, in both views, the robot end effector remains within the yellow region without noticeable deviation. These results demonstrate that the robot successfully accomplishes the self-motion task. 
+
+F. Comparison 
+
+Finally, we quantitatively compare the proposed method with the deep visual inverse kinematic (DVIK) approach proposed by Almanzor et al. [22], as both methods are data-driven and based on visual images. Since the DVIK method only addresses shape control, we compare it with the shape controller proposed in this work. Both methods are used to drive the robot toward the same reference shape. Because the DVIK method performs planar two-dimensional shape control, only the images from View 1 are used for control, while the results from View 2 are used solely for comparative analysis. As shown in Fig. 6(A), the proposed method enables the robot shapes observed from both views to converge to the reference shape. Although the DVIK method can drive the robot to the reference shape in View 1, it is inherently a single-view control approach. As a result, apparent discrepancy between the actual and reference shapes can be observed in View 2. In the worst case, single-view control may lead to substantial errors in the other view due to the non-unique mapping between planar observations and the three-dimensional robot shape. Figs. 6(B) and 6(C) illustrate the shape state errors for the two methods, showing that the proposed method achieves a significantly smaller steady-state error than the DVIK ap-proach. To further ensure the reliability of the comparison, we randomly select 12 different reference shape states to evaluate both methods, and the statistical results are summarized in Fig. 6(D). It can be seen that the proposed method yields similar error distributions across the two views. In contrast, the DVIK method exhibits larger errors in View 1 compared to the proposed method, and, more importantly, the errors observed in View 2 are significantly higher than those in View 1. We also evaluate the performance of both methods in the presence of an environmental obstacle, as shown in Fig. 6(E). As expected, the proposed method is able to regulate the robot to the reference shape while simultaneously avoiding the obstacle in the environment. In contrast, the DVIK method causes the robot to collide with the obstacle during the shape regulation process, since it is designed for obstacle-free environments and cannot exploit shape control to actively perform obstacle avoidance. The reasons for selecting the DVIK method for quantitative comparison are as follows. First, model-based approaches require explicit physical knowledge to construct analytical models, whereas the proposed method does not rely on any prior assumptions or physical modeling. Second, shape control methods based on discrete point representations typically involve substantially different hardware setups and sensing requirements compared to our approach. These methods often require a large number of markers or sensors distributed along the robot body to enable shape control, while our method achieves shape control purely from visual observations without such instrumentation. As a result, a strict and fair comparison with these approaches is not feasible. In contrast, the DVIK method closely matches our experimental setup. It is a data-driven approach that does not depend on physical models or body-mounted markers and relies solely on visual images of the robot to achieve control. Although a recent general controller is also capable of image-based shape control [38], it primarily focuses on improving adaptability across differ-ent tasks and perturbations. Similar to DVIK, the general controller is also based on a single-view visual input and does not provide an interpretable representation of the robot shape. By contrast, the proposed method explicitly emphasizes shape interpretability, which enables the effective exploitation of shape control for more complex behaviors, such as obstacle avoidance and self-motion. V. D ISCUSSION AND CONCLUSION 
+
+This paper proposes a novel shape-interpretable visual self-modeling framework for continuum robots, enabling hybrid shape-position control without requiring analytical kinematic or dynamic models. By encoding robot shapes from multi-view planar images with B´ ezier-based shape parameterization and learning both shape and position dynamics using neural or-dinary differential equations, the proposed approach achieves 12 Reference shape  Actual shape         
+
+> View 1 View 2
+> Time 0 s 3 s 6 s 9 s Time 0 s 3 s 6 s 9 s
+> Ours DVIK
+
+A
+
+CB        
+
+> 连续体机器人形状调节对比实验结果。 (a) 所提出的 NODE -ZNN 方法和对比的 DVIK 方法调节机器人形状的实验截图，所提出的方法可确保两个不同视
+> 角(View1 和View 2) 中的机器人都被调节至期望形状，而 DVIK 方法由于是平面形状控制方法，它只能确保视角 1内机器人被调节至期望形状，而视角 2
+> 中参考形状与机器人实际形状存在明显的偏差。 (b) 本文方法的形状状态调节误差变化。 (c)DVIK 方法的形状状态调节误差变化。 (d) 十二组不同参考形
+> 状调节任务的误差统计结果，可以看到本文方法在两个不同视角取得的误差分布基本一致且均小于 DVIK 方法在视角 1的误差，另外由于 DVIK 方法是平面
+> 形状调节方法（在本文对比中其仅关注视角 1），该方法在视角 2的误差更大且误差分布与视角 1存在显著不同。 (e) 在有障碍物环境中的形状调节结果。
+> 由于本文利用参数化贝塞尔曲线刻画机器人形状，在形状调节任务中可以同时利用曲线状态信息来改进控制器从而实现规避环境障碍，而 DVIK 方法无
+> 法实现避障导致机器人与障碍物的碰撞。
+> Keep distance from the obstacle
+> View 1 View 2
+> Time Time
+
+E  
+
+> Obstacle Collide with the obstacle
+> Ours DVIK
+
+D
+
+Fig. 6. Comparative results of shape regulation. (A) Snapshots of the robot. Our method ensures that the robot is regulated to the reference shape in two different views, whereas the DVIK method [22], being a planar shape control approach, can only guarantee that the robot in View 1 reaches the reference shape. In View 2, a clear discrepancy exists between the reference shape and the actual robot shape when using the DVIK method. (B) Shape-state error of our method. (C) Shape-state error of the DVIK method. (D) Statistical error results for 12 different shape regulation tasks. The proposed method achieves nearly identical error distributions in the two views, and these errors are consistently smaller than those of the DVIK method in View 1. Moreover, since the DVIK method performs planar shape regulation, its error in View 2 is significantly larger than that in View 1. (E) Shape regulation results in the environment with an obstacle. The proposed method can simultaneously exploit interpretable shape state information during shape regulation to improve the controller and achieve obstacle avoidance, whereas the DVIK method fails to avoid the obstacle, resulting in collisions between the robot and the obstacle. 
+
+unified modeling, geometry-aware control, and obstacle avoid-ance within a single data-driven framework. The effectiveness of the proposed framework is validated experimentally on a cable-driven, three-segment continuum robot. The results demonstrate accurate shape-position regulation and tracking, while successfully avoiding obstacles. The proposed approach offers several distinct advantages when compared with existing methods for continuum robot modeling and control. First, compared with model-based ap-proaches, the proposed framework does not rely on analytical kinematic or dynamic models. Continuum robots are charac-terized by strong nonlinearity, high redundancy, and significant parameter uncertainty, which make accurate model derivation and real-time computation extremely challenging. By leverag-ing vision-based self-modeling and data-driven learning, the proposed method avoids these modeling burdens while still achieving accurate shape-position control, thereby improving practical applicability. Second, compared with data-driven shape control methods based on discrete point measurements, such as those relying on multiple markers attached to the robot body, the proposed approach eliminates the dependence on dense physical sensing or extensive labeling. Instead of 13 
+
+tracking a large number of discrete points, robot shapes are encoded using B´ ezier curves derived directly from visual observations, resulting in a compact yet expressive shape representation. This significantly reduces system complex-ity, sensing requirements, and setup effort, while preserving sufficient geometric information for shape control. Third, compared with end-to-end vision-based data-driven control methods, the proposed approach provides several fundamental advantages. End-to-end approaches typically employ implicit latent representations, which lack explicit geometric semantics and limit their ability to reason about robot-environment interactions. In contrast, the proposed method achieves (i) an increased shape dimensionality (from planar space to 3D space) through multi-view shape encoding, (ii) an explicit, geometry-aware and control-oriented shape representation that enables direct perception of robot-environment distances, and (iii) a unified hybrid shape-position control framework that allows shape regulation to be exploited for advanced behaviors such as obstacle avoidance and self-motion. These properties make the proposed method more flexible, interpretable, and suitable for safety-critical tasks. The superior performance of the proposed method over the baseline method stems from its explicit, interpretable shape representation embedded in the data-driven control framework. Unlike end-to-end vision-based controllers, where robot shape and environment geometry remain latent, the proposed ap-proach reconstructs the robot shape using low-dimensional, continuous curve parameters, making the geometric relation-ship between the robot and surrounding obstacles directly observable. This explicit observability enables obstacle avoid-ance and self-motion to be naturally integrated into the con-trol law. Moreover, by jointly exploiting multiple views, the proposed method resolves the inherent ambiguity of single-view shape control and ensures consistency across different views. In contrast, existing methods often suffer from non-unique visual-to-shape mappings or rely on discrete, marker-based representations that lack continuity and scalability. The proposed vision-based, shape-interpretable control framework suggests a new paradigm for continuum robot control that bridges data-driven learning and geometry-aware modeling. By explicitly representing robot shape with low-dimensional, physically meaningful parameters ex-tracted from visual observations, the proposed method enables environment-aware control behaviors that go beyond conven-tional goal-reaching tasks, such as obstacle avoidance and self-motion. This elevates robot shape from a latent variable in end-to-end learning to a task-relevant and perceptually grounded control primitive. As a result, the framework provides a general and extensible foundation for safe and flexible interaction between continuum robots and complex environments, and can potentially be extended to other soft or highly deformable robotic systems. Despite its strengths, the proposed framework has several limitations that suggest directions for future research. First, the current approach relies on accurate planar image segmentation and skeleton extraction, which may be sensitive to light-ing, severe occlusion, or background complexity. Integrating advanced or adaptive vision segmentation techniques could improve robustness in unstructured environments. Second, the B´ ezier-curve-based shape representation, while compact and control-oriented, imposes smoothness and may not fully capture localized high-curvature deformations. Future work could explore adaptive or piecewise parametric representations to better describe complex shapes. Third, although multi-view planar images are used to uniquely determine 3D shape, the framework does not explicitly reconstruct the full three-dimensional configuration, limiting applications that require precise 3D perception. Extending the method to include ex-plicit 3D reconstruction from visual cues is a promising direc-tion. Finally, the current shape-position control scheme treats shape and position tasks with equal priority, which may not be optimal for scenarios with hierarchical task requirements. Incorporating task-priority frameworks, such as null-space pro-jection or weighted optimization, could enable more flexible and safe task execution. Addressing these limitations will further enhance the autonomy, adaptability, and applicability of continuum robots in complex, dynamic environments. Overall, this work presents a vision-based, shape-interpretable framework for continuum robot modeling and control. This framework provides a foundation for more autonomous, adaptable, and safe continuum robot systems, and suggests a generalizable paradigm for integrating visual perception with geometry-aware control in soft and highly deformable robotics. REFERENCES [1] Z. Xie, F. Yuan, J. Liu, L. Tian, B. Chen, Z. Fu, S. Mao, T. Jin, Y. Wang, X. He, G. Wang, Y. Mo, X. Ding, Y. Zhang, C. Laschi, and L. Wen, “Octopus-inspired sensorized soft arm for environmental interaction,”                               
+
+> Science Robotics , vol. 8, no. 84, p. eadh7852, 2023. [2] G. Qin, A. Ji, Y. Cheng, W. Zhao, H. Pan, S. Shi, and Y. Song, “A snake-inspired layer-driven continuum robot,” Soft Robotics , vol. 9, no. 4, pp. 788–797, 2022. [3] K. Ma, X. Chen, J. Zhang, Z. Xie, J. Wu, and J. Zhang, “Inspired by physical intelligence of an elephant trunk: Biomimetic soft robot with pre-programmable localized stiffness,” IEEE Robotics and Automation Letters , vol. 8, no. 5, pp. 2898–2905, 2023. [4] J. Wang, C. Hu, G. Ning, L. Ma, X. Zhang, and H. Liao, “A novel miniature spring-based continuum manipulator for minimally invasive surgery: Design and evaluation,” IEEE/ASME Transactions on Mecha-tronics , vol. 28, no. 5, pp. 2716–2727, 2023. [5] T. Wen, J. Hu, J. Zhang, X. Li, S. Kang, and N. Zhang, “Design, performance analysis, and experiments of a soft robot for rescue,”
+> Journal of Mechanisms and Robotics , vol. 16, no. 7, p. 071011, 2023. [6] Z. Yang, L. Yang, Y. Sun, and X. Chen, “A novel contact-aided continuum robotic system: Design, modeling, and validation,” IEEE Transactions on Robotics , vol. 40, pp. 3024–3043, 2024. [7] J. Chen, Q. Qiu, and J. Ji, “A soft-rigid hybrid robot-assisted feeding system with a tendon-driven continuum robot,” IEEE Robotics and Automation Letters , vol. 10, no. 12, pp. 13217–13224, 2025. [8] K. Qiu, H. Zhang, J. Zhang, R. Xiong, H. Lu, and Y. Wang, “An actuator space optimal kinematic path tracking framework for tendon-driven continuum robots: Theory, algorithm and validation,” The International Journal of Robotics Research , vol. 44, no. 6, pp. 1006–1034, 2025. [9] F. Li, H. Yang, G. Gu, Y. Wang, and H. Peng, “Position and orientation tracking control of a cable-driven tensegrity continuum robot,” IEEE Transactions on Robotics , vol. 41, pp. 1791–1811, 2025. [10] S. Lilge and J. Burgner-Kahrs, “Kinetostatic modeling of tendon-driven parallel continuum robots,” IEEE Transactions on Robotics , vol. 39, pp. 1563–1579, 2023. [11] T. G. Thuruthel, E. Falotico, M. Manti, A. Pratesi, M. Cianchetti, and C. Laschi, “Learning closed loop kinematic controllers for contin-uum manipulators in unstructured environments,” Soft Robotics , vol. 4, pp. 285–296, 2017. 14
+
+[12] M. C. Yip and D. B. Camarillo, “Model-less feedback control of con-tinuum manipulators in constrained environments,” IEEE Transactions on Robotics , vol. 30, pp. 880–889, 2014. [13] N. Tan, P. Yu, X. Wang, and K. Huang, “Behavior-predefined adaptive control for heterogeneous continuum robots,” The International Journal of Robotics Research , vol. 44, pp. 65–95, 2025. [14] D. Bruder, X. Fu, R. B. Gillespie, C. D. Remy, and R. Vasudevan, “Data-driven control of soft robots using Koopman operator theory,” 
+
+IEEE Transactions on Robotics , vol. 37, pp. 948–961, 2021. [15] B. Thamo, D. Hanley, K. Dhaliwal, and M. Khadem, “Data-driven steering of concentric tube robots in unknown environments via dynamic mode decomposition,” IEEE Robotics and Automation Letters , vol. 8, pp. 856–863, 2023. [16] J. Wang, B. Xu, J. Lai, Y. Wang, C. Hu, H. Li, and A. Song, “An improved Koopman-MPC framework for data-driven modeling and control of soft actuators,” IEEE Robotics and Automation Letters , vol. 8, pp. 616–623, 2023. [17] D. A. Haggerty, M. J. Banks, E. Kamenar, A. B. Cao, P. C. Curtis, I. Mezi´ c, and E. W. Hawkes, “Control of soft robots with inertial dynamics,” Science Robotics , p. eadd6864, 2023. [18] P. Yu and N. Tan, “On the learning-based control of continuum robots with provable robustness, efficiency, and generalizability,” The Interna-tional Journal of Robotics Research , pp. 1–20, 2025. [19] M. Kasaei, K. K. Babarahmati, Z. Li, and M. Khadem, “Data-efficient non-parametric modelling and control of an extensible soft manipula-tor,” in IEEE International Conference on Robotics and Automation ,pp. 2641–2647, IEEE, 2023. [20] M. Kasaei, F. Alambeigi, and M. Khadem, “A synergistic framework for learning shape estimation and shape-aware whole-body control policy for continuum robots,” in IEEE International Conference on Robotics and Automation , pp. 13994–14000, 2025. [21] P. Yu, Z. Liang, and N. Tan, “Data-efficient and predefined-time stable control for continuum robots,” IEEE Transactions on Robotics , vol. 42, pp. 382–399, 2026. [22] E. Almanzor, F. Ye, J. Shi, T. G. Thuruthel, H. A. Wurdemann, and F. Iida, “Static shape control of soft continuum robots using deep visual inverse kinematic models,” IEEE Transactions on Robotics , vol. 39, pp. 2973–2988, 2023. [23] P. E. Dupont, N. Simaan, H. Choset, and C. Rucker, “Continuum robots for medical interventions,” Proceedings of the IEEE , vol. 110, no. 7, pp. 847–870, 2022. [24] A. Yeshmukhametov, K. Koganezawa, Y. Yamamoto, Z. Buribayev, Z. Mukhtar, and Y. Amirgaliyev, “Development of continuum robot arm and gripper for harvesting cherry tomatoes,” Applied Sciences , vol. 12, no. 14, p. 6922, 2022. [25] K. Long, H. Parwana, G. Fainekos, B. Hoxha, H. Okamoto, and N. Atanasov, “Neural configuration distance function for continuum robot control,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pp. 358–364, 2025. [26] S. Mbakop, G. Tagne, M. H. Frouin, M. Achille, and R. Merzouki, “Inverse dynamics model-based shape control of soft continuum finger robot using parametric curve,” IEEE Robotics and Automation Letters ,vol. 6, pp. 8053–8060, 2021. [27] S. Mbakop, G. Tagne, T. Chevillon, S. V. Drakunov, and R. Mer-zouki, “PH-Gauss-Lobatto reduced-order-model for shape control of soft-continuum manipulators,” IEEE Transactions on Robotics , vol. 40, pp. 2641–2655, 2024. [28] A. Gandhi, S. S. Chiang, C. D. Onal, and B. Calli, “Shape control of variable length continuum robots using Clothoid-based visual servoing,” 
+
+IEEE International Conference on Intelligent Robots and Systems ,pp. 6379–6386, 2023. [29] B. Ouyang, Y. Liu, H. Y. Tam, and D. Sun, “Design of an interactive control system for a multisection continuum robot,” IEEE/ASME Trans-actions on Mechatronics , vol. 23, pp. 2379–2389, 2018. [30] J. Lai, K. Huang, B. Lu, and H. K. Chu, “Toward vision-based adaptive configuring of a bidirectional two-segment soft continuum manipulator,” 
+
+IEEE/ASME International Conference on Advanced Intelligent Mecha-tronics , vol. 2020-July, pp. 934–939, 2020. [31] A. Singh, J. Sun, and J. Zhao, “Controlling the shape of soft robots using the Koopman operator,” in American Control Conference , pp. 153–158, IEEE, 2023. [32] J. Hu and J. Zhang, “Shape control of a dual segment soft robot using depth vision,” International Journal of Advanced Computer Science and Applications , vol. 14, pp. 37–44, 2023. [33] Y. Shen, J. Zhang, Y. Yuan, F. Zhang, and H. Ding, “Online learning based shape control for a soft manipulator based on spatial features feedback,” IEEE Robotics and Automation Letters , vol. 9, pp. 10081– 10088, 2024. [34] Y. Cao, M. Cai, B. Sun, Z. Qi, J. Xue, Y. Jiang, B. Hao, J. Zhu, X. Liu, C. Yang, and L. Zhang, “Magnetic continuum robot with modular axial magnetization: Design, modeling, optimization, and control,” IEEE Transactions on Robotics , vol. 41, pp. 1513–1532, 2025. [35] Z. Chen, Q. Guan, J. Hughes, A. Menciassi, and C. Stefanini, “A ver-satile neural network configuration space planning and control strategy for modular soft robot arms,” IEEE Transactions on Robotics , vol. 41, pp. 4269–4282, 2025. [36] F. Xu, Y. Zhang, J. Sun, and H. Wang, “Adaptive visual servoing shape control of a soft robot manipulator using B´ ezier curve features,” 
+
+IEEE/ASME Transactions on Mechatronics , vol. 28, pp. 945–955, 2023. [37] R. M. Monteiro, J. Shi, H. Wurdemann, F. Iida, and T. G. Thuruthel, “Visuo-dynamic self-modelling of soft robotic systems,” Frontiers in Robotics and AI , vol. 11, pp. 1–14, 2024. [38] Z. Tang, L. Tian, W. Xin, Q. Wang, D. Rus, and C. Laschi, “A general soft robotic controller inspired by neuronal structural and plastic synapses that adapts to diverse arms, tasks, and perturbations,” Science Advances , vol. 12, no. 2, p. eaea3712, 2026. [39] L. Lam, S.-W. Lee, and C. Suen, “Thinning methodologies-a compre-hensive survey,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 14, no. 9, pp. 869–885, 1992. [40] Y. Yuan and W. Sun, “Continuously shaping prioritized jacobian ap-proach for hierarchical optimal control with task priority transition,” 
+
+IEEE Transactions on Robotics , vol. 41, pp. 1639–1656, 2025.

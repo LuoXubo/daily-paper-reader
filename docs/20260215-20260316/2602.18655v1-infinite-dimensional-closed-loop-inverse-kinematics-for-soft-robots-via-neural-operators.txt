@@ -1,0 +1,519 @@
+Title: Infinite-Dimensional Closed-Loop Inverse Kinematics for Soft Robots via Neural Operators
+
+URL Source: https://arxiv.org/pdf/2602.18655v1
+
+Published Time: Tue, 24 Feb 2026 01:17:52 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Infinite-Dimensional Closed-Loop Inverse Kinematics for Soft Robots via Neural Operators 
+
+Carina Veil 1, Moritz Flaschel 2, Ellen Kuhl 1, and Cosimo Della Santina 3
+
+Abstract — While kinematic inversion is a purely geometric problem for fully actuated rigid robots, it becomes extremely challenging for underactuated soft robots with infinitely many degrees of freedom. Closed-loop inverse kinematics (CLIK) schemes address this by introducing end-to-end mappings from actuation to task space for the controller to operate on, but typically assume finite dimensions of the underlying virtual configuration space. In this work, we extend CLIK to the infinite-dimensional domain to reason about the entire soft robot shape while solving tasks. We do this by composing an actuation-to-shape map with a shape-to-task map, deriving the differential end-to-end kinematics via an infinite-dimensional chain rule, and thereby obtaining a Jacobian-based CLIK algorithm. Since the actuation-to-shape mapping is rarely available in closed form, we propose to learn it from simulation data using neural operator networks, which are differentiable. We first present an analytical study on a constant-curvature segment, and then apply the neural version of the algorithm to a three-fiber soft robotic arm whose underlying model relies on morphoelasticity and active filament theory. This opens new possibilities for differentiable control of soft robots by exploiting full-body shape information in a continuous, infinite-dimensional framework. 
+
+I. I NTRODUCTION 
+
+Kinematic inversion refers to finding a feasible robot configuration such that the robot assumes a desired posi-tioning of one or more of its parts in space [1]. For a rigid manipulator, this usually translates to computing joint positions that result in a desired end-effector pose, given the geometric link parameters. This formulation, however, assumes full actuation of rigid robots. When the robot itself becomes soft and can bend and twist continuously rather than only at discrete joints, its nature-inspired flexibility opens new possibilities in navigating complex environments and interacting safely with delicate objects, yet this same property makes control in general challenging and even the usually straightforward task of kinematic inversion difficult. 
+
+Related Work. For fully actuated systems, where the degrees of actuation equal the degrees of freedom, kinematic inversion is a purely geometric problem, in which desired                           
+
+> This work was supported by the NSF CMMI Award 2318188 Mechanics of Bioinspired Soft Slender Actuators and the ERC Advanced Grant 101141626 DISCOVER. Corresponding author: Carina Veil.
+> 1C. Veil and E. Kuhl are with the Department of Mechan-ical Engineering, Stanford University, Stanford, CA 94305, USA.
+
+{cveil,ekuhl }@stanford.edu      
+
+> 2M. Flaschel is with the Institute of Applied Mechanics, Friedrich-Alexander-Universit¨ at Erlangen–N¨ urnberg, 91058 Erlangen, Germany.
+
+moritz.flaschel@fau.de                
+
+> 3C. Della Santina is with the Cognitive Robotics Department, Delft University of Technology, 2628 Delft, The Netherlands.
+
+c.dellasantina@tudelft.nl 
+
+joint configurations can be selected freely from the en-tire configuration space. Jacobian-based closed-loop inverse kinematics ( CLIK ) schemes exploit this by using feedback in task-space to map back to required joint velocities via the Jacobian inverse, avoiding the need to solve the full nonlinear inverse kinematics problem at every step [2]–[5]. However, in under-actuated systems with fewer degrees of actuation than degrees of freedom, such as soft robots, not all configurations are attainable through control action [6]. Static kinematic constraints must be enforced explicitly, typically via a numerical optimization, which is then embedded, for example, in a model predictive control fashion [7]–[10]. A compact, closed-loop form similar to the fully actuated case only becomes possible once we introduce an end-to-end kinematic mapping from the actuator inputs to the task-space output [11]: This mapping plays the role of a virtual joint-space model, like a controllable subspace, on which standard CLIK algorithms can then operate [12]–[16]. This so-called 
+
+actuator-to-task closed-loop inverse kinematics approach was formalized for underactuated mechanical systems in [17], however, still assuming finite dimensions for the underlying virtual joint space. i.e., relying on the common soft robot approximation that the shape is linearly parametrizable with a set of basis functions. But what if we want to reason on the entire (infinite-dimensional) soft robot shape while solving tasks? 
+
+Contribution. In this work, we extend CLIK to systems with infinite-dimensional shape spaces, while keeping the controller finite-dimensional through end-to-end mappings from finite actuators to finite task dimensions. To this end, we define two mappings: (i) the mapping from actuators to shape, that is, the “internal” model of the (soft) robot, (ii) the forward kinematics from an infinite-dimensional shape space to a task, whose composition yields the end-to-end forward kinematics from actuation to task. Combining the gradients of both mappings via an infinite-dimensional chain rule yields the end-to-end forward differential kinematics, and the standard Jacobian-based CLIK algorithm applies. It quickly becomes obvious that the key challenge here is that soft robots’ actuator-to-shape mappings are highly complex and often lack closed-form expressions or explicit Jacobians, so that the proposed CLIK algorithm is only practical with a 
+
+learned , differentiable model of this map. To adress this, we propose to learn the mapping from simulation data using a neural operator network , which, unlike traditional neu-ral networks, learns mappings between infinite-dimensional function spaces without fixed discretization, while providing well-defined gradients with respect to the finite-dimensional    
+
+> arXiv:2602.18655v1 [cs.RO] 20 Feb 2026 Fig. 1: (Neural) Infinite-dimensional closed-loop inverse kinematics (CLIK) : We propose an extension of finite-dimensional CLIK that allows us to reason on the whole soft robot shape while solving tasks. Since analytical expressions of the Jacobian are difficult to obtain in practice for infinite-dimensional soft robot models, we embed a neural version of the algorithm that uses the neural operator of the robot learned from simulations.
+
+inputs [18], [19]. Neural operators are a recent trend in machine learning that have found wide interest in control and (soft) robotics already, for example as surrogate models for complex dynamics and soft materials [20]–[24], or to make complex or computationally expensive control schemes either real-time feasible or differentiable [25]–[29]. For us, they enable reasoning about the full infinite-dimensional soft robot shape during tasks. 
+
+Organization. First, we review finite-dimensional CLIK for underactuated mechanical systems in Section II, and then introduce its extension to infinite-dimensional shapes in Section III. Last but not least, Section IV presents the neural version of the algorithm. II. P RELIMINARIES : (F INITE -D IMENSIONAL )CLOSED -L OOP INVERSE KINEMATICS 
+
+Before introducing our extension to infinite-dimensional closed-loop inverse kinematics, we will briefly review the finite-dimensional case and unify notations. We refer to [30] and [17] for extended clarifications. 
+
+Kinematic inversion. Intuitively, forward kinematics an-swer “If I set the robot joints to these angles, where does the tip end up?” , while kinematic inversion solves the reverse: 
+
+“Which joint angles will get my tip to the desired position?” 
+
+Formally, let q ∈ Rn be the configuration space of a mechan-ical system with n degrees of freedom. Further, let x ∈ Rp be a p-dimensional task coordinate, commonly the end-effector position and orientation, such that the robot fulfilling the tasks is expressed through the forward kinematics 
+
+Φfin : Rn → Rp, q 7 → x = Φ fin (q). (1) The goal of kinematic inversion is to, given a desired task coordinate ¯x, find a configuration ¯q such that ¯x = Φ fin (¯ q).
+
+Closed-loop inverse kinematics (CLIK). This control scheme looks for solutions of the kinematic inversion in the form of dynamical system 
+
+˙q = cIK (q, ¯x)
+
+s.t. lim  
+
+> t→∞
+
+Φfin (q(t)) = ¯ x (2) so that its equilibrium ¯q satisfies the kinematic inversion ¯x =Φfin (¯ q). A standard choice for this dynamical system that ensures exponential convergence under mild assumptions is 
+
+˙q = JΦfin (q)−1K(¯ x − Φfin (q)) (3) with positive definite gain matrix K and associated Jacobian 
+
+JΦfin , which is square and invertible for the fully actuated case with p = n. It follows from linearizing the task error 
+
+˜x = ¯x − Φfin (q) and requiring the closed-loop dynamics 
+
+˙˜x = −K ˜x in task space. Inverting through the Jacobian yields (3), which exhibits exponential convergence provided the Jacobian remains invertible. 
+
+CLIK for underactuated systems. For underactuated systems with m < n , we cannot control the n-dimensional configuration space, but we can extend the above to finding a control cIK that also respects static constraints, i.e., 
+
+˙q = cIK (q, ¯x)
+
+s.t. lim  
+
+> t→∞
+
+Φfin (q(t)) = ¯ x and lim  
+
+> t→∞
+
+q(t) ∈ E , (4) where E is the attainable equilibria set containing all con-figurations that can be reached as a steady state [17]. To realize this, we have to introduce an end-to-end mapping from actuators to task output that creates a virtual configura-tion subspace controllable by actuators on which CLIK can operate. Therefore, consider the finite-dimensional mapping 
+
+Λfin : Rm → Rn, qa 7 → q, (5) from actuation coordinates qa with m independent degrees of actuation to configuration coordinates q, such that the composed forward pseudo-kinematics that maps actuators to task variables are 
+
+(Φ ◦ Λ) fin : Rm → Rp,qa 7 → x = (Φ ◦ Λ) fin (qa). (6) Note that, here, we focus on a square inversion prob-lem where the actuation space and task space have equal dimension ( m = p), making the actuation-to-task map-ping non-redundant. The corresponding square Jacobian is 
+
+J(Φ ◦Λ) fin (qa). Then, the standard gradient-based CLIK algo-rithm is 
+
+˙qa =  J(Φ ◦Λ) fin (qa)−1 K(¯ x − (Φ ◦ Λ) fin (qa)) . (7) where a positive definite gain matrix K ∈ Rm×m ensures exponential convergence analogous to the fully actuated case. Fig. 2: Block diagram of the infinite-dimensional closed-loop in-verse kinematics (23) in actuation space qa ∈ Rm, with a square actuation-to-task mapping. Trapezoids emphasize the change in dimensionality from input to output. 
+
+III. I NFINITE -D IMENSIONAL CLOSED -L OOP INVERSE 
+
+KINEMATICS 
+
+For the infinite-dimensional analogue of (7), we introduce a general (soft) robot model via the actuation-to-shape 
+
+mapping 
+
+Λ : Rm → X, qa 7 → r = Λ( qa), (8) where X = L2([0 , 1]; R3) is a Hilbert space of square-integrable curves with respect to the normalized spatial coordinate s ∈ [0 , 1] , and equipped with the standard L2-inner product. Furthermore, r : [0 , 1] → R3 is a C1
+
+curve representing the soft robot shape in space 1. Note that we parametrize attainable shapes by actuator coordinates 
+
+qa ∈ Rm, so the attainable-equilibria manifold forms an m-dimensional submanifold of the infinite-dimensional function space X. Next, let Φ denote a p-dimensional task, i.e. the 
+
+shape-to-task mapping 
+
+Φ : X → Rp, r 7 → x = Φ( r). (9) such that the end-to-end mapping from actuation to task on which CLIK operates is the composition 
+
+Φ ◦ Λ : Rm → Rp, qa 7 → x = (Φ ◦ Λ)( qa). (10) 
+
+A. Differential Kinematics 
+
+To realize the infinite-dimensional CLIK version of (7), we need the end-to-end Jacobian JΦ◦Λ(qa) ∈ Rp×m, which is obtained via the differentials of the component mappings 
+
+Λ and Φ, connected by the chain rule. 
+
+Actuation-to-shape. The Fr´ echet derivative of Λ at qa,
+
+Λ′(qa), is a bounded linear map 
+
+Λ′(qa) : Rm 7 → X, 
+
+Λ( qa + δq a) = Λ( qa) + Λ ′(qa)[ δq a] + o(∥δq a∥), (11) that maps small changes in actuators to small changes in shape. Since our actuation is finite dimensional, the Fr´ echet derivative reduces to a linear combination of partial deriva-tives in the function space, 
+
+Λ′(qa)[ δq a] = 
+
+> m
+
+X
+
+> i=1
+
+δq a,i 
+
+∂Λ( qa)
+
+∂q a,i 
+
+, (12) 
+
+∂Λ( qa)
+
+∂q a,i 
+
+=: ∂qa,i Λ( qa) ∈ X.        
+
+> 1Normalized arc-length s∈[0 ,1] is used without loss of generality via the standard reparameterization s= ˜ s/L . The formulation also holds in
+> R2.
+
+Shape-to-task. For a perturbation v : [0 , L ] 7 → R3, define the perturbed shape rε = r+εv and the directional derivative 
+
+Φ′(r)[ v] = ddε Φ( rε) ε=0 . (13) The directional derivative Φ′(r)[ v] defines a bounded linear functional on the tangent space of admissible perturbations 
+
+v. Endowing this space with a Hilbert structure (such as 
+
+X = L2([0 , 1]; R3)) with inner product 
+
+⟨u, v ⟩L2 =
+
+Z 10
+
+u(z) · v(z)dz, (14) the Riesz representation theorem [31] ensures the existence of a unique element ∇X Φ( r) ∈ X such that 
+
+Φ′(r)[ v] = ⟨∇ X Φ( r), v ⟩X , ∀v ∈ X, (15) i.e. the L2 gradient of Φ at r.
+
+End-to-end. For the CLIK algorithm, we consider the differential end-to-end kinematics 
+
+˙x = JΦ◦Λ(qa) ˙ qa, J Φ◦Λ ∈ Rp×m. (16) For any direction ˙qa ∈ Rm, by chain rule, the derivative of this composition is 
+
+(Φ ◦ Λ) ′(qa)[ ˙ qa] =  Φ′(r)  Λ′(qa)[ ˙ qa]. (17) Together with the task differential Φ′(r)[ v] (15), this yields 
+
+(Φ ◦ Λ) ′(qa)[ ˙ qa] = ∇X Φ( r), Λ′(qa)[ ˙ qa] X (18) 
+
+= Λ′(qa)∗ ∇X Φ( r), ˙qa Rm , (19) where Λ′(qa)∗ : X → Rm is the Hilbert adjoint. Comparing this with the differential end-to-end kinematics (16), we note that the Jacobian of the composition must be 
+
+JΦ◦Λ(qa) = Λ ′(qa)∗∇X Φ(Λ( qa)) ∈ Rp×m, (20) and its i-th column is calculated as 
+
+JΦ◦Λ,:,i (qa) = ⟨∇ X Φ(Λ( qa)) , ∂ qa,i Λ( qa)⟩X , (21) 
+
+=
+
+Z L
+
+> 0
+
+∂qa,i Λ( qa)( z) · ∇ X Φ(Λ( qa))( z) dz (22) for i = 1 , 2, .., m . When p = m and JΦ◦Λ(qa) is nonsingular, following the usual steps for kinematic inversion yields the final CLIK algorithm (cf. Figure 2) 
+
+˙qa = ( JΦ◦Λ(qa)) −1 K(¯ x − (Φ ◦ Λ)( qa)) , (23a) 
+
+r = ¯ r(qa) (23b) with positive definite gain matrix K ∈ Rm×m.
+
+Proposition 1: The closed-loop kinematic inversion (23) solves (4) exponentially fast ∀K ≻ 0.
+
+Proof: First, we formulate the differential kinematics of the end-to-end mapping (16), and plug in the proposed controller (23) 
+
+˙x = JΦ◦Λ(qa) ˙ qa (24) 
+
+= JΦ◦Λ(qa) ( JΦ◦Λ(qa)) −1 K(¯ x − (Φ ◦ Λ)( qa)) (25) 
+
+= K(¯ x − (Φ ◦ Λ)( qa)) . (26) We observe that the resulting error dynamics ˙¯x − ˙x =
+
+−K(¯ x−x) is linear and converges exponentially fast to zero with the rated defined by K. Consequently, the steady state Fig. 3: While standard tasks usually focus to position the end-effector r(¯ s = 1) , the continuum nature of the soft robot invites for just reaching a target point with the closest point r(s∗) on its backbone, where s∗ is adapted in each iteration. 
+
+of (23) fulfills lim t→∞ Φ( q(t)) = ¯ x.
+
+B. Representative Tasks and Resulting Jacobians 
+
+We can think of many functionals Φ : X → Rp in the task space of a robot. The most common examples involve reaching a target or a prescribed distance from it for a specific point along the robot’s body, typically the end-effector for rigid robots. While such tasks are equally relevant for soft robots, their continuous nature invites an adaptation of this formulation: rather than requiring the end-effector to reach the target, we may instead define the task such that the point along the robot’s body closest to the target reaches it (cf. Figure 3). 
+
+Positioning tasks. Reaching a target point x0 (or time-varying x0(t)) at a fixed centerline coordinate ¯s ∈ [0 , 1] (or 
+
+¯s(t)) of the robot centerline r translates to 
+
+Φfixed pos (r) = r(¯ s) − x0. (27) However, our infinite-dimensional CLIK shines for the more expressive closest-point task, which automatically identifies the best location along the entire robot shape to reach the target. This is formulated as 
+
+Φopt pos (r) = r(s∗) − x0, (28a) where s∗ = argmin s∈[0 ,1] 
+
+12 ∥r(s) − x0∥2, (28b) meaning that the closest centerline coordinate s∗ to the target is determined through optimization at each step. The L2-gradients of the positioning tasks are 
+
+∇L2 Φfixed pos (r) = δ(s − ¯s) ∈ X, and ∇L2 Φopt pos (r) =
+
+δ(s − s∗) ∈ X, such that the Jacobians of the end-to-end mapping JΦ◦Λ ∈ R3×m have m columns 
+
+J(Φ fixed pos ◦Λ): ,i (qa) = ∂qa,i Λ( qa)(¯ s), (29) 
+
+J(Φ opt pos ◦Λ): ,i (qa) = ∂qa,i Λ( qa)( s∗), (30) i.e., only the partial derivative of the actuation-to-shape mapping at the respective s-coordinate remains. 
+
+Distance tasks. Scalar distance tasks follow the same structure. The fixed-coordinate variant minimizes squared distance from a prescribed centerline coordinate ¯s ∈ [0 , 1] Φfixed dist (r) = 12 ∥r(¯ s) − x0∥2. (31) Again, infinite-dimensional CLIK excels when minimizing the distance from the closest point on the centerline 
+
+Φopt dist (r) = min 
+
+> s∈[0 ,1]
+
+12 ∥r(s) − x0∥2, (32) where, the closest centerline coordinate s∗ directly results from the distance optimization. Assuming uniqueness and nondegeneracy of the minimizer (Infinite-dimensional Dan-skin’s Theorem, cf. Theorem 4.13 in [32]), its directional derivative follows (15) with L2-gradients ∇L2 Φfixed dist (r) = (r(s∗) − x0)δ(s − s∗) ∈ X, and ∇L2 Φopt dist (r) = ( r(s∗) −
+
+x0)δ(s − ¯s) ∈ X, such that the row Jacobians of the end-to-end mapping JΦ◦Λ ∈ R1×m have m scalar entries 
+
+J(Φ fixed dist ◦Λ) ,i (qa) = ∂qa,i Λ( qa)(¯ s)⊤ (r(¯ s) − x0), (33) 
+
+J(Φ opt dist ◦Λ) ,i (qa) = ∂qa,i Λ( qa)( s∗)⊤ (r(s∗) − x0). (34) 
+
+C. Toy Example: Constant Curvature Segment 
+
+Let us now consider an analytical example to demonstrate the infinite-dimensional CLIK algorithm. For the sake of simplicity, and almost w.l.o.g., assume a planar, inextensible robot such that the only strain is the curvature κ(s), where 
+
+s ∈ [0 , 1] is a normalized arc-length coordinate and the physical arc length is L. This leads to infinite-dimensional mapping Λκ that maps curvature functions to a backbone pose ( x, y, α ), more precisely, 
+
+Λκ(κ)( s) = 
+
+x(s)
+
+y(s)
+
+α(s)
+
+ =
+
+
+
+L R s 
+
+> 0
+
+cos( α(v)) dv L R s 
+
+> 0
+
+sin( α(v)) dv R s 
+
+> 0
+
+κ(v)dv 
+
+ . (35) Assuming a constant curvature q along the segment such that 
+
+κ(s) ≈ q, and focusing on the centerline position r(s) = [x(s), y (s)] without orientation, this simplifies to 
+
+ΛCC (q)( s) = r(s) = 
+
+" L sin( sq )
+
+> q
+
+L 1−cos( sq )
+
+> q
+
+#
+
+(36) with Jacobian 
+
+JCC (q) = L
+
+h sq cos( sq )−sin( sq ) 
+
+> q2
+> (cos( sq )−1)+ sq sin( sq )
+> q2
+
+i⊤
+
+.
+
+(37) Since the constant curvature segment has only one degree of actuation, namely this curvature itself, i.e. qa = q, we require a one dimensional task such as the scalar distance task Φfixed dist .The scalar Jacobian of the composition is then 
+
+JΦfixed dist ◦ΛCC (q) = JCC (q)(¯ s)( r(¯ s) − x0). (38) Reaching a point translates to eliminating the distance, i.e. 
+
+¯x = Φ fixed dist (¯ r) = 0 , such that the CLIK control is 
+
+˙q = −K
+
+h
+
+J(Φ fixed dist ◦ΛCC )(q)
+
+i−1
+
+Φfixed dist (Λ CC (q)) (39) with scalar weight K > 0. The same holds for the closest-point version of the task Φopt dist with s∗ instead of ¯s.Figure 4 shows simulations of such a constant curvature segment reaching a target point at a fixed backbone coordi-0.0 0.2 0.4 0.6 0.8 1.0
+
+> x
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> y
+
+Positioning the tip           
+
+> Initial Final Target Point ¯s
+> 0.00.51.0time
+> 0
+> 2curvature  q
+> 0.00.51.0time
+> 0.00
+> 0.25 task  x
+> −0.20.00.20.40.60.81.0
+> x
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> y
+
+Positioning the closest-point     
+
+> Initial Final Target Point
+> s∗
+> 0.00.51.0time
+> 0.0
+> 2.5curvature  q
+> 0.00.51.0time
+> 0.000
+> 0.025 task  x
+> s∗
+> 20
+> 40
+
+Fig. 4: Constant curvature segment: Robot evolution and time evolutions ( t ∈ [0 , 1] ) of the actuation variable q and the task variable x for the point-reaching task Φfixed pos (top) and the closest-point task Φfixed opt (bottom). 
+
+nate (the tip position in this case), as well as the closest-point task where any point on the robot should reach the target as fast as possible. In both scenarios, the scalar weight is 
+
+K = 10 and we observe exponential convergence. For the closest-point task, the optimal coordinate s∗ is continuously updated to the point nearest to the target. IV. N EURAL CLOSED -L OOP INVERSE KINEMATICS 
+
+While the previous example demonstrates how the infinite-dimensional CLIK works and what possibilities we have when being able to reason on the whole soft body shape while solving tasks, we recognize that the first of the two maps Λ is very hard to obtain in closed form in practice, especially once more complex soft robots are involved. This is why we propose to learn the soft robot model operator of the actuation-to-shape mapping Λ (8), denoted as GΛ, via 
+
+neural operator networks .
+
+A. Neural Operator Networks and Their Gradients 
+
+The universal operator theorem [33] shows that a neural network with one hidden layer can approximate any con-tinuous nonlinear operators. Extending this, the DeepONet 
+
+[19] architecture allows for learning operators of the form 
+
+G : u 7 → G(u), where both u and G(u) are functions defined on (infinite-dimensional) spaces. For any point s in the domain of G(u), the value G(u)( s) is a real-valued vector in Rd. To learn said operator, DeepONet takes as inputs the sampled values [u(x1), u (x2), ..., u (xm)] at a finite number of fixed locations x1, x 2, ..., x m, together with the evaluation points s. The architecture consists of two sub-networks, the branch network processing the input function, and the trunk network processing the evaluations points, 
+
+Gbranch : Rm → Rv×d, u 7 → abr ,
+
+Gtrunk : R → Rv×d, s 7 → atr , (40) where v is a hyperparameter controlling the width of the latent representation. The final prediction is computed as the inner product of the outputs of the branch and trunk networks over the latent dimension 
+
+G(u)( s) = abr ⊙ atr , (41) where ⊙ denotes the element-wise multiplication over the latent dimension. Once trained, the DeepONet realization is a differentiable mapping with respect to all its inputs, so gradients with respect to both the input function samples and the evaluation coordinate s are obtained directly by automatic differentiation. In practice, the branch network is trained on finitely many function samples, while at inference time the trunk network can be evaluated ar arbitrarily many, arbitrarily fine locations 
+
+s. This decouples the discretization of the input function from the resolution of the output, which is a key advantage of neural operators over discretization-based neural networks, and makes it particularly powerful for infinite-dimensional CLIK where we want to reason over the continuous robot shape and might be interested in finer discretizations. 
+
+B. Example: Three-fiber Soft Robotic Arm 
+
+To demonstrate our neural infinite-dimensional CLIK al-gorithm, we consider a soft robotic arm initially designed with three liquid crystal elastomer fibers, inspired by the elephant trunk musculature. It is depicted in Figure 5. By design, this structure is soft and slender, and can grow, shrink, or actively remodel its intrinsic shape while also deforming elastically – which is why it is modelled as an ac-tive, morphoelastic filament [34], [35]. This model has been previously validated in experiments [36], [37], successfully used for path-planning algorithms [38], and shall now serve as example for the neural operator implementation of infinite-dimensional CLIK. We briefly summarize this model here, but refer to [35], [37] for details. Fig. 5: Three-fiber soft robotic arm [36], [37]: The orientation of the fibers is inspired by the muscular structure of the elephant trunk, with one straight fiber and a helical fiber pair, enabling continuous deformations and optimal reachability. 
+
+Morphoelasticity. Consider a tubular body of length L,which is reduced to the centerline r : [0 , 1] → R3 with normalized spatial coordinate s ∈ [0 , 1] , and an orthonormal director frame D = {d1, d 2, d 3}, where di : [0 , L ] → R3,is attached to r(s) for all s. The kinematics of the one-dimensional filament follow as 
+
+r′(s) = ζd 3, (42a) 
+
+d′
+
+> i
+
+(z) = ζu × di, i = {1, 2, 3}, (42b) with the axial extension of the filament ζ and the Darboux curvature vector u = u1d1 + u2d2 + u3d3 describing the evolution of the director basis D along the filament. With-out external load, we refer to these properties as intrinsic 
+
+curvatures u = ˆu and intrinsic extension ζ = ˆζ. Under (gravitational) load, intrinsic and actual properties differ, and we further need to consider the quasi-static solution of the force and moment balance equations, namely 
+
+∂n ∂s + ˆζf = 0 , ∂m ∂s + ∂r ∂s × n + ˆζl = 0 . (43) Here, n is the internal force, ˆζf is the external body force per unit length, m is the internal momentum, and ˆζl is the external body couple per unit length. 
+
+Active filaments. To connect the filament model to the robot’s actuation, we treat the soft robot as an active fil-ament whose material can locally shorten or extend along embedded fibers. The internal fiber architecture is described by a fiber direction field inside the filament body, which may be uniaxial or helical, and the corresponding intrinsic properties are obtained by integrating the fiber contributions over the cross section. While the proposed approach allows for general forms of activation γi, in this work we consider piecewise uniform activations and obtain a single scalar value 
+
+γi ∈ R per fiber. We identify these activation scalars with the actuation coordinates and write qa,i := γi, so that the actuation coordinate directly scales the intrinsic contraction of extension generated by each fiber. Negative activation 
+
+γi < 0 (or qa,i < 0) corresponds to contraction , positive activation γi > 0 (or qa,i > 0) corresponds to extension .
+
+Three-fiber soft robotic arm. The soft robot considered in this work has one longitudinal and two helical fibers inspired by the elephant trunk musculature (Figure 5) and is subject to gravitational load. Combining the above, its forward kinematics are governed by 
+
+r′(s) = ζd 3, (44a) 
+
+d′
+
+> i
+
+(s) = ˆζu × di, i = {1, 2, 3}, (44b) 
+
+0 = ∂n ∂s + ˆζf (44c) 
+
+0 = ∂m ∂s + ∂r ∂s × n + ˆζl. (44d) where the mapping from actuation qa ∈ R3 to shape r(s) is mediated by the intrinsic curvature ˆu and extension ˆζ, both of which are functions of the fiber activations, hence, the actuation, i.e., ˆu(qa) and ˆζ(qa).
+
+C. Learning the Model with a Neural Operator 
+
+In our application, the architecture of the operator network is simplified compared to the DeepONet architecture [19], since the input is a single scalar-valued actuation function and the actuation coordinates qa ∈ Rm are already finite-dimensional. Consequently, the branch net reduces to astandard feedforward network that takes qa as input, while the trunk net only encodes the spatial variable s. At the same time, we retain the key property that the operator is learned over actuation and space, so we can evaluate the learned actuation-to-shape mapping GΛ at arbitrarily many points s
+
+and differentiate with respect to qa, which is exactly what the neural CLIK algorithm requires. 
+
+Data. For data generation, we solve the boundary value problem (44) N = 1 , 000 , 000 times to obtain samples of the actuation-to-shape mapping for random activations within the physical constraints of the system qa,i ∈ [−1.67 , 0] ,
+
+i = 1 , 2, 3. Note that qa = 0 corresponds to the steady state of the system in which the soft robot hangs downward, and negative actuation leads to fiber contraction relative to this state. Histograms of the activations show that the entire actuation space is sufficiently represented in the dataset. The spatial coordinate s is discretized with ns = 100 points in 
+
+[0 , 1] . We use the Julia package developed for the active filament theory [35] and the associated parameters of the minimal three fiber prototype [36]. We store each solution as a discrete centerline in a matrix R ∈ Rns×3 with its respective (x, y, z )-coordinates at the ns locations. 
+
+Training process. Of the 1,000,000 samples, 200,000 are held out as a test set. From the remaining data, 640,000 samples are used for training and 160,000 for validation. We train the operator network for 500 epochs with the Adam optimizer, tanh activations, batch size 32, and an exponentially decaying learning rate, using the validation loss to select the best model checkpoint (typically reached after 400-450 epochs). On the held-out test set, the trained −0.050    
+
+> −0.025
+> 0.000
+> 0.025 x0.000 0.025 0.050
+> y
+> 0.000 0.025 0.050 0.075
+
+Positioning a fixed point Initial Final Target ¯s0.0 0.5 1.0time           
+
+> −0.50
+> −0.25
+> 0.00 activations
+> 0.00.51.0time
+> −0.05
+> 0.00 task γ1γ2γ3xyz−0.025
+> 0.000
+> 0.025
+> 0.050 x−0.025 0.000 0.025 0.050
+> y
+> 0.000 0.025 0.050 0.075
+
+Positioning the closest-point Initial Final Target s∗0.0 0.5 1.0time       
+
+> −0.4
+> −0.2
+> 0.0activations
+> 0.00.51.0time
+> −0.01
+> 0.00 task γ1γ2γ3xyz
+
+Fig. 6: Three-fiber soft robotic arm. Robot evolution ( ) and time evolutions of the actuation variable ( activations γi) and the task variable x for the fixed point-reaching task Φfixed pos (left) closest-point task Φopt pos (right). For the robot evolution, we plot every 10th shape. 
+
+model achieves a mean squared error of 1.38 × 10 −10 and an L2 relative error of 6.08 × 10 −4. The architecture and test performance are summarized in Table I.                      
+
+> Architecture and Training
+> Optimizer Adam
+> Activation tanh
+> Learning rate Exponential decay
+> Epochs 500
+> Batch size 32
+> Branch layers [3, 64, 64, 64, 192]
+> Trunk layers [1, 64, 64, 64, 192]
+> Test Performance
+> MSE 1.38 ×10 −10
+> L2 relative error 6.08 ×10 −4
+
+TABLE I: Neural operator hyperparameters and performance. 
+
+D. Composed Jacobian and Neural CLIK 
+
+The soft robot has three actuators, hence, we consider the three-dimensional tasks Φfixed pos and Φopt pos that position the robot with respect to a target point in (x, y, z ) coordinates. From automatic differentiation, we obtain the gradient of the operator network GΛ with respect to the input qa. With the task gradients being Dirac at ¯s or s∗, the Jacobian of the composition is the evaluation of the operator network gradient at the required spatial coordinate ¯s or s∗ according to (29), (30), namely 
+
+JΦfixed pos ◦G Λ (qa) = ∂GΛ(qa)
+
+∂q a
+
+(¯ s) ∈ R3×3, (45) 
+
+JΦopt pos ◦G Λ (qa) = ∂GΛ(qa)
+
+∂q a
+
+(s∗) ∈ R3×3. (46) Reaching a point translates to a desired task variable ¯x =Φpos (¯ r) = [0 , 0, 0] , and the control law follows as (23). Figure 6 shows simulations of the neural version of the infinite-dimensional CLIK algorithm for the two distinct positioning tasks. The simulation is for t ∈ [0 , 1] with a time step of dt = 0 .001 . The weighting matrix is K =8 · diag (1 , 1, 1) , i.e., all positioning coordinates are equally weighted, and the magnitude is a balance between conver-gence speed and overshooting. We use a spatial discretization with ns = 100 points in this example, but this discretization could be arbitrarily finer. The code will be made available on GitHub upon acceptance. V. C ONCLUSION 
+
+In this paper we extend classical closed-loop inverse kinematics (CLIK) to the infinite-dimensional shape space of soft robots, enabling controllers to reason directly on the entire robot shape while solving tasks. By composing an actuation-to-shape map with a shape-to-task map and applying an infinite-dimensional chain rule, we derive the corresponding differential end-to-end kinematics and obtain a Jacobian-based CLIK algorithm. Since the actuation-to-shape mapping typically lacks closed-form expressions, we show how to learn it from simulation data using differentiable neural operator networks. The simulations focus on simple positioning tasks, yet the framework naturally extends to more complex objective functionals, and future work will explore how to incorporate obstacles or task-space trajectory tracking. Experimental validation is necessary to assess how the algorithm performs under model mismatch between the simulated (learned) operator and the real robot. REFERENCES [1] P. Larochelle and J. M. McCarthy, “Inverse kinematics,” in Encyclope-dia of Robotics , M. H. Ang, O. Khatib, and B. Siciliano, Eds. Berlin, Heidelberg: Springer Berlin Heidelberg, 2020, pp. 1–4. [2] C. Schumacher, E. Knoop, and M. B¨ acher, “A versatile inverse kine-matics formulation for retargeting motions onto robots with kinematic loops,” IEEE Robotics and Automation Letters , vol. 6, no. 2, pp. 943– 950, 2021. [3] M. D. Fiore and C. Natale, “On the convergence of a closed-loop inverse kinematics solver with time-varying task functions,” IEEE Robotics and Automation Letters , vol. 9, no. 1, pp. 81–86, 2023. [4] B. Kenwright, “Real-time character inverse kinematics using the gauss-seidel iterative approximation method,” arXiv preprint arXiv:2211.00330 , 2022. [5] J. Colan, A. Davila, and Y. Hasegawa, “Variable step sizes for iterative Jacobian-based inverse kinematics of robotic manipulators,” IEEE access , vol. 12, pp. 87 909–87 922, 2024. [6] I. Fantoni and R. Lozano, Non-Linear Control for Underactuated Mechanical Systems . Springer Science & Business Media, 2012. [7] Y. Wang, Y. Liu, M. Leibold, M. Buss, and J. Lee, “Hierarchical incremental MPC for redundant robots: A robust and singularity-free approach,” IEEE Transactions on Robotics , vol. 40, pp. 2128–2148, 2024. [8] C. Duriez, E. Coevoet, F. Largilliere, T. Morales-Bieze, Z. Zhang, M. Sanz-Lopez, B. Carrez, D. Marchal, O. Goury, and J. Dequidt, “Framework for online simulation of soft robots with optimization-based inverse model,” in 2016 IEEE International Conference on Simulation, Modeling, and Programming for Autonomous Robots (SIMPAR) . IEEE, 2016, pp. 111–118. [9] S. Tonkens, J. Lorenzetti, and M. Pavone, “Soft robot optimal control via reduced order finite element models,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2021, pp. 12 010–12 016. [10] T. Votroubek and T. Kroupa, “Globally optimal inverse kinematics as a quadratic program,” arXiv preprint arXiv:2312.15569 , 2023. [11] R. J. Webster III and B. A. Jones, “Design and kinematic modeling of constant curvature continuum robots: A review,” The International Journal of Robotics Research , vol. 29, no. 13, pp. 1661–1683, 2010. [12] T. George Thuruthel, Y. Ansari, E. Falotico, and C. Laschi, “Control strategies for soft robotic manipulators: A survey,” Soft robotics , vol. 5, no. 2, pp. 149–163, 2018. [13] F. Campisano, S. Cal´ o, A. A. Remirez, J. H. Chandler, K. L. Obstein, R. J. Webster III, and P. Valdastri, “Closed-loop control of soft con-tinuum manipulators under tip follower actuation,” The International journal of robotics research , vol. 40, no. 6-7, pp. 923–938, 2021. [14] G. Fang, Y. Tian, Z.-X. Yang, J. M. Geraedts, and C. C. Wang, “Efficient Jacobian-based inverse kinematics with sim-to-real transfer of soft robots by learning,” IEEE/ASME Transactions on Mechatronics ,vol. 27, no. 6, pp. 5296–5306, 2022. [15] J. M. Bern and D. Rus, “Soft IK with stiffness control,” in 2021 IEEE 4th International Conference on Soft Robotics (RoboSoft) . IEEE, 2021, pp. 465–471. [16] J. Rogatinsky, D. Recco, J. Feichtmeier, Y. Kang, N. Kneier, P. Ham-mer, E. O’Leary, D. Mah, D. Hoganson, N. V. Vasilyev et al. , “A multifunctional soft robot for cardiac interventions,” Science Advances ,vol. 9, no. 43, p. eadi5559, 2023. [17] C. Della Santina, “Pushing the boundaries of actuators-to-task kine-matic inversion: From fully actuated to underactuated (soft) robots,” 
+
+Authorea Preprints , 2025. [18] A. Anandkumar, K. Azizzadenesheli, K. Bhattacharya, N. Kovachki, Z. Li, B. Liu, and A. Stuart, “Neural operator: Graph kernel network for partial differential equations,” in ICLR 2020 Workshop on Integra-tion of Deep Neural Models and Differential Equations , 2020. [19] L. Lu, P. Jin, G. Pang, Z. Zhang, and G. E. Karniadakis, “Learning nonlinear operators via DeepONet based on the universal approxima-tion theorem of operators,” Nature Machine Intelligence , vol. 3, no. 3, pp. 218–229, 2021. [20] G. M. Campbell, G. Muhaxheri, L. F. Guilhoto, C. D. Santangelo, P. Perdikaris, J. Pikul, and M. Yim, “Active Learning Design: Model-ing Force Output for Axisymmetric Soft Pneumatic Actuators,” Apr. 2025. [21] J. Gao, M. Y. Michelis, A. Spielberg, and R. K. Katzschmann, “Sim-to-Real of Soft Robots With Learned Residual Physics,” IEEE Robotics and Automation Letters , vol. 9, no. 10, pp. 8523–8530, Oct. 2024. [22] L. Lingsch, M. Y. Michelis, E. de Bezenac, S. M. Perera, R. K. Katzschmann, and S. Mishra, “Beyond regular grids: Fourier-based neural operators on arbitrary domains,” 2024. [23] P. Ma, P. Y. Chen, B. Deng, J. B. Tenenbaum, T. Du, C. Gan, and W. Matusik, “Learning neural constitutive laws from motion observa-tions for generalizable pde dynamics,” in International Conference on Machine Learning . PMLR, 2023, pp. 23 279–23 300. [24] L. Chen, G. Chen, X. Liu, J. Su, X. Lyu, L. Wang, and Y. Li, “Shape-morphing programming of soft materials on complex geometries via neural operator,” arXiv preprint arXiv:2601.11126 , 2026. [25] L. Bhan, Y. Shi, and M. Krstic, “Neural operators for bypassing gain and control computations in PDE backstepping,” IEEE Transactions on Automatic Control , vol. 69, no. 8, pp. 5310–5325, 2023. [26] V. Kumar, S. Goswami, K. Kontolati, M. D. Shields, and G. E. Kar-niadakis, “Synergistic learning with multi-task DeepONet for efficient PDE problem solving,” Aug. 2024. [27] M. Lamarque, L. Bhan, Y. Shi, and M. Krstic, “Adaptive neural-operator backstepping control of a benchmark hyperbolic PDE,” 
+
+Automatica , vol. 177, p. 112329, 2025. [28] T. O. de Jong, K. Shukla, and M. Lazar, “Deep operator neural network model predictive control,” arXiv preprint arXiv:2505.18008 , 2025. [29] J. Hu, J. Qi, and J. Zhang, “Neural operator based reinforcement learning for control of first-order PDEs with spatially-varying state delay,” 2025. [30] B. Siciliano, “A closed-loop inverse kinematic scheme for on-line joint-based robot control,” Robotica , vol. 8, no. 3, pp. 231–243, 1990. [31] J. Neuberger, Sobolev Gradients and Differential Equations . Springer Science & Business Media, 2009. [32] J. F. Bonnans and A. Shapiro, Perturbation Analysis of Optimization Problems . Springer Science & Business Media, 2013. [33] T. Chen and H. Chen, “Universal approximation to nonlinear operators by neural networks with arbitrary activation functions and its applica-tion to dynamical systems,” IEEE Transactions on Neural Networks ,vol. 6, no. 4, pp. 911–917, 1995. [34] D. E. Moulton, T. H. Lessinnes, and A. Goriely, “Morphoelastic rods. Part I: A single growing elastic rod,” Journal of the Mechanics and Physics of Solids , vol. 61, no. 2, pp. 398–427, 2013. [35] B. Kaczmarski, D. E. Moulton, E. Kuhl, and A. Goriely, “Active fila-ments I: Curvature and torsion generation,” Journal of the Mechanics and Physics of Solids , vol. 164, p. 104918, 2022. [36] S. Leanza, J. Lu-Yang, B. Kaczmarski, S. Wu, E. Kuhl, and R. R. Zhao, “Elephant trunk inspired multimodal deformations and movements of soft robotic arms,” Advanced Functional Materials , vol. 34, no. 29, p. 2400396, 2024. [37] B. Kaczmarski, S. Leanza, R. Zhao, E. Kuhl, D. E. Moulton, and A. Goriely, “Minimal design of the elephant trunk as an active Filament,” Physical Review Letters , vol. 132, no. 24, p. 248402, Jun. 2024. [38] C. Veil, M. Flaschel, and E. Kuhl, “Shape-space graphs: Fast and collision-free path planning for soft robots,” arXiv preprint arXiv:2510.03547 , 2025.

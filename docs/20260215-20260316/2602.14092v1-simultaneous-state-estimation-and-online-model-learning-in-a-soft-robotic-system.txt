@@ -1,0 +1,607 @@
+Title: Simultaneous State Estimation and Online Model Learning in a Soft Robotic System
+
+URL Source: https://arxiv.org/pdf/2602.14092v1
+
+Published Time: Tue, 17 Feb 2026 02:18:02 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Simultaneous State Estimation and Online Model Learning in a Soft Robotic System 
+
+Jan-Hendrik Ewering a,b
+
+ewering@imes.uni-hannover.de 
+
+Max Bartholdt a,c
+
+bartholdt.max@mh-hannover.de 
+
+Simon F. G. Ehlers a
+
+ehlers@imes.uni-hannover.de 
+
+Niklas Wahlstr¨ om b
+
+niklas.wahlstrom@it.uu.se 
+
+Thomas B. Sch¨ on b
+
+thomas.schon@uu.se 
+
+Thomas Seel a
+
+seel@imes.uni-hannover.de 
+
+aInstitute of Mechatronic Systems , Leibniz Universit¨ at Hannover , Hanover, Germany. 
+
+bDepartment of Information Technology , Uppsala University , Uppsala, Sweden. 
+
+cClinical Dep. of Cardiothoracic, Transplantation, and Vascular Surgery , Hannover Medical School , Hanover, Germany. 
+
+This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible. 
+
+Abstract —Operating complex real-world systems, such as soft robots, can benefit from precise predictive control schemes that require accurate state and model knowledge. This knowledge is typically not available in practical settings and must be inferred from noisy measurements. In particular, it is challenging to simul-taneously estimate unknown states and learn a model online from sequentially arriving measurements. In this paper, we show how a recently proposed gray-box system identification tool enables the estimation of a soft robot’s current pose while at the same time learning a bending stiffness model. For estimation and learning, we rely solely on a nominal constant-curvature robot model and measurements of the robot’s base reactions (e.g., base forces). The estimation scheme—relying on a marginalized particle filter— allows us to conveniently interface nominal constant-curvature equations with a Gaussian Process (GP) bending stiffness model to be learned. This, in contrast to estimation via a random walk over stiffness values, enables prediction of bending stiffness and improves overall model quality. We demonstrate, using real-world soft-robot data, that the method learns a bending stiffness model online while accurately estimating the robot’s pose. Notably, reduced multi-step forward-prediction errors indicate that the learned bending-stiffness GP improves overall model quality. 
+
+Index Terms —Nonlinear system identification, state estimation, particle filtering, Gaussian processes, soft robotics. 
+
+I. I NTRODUCTION 
+
+Predictive control schemes, such as Model Predictive Con-trol ( MPC ), require system models that provide accurate multi-step forward predictions [1], [2], [3]. Moreover, state infor-mation, e. g., position and velocity data, is usually required to reliably operate complex real-world systems, such as au-tonomous vehicles [3] or soft robots [1], [2]. However, in many practical applications, only nominal models are available, and the unknown system state is just indirectly observed through output measurements. In this case, we face a coupled inference problem: Estimating system states from measurement data of-ten relies on model knowledge [4]. Conversely, model learning schemes often rely on state measurements. Therefore, jointly 
+
+This research was supported in parts by the Kjell och M¨ arta Beijer Founda-tion and the Swedish Research Council (VR) under the contract numbers 2021-04321 and 2025-04318, and the German Academic Scholarship Foundation (Studienstiftung des Deutschen Volkes) .  
+
+> Optical tracking system for validating xyu
+> Supply pressure
+> Pneumatic soft robot Simultaneous state estimation & online model learning Multi-step prediction Force-torque sensor PC
+> Estimated states Bending stiffness model
+> kbend (x)
+> Sec. VI-B Sec. VI-A
+> in each time step t
+> Online state estimation & model learning Closed-form model posterior Particle filter, marginalized over model parameters
+
+Fig. 1. Nonlinear soft robotic system with the unknown states x ∈ R6,defining its current pose and velocity, control input pressures u ∈ R3, and force/torque measurements of the base reactions y ∈ R3. Simultaneously to estimating the current hidden states x, a state-dependent bending stiffness model kbend (x) is learned using a particle filter, marginalized over model parameters. Figure adapted from [5] and reprinted with permission from 2024 IEEE Int. Conf. on Robotics and Automation (ICRA). ©2024 IEEE. 
+
+learning a model and inferring unknown states is challenging, especially in online and nonlinear filtering applications. In this paper, we face this joint inference problem in the soft robotic system depicted in Figure 1. This is interesting, as soft and continuum robots, often driven by pneumatic pressure [5] or tendons [2], [6], are compliant and flexible by construction [7], thereby paving the way for novel application domains. However, it is often difficult to construct accurate dynamics models and to sense a soft robot’s current pose [7], [8]. 
+
+> arXiv:2602.14092v1 [eess.SY] 15 Feb 2026
+
+Specifically, we show how to estimate a soft robot’s cur-rent pose while, for the first time, simultaneously learning a bending stiffness model online. This is enabled by a recently proposed gray-box system identification tool [9], which we validate on a complex, real-world robotic system, in contrast to the vast majority of work on joint state inference and model learning. Unlike most soft robotic estimation schemes, we do not rely on restrictive sensor setups, such as optical tracking, but use only noisy measurements of the robot’s base reactions (e. g., base forces). To this end, we employ the tailored Particle Filter ( PF ) for gray-box system identification proposed in [9] and extend it with a hyperparameter learning procedure. Importantly, the estimation scheme allows us to conveniently interface a nominal constant-curvature approximation with a Gaussian Process ( GP ) bending stiffness model, which is to be learned. This retains physical model interpretability by explicitly learn-ing the bending stiffness model nested within a well-known nonlinear constant-curvature model, differing from black-box learning approaches. Moreover, we showcase in a multi-step prediction test scenario that the model quality is significantly improved through online learning. II. R ELATED WORK 
+
+Considering the general methodology, there are various works on Bayesian state inference and model learning, often built around nonlinear system identification methods [10]. A natural extension for Bayesian modeling is to learn a  
+
+> GP
+
+state-space model from batched [11], [12], [13], [14], [15] or—as done in this work—sequentially arriving input-output data [9], [16], [17], [18], [19], [20]. To enable model learning, many approximate the states as auxiliary variables using nonlinear Kalman filters [19], [20] or Sequential Monte Carlo ( SMC ) approaches [9], [12], [13], [14], [15], [16], [17], [18]. The latter has the advantage that complex non-Gaussian probability density functions can be conveniently represented, which we exploit in this paper. While most work focuses on learning an entire GP state-space model [16], [17], [20], fewer methods enable incorporating system knowledge in the form of a nonlinear nominal model [9], [18], [19], as readily available for the current soft robotic application. While all of the above research enables simultaneous state estimation and online model learning, none of the presented methods has been validated in a nonlinear real-world robotic system. In the subfield of soft robotic state estimation, existing work focuses either on offline estimation of the robot’s shape [8], [21] or on online estimation from sequentially arriving measurements [5], [6], [22], [23], [24], [25], [26], [27]. For online applications, while some papers use sliding-window observers [6], [26], the predominant estimation approach is Bayesian filtering [5], [22], [23], [25], [27]. Importantly, all of these approaches rely on system models. Therefore, estimation schemes build on Cosserat rod models [6], [8], [21] or, more commonly, on simplified nominal models, using constant-curvature assumptions or polynomial shape basis functions [5], [22], [23], [24], [25], [26]. To account for unmodeled effects in the latter, limited model fidelity is often compensated for by estimating unknown parameters as slack variables. For this, a typical approach is to estimate the parameters alongside the states in a nonlinear Kalman filter [5], using a random walk assumption. Notably, while all these works provide state estimates that might be used for control, they rely on a fixed, often nominal, system model. This hampers accurate multi-step predictions—a prerequisite for predictive control. Instead, an interesting approach, which we follow in this paper, is to perform online model learning alongside state estimation. III. P ROBLEM FORMULATION 
+
+Consider the situation when a nominal system model— here, a dynamic constant-curvature soft robot model—and sequentially arriving noisy output measurements are available. Given this, we aim to simultaneously estimate the unknown latent state representing the robot’s pose and velocity, and learn an augmented system model to improve the overall prediction accuracy. Formally, consider a nonlinear stochastic discrete-time state-space system 
+
+xt+1 = f nom (xt, ut, k bend (xt)) + ωt ,
+
+yt = hnom (xt, ut, k bend (xt)) + et , (1) where the state transition function f nom : Rnx × Rnu × R →
+
+Rnx , and the measurement function hnom : Rnx × Rnu × R →
+
+Rny together constitute the nominal model, which is based on a constant-curvature assumption. The predictive accuracy of the nominal model is limited due to various modeling assump-tions. The formulation (1) accounts for this by augmenting the nominal system equations with a state-dependent bending stiffness model kbend : Rnx → R, which is to be learned. In both the state transition and measurement equation, we assume additive Gaussian noise ωt ∼ N (ωt|0, Σω ) and 
+
+et ∼ N (et|0, Σe) with covariances Σω and Σe, respectively. The inputs that drive the robot are pneumatic pressures, denoted by ut ∈ Rnu at time step t. The outputs yt ∈ Rny
+
+are base reaction forces and torques, measured using a force-torque sensor. The sensor setup is depicted in Figure 1. Given the input-output data and the nominal model, our goal is to estimate the unknown hidden robot states xt ∈ Rnx ,i. e., the the robot’s pose and velocity, while simultaneously learning the nonlinear bending stiffness model kbend (xt).IV. K EY IDEA 
+
+Learning a bending stiffness model in the context of the constant-curvature approximation f nom & hnom is challenging for two reasons. First, while the nominal model itself might be known, it cannot be assumed to be invertible. This pre-vents us from learning the bending stiffness with “pseudo-measurements”, constructed using a coordinate transformation 
+
+f −1nom (xt+1 ) xt,ut ≈ kbend (xt). Second, the soft robot’s states, which are regression inputs to kbend (xt), are unknown and need to be estimated. We tackle these problems by adopting a sampling-based estimation strategy. This avoids inverting the nominal model while enabling state inference. In particular, we estimate unknown states using a particle filter—marginalized over the bending stiffness model parameters—that samples forward 
+
+through the entire model (1). Sequentially, the bending stiff-ness GP model is learned using the posterior state and bending stiffness estimates (see Figure 1). The gray-box system identification tool has been proposed in our recent work [9], and we exploit it here to simultaneously perform state estimation and online model learning in the nonlinear soft robotic system. Therefore, the hierarchical soft robot model is introduced in Section V, and the estimation scheme is revisited in Section VI. We thoroughly test the algorithm and the learned model using real-world data in Section VII and draw conclusions in Section VIII. V. S OFT ROBOT MODEL 
+
+In this section, we present a suitable model structure in accordance with (1). First, the nominal system equations based on constant-curvature assumptions are briefly revisited in Section V-A. Section V-B is dedicated to constructing a GP -based bending stiffness model for online learning. 
+
+A. Nominal Constant-Curvature Model 
+
+For the nominal system equations, we adopt the soft robot model presented in [5], [28]. At its core, the model relies on a constant-curvature kinematics assumption to approximate the arc of a soft robot. Therefore, the robot state is fully described by its elongation δL relative to a reference length, as well as its relative coordinates δx and δy from the robot’s base to the robot’s tip [29]. Thus, we have the generalized coordinates 
+
+q⊤ = [ δx, δy, δL ], q ∈ Ω ⊂ Rnq , and nq = 3 . The full state vector comprises the generalized coordinates and their time derivatives, i. e., x⊤ = [ q⊤, ˙q⊤] ∈ Rnx , and nx = 6 . The base reaction forces and torques y ∈ R6, relevant for modeling the measurement function hnom , are incorporated using a floating base approach. Finally, using Lagrangian equations of the second kind, the state dynamics f nom are constructed. For a detailed derivation of the model, we refer to [5], [28]. The model relies on three main assumptions: a constant robot curvature, a concentrated robot mass, and a stiffness model that is affine in the generalized coordinates. The latter approximates the restoring force τ bend to bending the soft robot in one direction, i. e., we have τbend ,x = kbend δx for the coordinate δx . The modeling assumptions significantly limit the model’s predictive accuracy. In fact, due to model simplifications, the state estimation scheme proposed in [5] ne-cessitates estimating the parameter kbend as an auxiliary slack variable to enable satisfactory filter performance. Instead, we augment the nominal system equations with a state-dependent bending stiffness model kbend (x) to account for lacking model fidelity and to enable accurate multi-step predictions. 
+
+B. Bending Stiffness Model 
+
+We model the bending stiffness as a state-dependent func-tion to be learned. The function is assumed to only depend on the current pose of the robot, i. e., kbend (x) ≡ kbend (q).To obtain a data-efficient model for online learning, we approximate the bending stiffness using a zero-mean GP , i. e., 
+
+kbend (x) ∼ GP (0 , κ (q, q′)) , (2) with covariance (kernel) function κ(q, q′) [30]. A common drawback of GPs is that their computational complexity and memory requirements scale poorly with the number of train-ing data points. However, for efficient online learning, it is desirable that the bending stiffness model features (i) acomputational complexity that is independent of the training data dimension and (ii) a linear representation to facilitate closed-form marginalization (see Section VI). Importantly, the reduced-rank GP presented in [31] exhibits these properties, making it a popular choice when it comes to online inference and learning [9], [16]. Please note that we revisit the GP construction only briefly, based on our previous work [9], [15], while applying it to bending stiffness modeling. Loosely speaking, the reduced-rank GP [31] approximates the kernel by a finite-dimensional eigenfunction expansion that encodes its spectral density S in the frequency domain. The chosen covariance function is described by 
+
+κ(q, q′) ≈
+
+> M
+
+X
+
+> m=1
+
+S(√ϱm)ϕm(q)ϕm(q′), (3) where ϕm : Ω → R are eigenfunctions of the Laplace operator on the domain Ω = [ −L1, L 1]×· · ·× [−Lnq , L nq ], and ϱm are the corresponding eigenvalues. For this rectangular domain, the eigenfunctions have a closed form, that is 
+
+ϕm(q) = 
+
+> nq
+
+Y
+
+> i=1
+
+L− 12 
+
+> i
+
+sin 
+
+ πj m,i (qi + Li)2Li
+
+
+
+, ϱ m =
+
+> nq
+
+X
+
+> i=1
+
+π2j2
+
+> m,i
+
+4L2
+
+> i
+
+,
+
+where the indices jm,i determine the frequency of the cor-responding eigenfunction [32]. Predictions of kbend (x) ∼GP (0 , κ (q, q′)) can be performed with the reduced-rank GP at computational complexity O(M ) using the following simple basis function expansion 
+
+ˆkbend (x) = 
+
+> M
+
+X
+
+> m=1
+
+amϕm(q) = a⊤ϕ(q) , (4) where the vector-valued function 
+
+ϕ(q) = [ ϕ1(q), . . . , ϕ M (q)] ⊤ , (5) and the weights a = [ a1, . . . , a M ]⊤ follow a density N (0, V ),with V = diag( S(√ϱ1), . . . , S (√ϱM )) .To estimate the current bending stiffness (and using it for parameter learning) at a given sample time t, we model observations kt ∈ R of ˆkbend (x) as 
+
+kt = ˆkbend (x) x=xt
+
++ vt , vt ∼ N (vt | 0, σ 2) . (6) For conjugacy reasons and to describe the model (4) and (6) with a single density [14], [16], we express the GP prior as a zero-mean multivariate normal N (a | 0, σ 2V ), where the scale σ2 reflects the noise, and the covariance V encodes the spectral density of the chosen kernel. While any isotropic kernel can be employed, we resort to approximating a common squared exponential kernel 
+
+κse (q, q′) = σ2 
+
+> f
+
+exp 
+
+
+
+− ∥q − q′∥2
+
+2ℓ2
+
+
+
+, (7) with Euclidean norm ∥·∥ and the spectral density 
+
+Sse (ω) = σ2 
+
+> f
+
+(2 πℓ 2)nq /2 exp 
+
+
+
+− ℓ2ω2
+
+2
+
+
+
+. (8) The kernel hyperparameters ϑ = {σ2 
+
+> f
+
+, ℓ } are scale σ2 
+
+> f
+
+and length scale ℓ.The noise parameter σ2 in (6) is unknown and must be estimated along with the basis function coefficients a. A typical approach for online noise estimation is to set an inverse Gamma prior IG (σ2 | ψ, ν ) on σ2 [33], [34], with scale ψ and degrees of freedom ν. The overall reduced-rank GP prior for the parameters θ = {a, σ 2} is then a normal inverse Gamma density ( N IG ), i. e., 
+
+a, σ 2 ∼ N IG (a, σ 2 | 0, V , ψ, ν )= N (a | 0, σ 2V )IG (σ2 | ψ, ν ) . (9) Please note that using the prior (9) enables efficient marginal-ization and recursive closed-form computation of the parame-ter posterior, which is convenient for online learning [16]. For learning the bending-stiffness model online , we consider time-varying parameters θt at time step t, which must be esti-mated from sequentially arriving base reaction measurements 
+
+yt. Moreover, the GP kernel hyperparameters ϑt should be learned as well. VI. O NLINE INFERENCE AND LEARNING 
+
+In this section, we revisit the gray-box system identification tool—recently introduced in [9]—for simultaneously estimat-ing hidden states and learning model parameters. In particular, we target the joint posterior density 1
+
+p(x0: t, k 0: t, θt | y0: t) = p(θt | x0: t, k 0: t)
+
+| {z }
+
+> posterior (i)
+
+p(x0: t, k 0: t | y0: t)
+
+| {z }
+
+> posterior (ii)
+
+,
+
+where we recursively compute posterior (i) in closed form, exploiting a conjugate GP parameter prior (see Section VI-A) and sample from posterior (ii) using a PF , marginalized over the model parameters θt (see Section VI-B). Importantly, both closed-form posterior and parameter marginalization rely on the linear-in-its-parameters bending stiffness model, defined in Section V-B, and we refer to the PF construction as a “marginalized PF ” in the following. Beyond our prior work [9], we take inspiration from [16] and adopt a learning scheme for the GP kernel hyperparameters 
+
+ϑ (see Section VI-C). The overall procedure for simultaneous state estimation and online model learning is given in Algo-rithm 1, and the key idea is summarized in Figure 1.   
+
+> 1To retain a concise notation, dependence on the system inputs utis not explicitly written in this section.
+
+A. Online Model Learning 
+
+Assume, for now, that state estimates xt and bending stiff-ness estimates kt are provided sequentially by the marginalized 
+
+> PF
+
+. Given these, let us now derive recursive equations to com-pute the parameter posterior p(θt | x0: t, k 0: t). We employ a scheme for online noise parameter learning with marginalized 
+
+> PFs
+
+, inspired by [33] and adopted for model learning in [9], [16]. To retain conciseness, we state only the main steps and refer to [33] for further details. To start with, the current parameter posterior can be decomposed as 
+
+p(θt | x0: t, k 0: t) ∝
+
+p(xt, k t | θt, xt−1, k t−1)p(θt | x0: t−1, k 0: t−1) , (10) using Bayes’ rule. Since the constant-curvature model (1) is independent of θt, the likelihood is given by 
+
+p(xt, k t | θt, xt−1, k t−1)= p(kt | xt, θt)p(xt | xt−1, k t−1) . (11) In (11), we see that the likelihood follows the normal density 
+
+p(kt | xt, θt) = N (kt | a⊤ 
+
+> t
+
+ϕ(qt), σ 2 
+
+> t
+
+) , (12) up to a scaling, resulting from p(xt|xt−1, k t−1). Given the conjugate normal-inverse-Gamma prior (9) and the likelihood (11), the parameter posterior p(θt|x0: t, k 0: t) is again a normal-inverse-Gamma density [16], [33] 
+
+p(θt | x0: t, k 0: t) = N IG (a, σ 2 | mt|t, V t|t, ψ t|t, ν t|t) , (13) where mt|t, V t|t, ψt|t, and νt|t are the posterior density parameters, given the estimates xt and kt. Conveniently, the posterior (13) can be recursively computed in closed form by summation of the priors’ sufficient statistics and new statistics obtained from the current estimates xt, kt [9], [16]. Specifically, the posterior density is characterized by 
+
+mt|t = r−11,t |ts1,t |t , V t|t = r−11,t |t ,ψt|t = s2,t |t − s⊤
+
+> 1,t |t
+
+r−11,t |ts1,t |t , νt|t = r2,t |t , (14) with updated statistics ηt|t = {s1,t |t, s 2,t |t, r1,t |t, r 2,t |t}, i. e., 
+
+s1,t |t = s1,t |t−1 + ϕ(qt)kt ,s2,t |t = s2,t |t−1 + k2 
+
+> t
+
+,
+
+r1,t |t = r1,t |t−1 + ϕ(qt)ϕ(qt)⊤ ,r2,t |t = r2,t |t−1 + 1 .
+
+(15) To incorporate the GP prior (9), the initial N IG distribution parameters are set as 
+
+m0 = 0 , V 0 = V , ψ0 = ψ , ν0 = ν , (16) which corresponds to the initial sufficient statistics η0 by the inverse relationship of (14). If the parameters θt are known to vary over time, expo-nential forgetting can be employed to discard old information contained in the sufficient statistics. We introduce forgetting in the time update step of the statistics ηt|t−1, that is, 
+
+si,t |t−1 = γsi,t −1|t−1 , ri,t |t−1 = γri,t −1|t−1 , i = 1 , 2 ,
+
+(17) where 0 ≤ γ ≤ 1 is the so-called forgetting factor [35]. B. State Estimation 
+
+Given the current parameter density, defined by the statistics 
+
+ηt|t−1, we approximate the filtering density 
+
+p(x0: t, k 0: t | y0: t) ≈
+
+> N
+
+X
+
+> i=1
+
+witδ{xi
+
+> 0: t,k i
+> 0: t}
+
+(x0: t, k 0: t), (18) as a set of N weighted particles, each representing a trajectory of state and bending stiffness values. In (18), the Dirac delta mass centered at z is denoted by δz (·). The importance weight of each particle i at time step t is denoted wit, and it is associated with trajectories xi
+
+> 0: t
+
+, k i
+
+> 0: t
+
+.The trajectories are obtained by recursively applying the three steps that define a standard SMC algorithm: sampling, weighting, and resampling [4]. Specifically, we use an auxil-iary PF [4] to increase the sample efficiency. In the sampling step, state and bending stiffness samples are drawn from a tractable proposal distribution π(xt, k t | x0: t−1, k 0: t−1, y0: t).Then, the weights {wit}Ni=1 are updated according to 
+
+wit ∝ p  yt | xi
+
+> 0: t
+
+, k i
+
+> 0: t
+
+
+
+p
+
+
+
+yt | ˜xait 
+
+> t
+
+, ˜kait
+
+> t
+
+ = N  yt | h  xit, ut, k it
+
+ , Σe
+
+
+
+N
+
+
+
+yt | h
+
+
+
+˜xait 
+
+> t
+
+, ut, ˜kait
+
+> t
+
+
+
+, Σe
+
+ .
+
+(19) While the weighting step is easily computed using the drawn state and bending stiffness values, the sampling procedure requires more attention to account for our current model parameter estimate. In fact, generating samples for the state and bending stiffness at time step t, given the previous trajec-tory estimates x0: t−1 and k0: t−1, requires drawing from the state transition density p(xt, k t|x0: t−1, k 0: t−1). This density is composed as 
+
+p(xt, k t | x0: t−1, k 0: t−1)= p(xt | xt−1, k t−1)p(kt | xt, ηt|t−1)= p(xt | xt−1, k t−1)
+
+Z
+
+p(kt | xt, θ)p(θ | ηt|t−1)d θ ,
+
+(20) where the first term on the right-hand side is defined by (1). The second term in (20), i. e., the predictive bending stiffness density p(kt | xt, ηt|t−1), is obtained by integrating out the parameters θ from the hierarchical models 
+
+kt ∼ N  kt | a⊤ϕ(xt), σ 2 ,
+
+a, σ 2 ∼ N IG (a, σ2 | mit|t−1, V it|t−1, ψ it|t−1, ν it|t−1) , (21) for each particle i. Therefore, each particle carries its own bending stiffness model, represented by an individual set of statistics ηit|t−1. Conveniently, due to the conjugate prior configuration in (21), each predictive density p(kt|xt, ηt|t−1)
+
+follows a Student-t distribution ( T ) [9] with 
+
+p(kt | xt, ηt|t−1) = T (kt | ρ, μ, Λ) , (22) and distribution parameters 
+
+ρ = νt|t−1 , μ = mt|t−1⊤ϕ(xt) ,
+
+Λ = ξ + 1 
+
+ξρ ψt|t−1 , ξ = 1 /  ϕ(xt)⊤V t|t−1ϕ(xt) . (23) 
+
+Algorithm 1 Marginalized PF for online state estimation and model learning (for all i = 1 , . . . , N )
+
+Initialize: Data y0: T , prior p(θ), hyperparameters ϑi, particles 
+
+xi
+
+> 0
+
+, k i 
+
+> 0
+
+∼ p(x0, k 0|θ), weights wi 
+
+> 0
+
+= 1 /N . 
+
+> 1:
+
+for t = 1 , . . . , T do  
+
+> 2:
+
+Statistics time update ηit|t−1 ← ηit−1|t−1. ▷ by (17)  
+
+> 3:
+
+Comp. auxiliary states ˜xit = f nom (xit−1, ut−1, k it−1). 
+
+> 4:
+
+Compute first-stage weights 
+
+˜λi = wit−1N (yt | hnom (˜ xit, ut, k it), Σe)
+
+and normalize λi = ˜λi/ PNj=1 ˜λj . 
+
+> 5:
+
+Resample a ait ∼ C ({λi}Ni=1 ). 
+
+> 6:
+
+if GP hyperparameter learning then  
+
+> 7:
+
+Sample hyperparameters ϑit. ▷ by (24)  
+
+> 8:
+
+Update prior V i. ▷ by (8)  
+
+> 9:
+
+end if  
+
+> 10:
+
+Draw xit ∼ N (xt | f nom (xait
+
+> t−1
+
+, ut−1, k ait
+
+> t−1
+
+), Σω ). 
+
+> 11:
+
+Draw kit ∼ p(kt | xit, ηait
+
+> t|t−1
+
+). ▷ by (22)  
+
+> 12:
+
+Statistics measurement update and resampling ηit|t ← ηait
+
+> t|t−1
+
+. ▷ by (15)  
+
+> 13:
+
+Compute weights wit and normalize. ▷ by (19)  
+
+> 14:
+
+end for    
+
+> aWe describe the resampling step using a categorical distribution Cto express sampling particle indices from a discrete probability mass function, spanned by the weights {λi}Ni=1 .
+
+This enables efficient sampling and, hence, state estima-tion while—through parameter marginalization—respecting the different bending stiffness models. For further details on the algorithm, we refer to [9]. 
+
+C. Hyperparameter Learning 
+
+While it is often intractable to learn all hyperparameters online [16], the GP kernel hyperparameters can actually be determined in our state estimation and model learning setup. This has the potential to further align the learned GP model with the training data and enable more accurate predictions, while requiring less expert knowledge. For learning the kernel hyperparameters ϑ, we follow the lines of [16] and model the hyperparameter evolution with a random walk, i. e., 
+
+ϑt+1 = ϑt + ζt , ζt ∼ N (0, Σζ ) , (24) where Σζ is a diagonal matrix. Without the hyperparameter learning scheme, the GP prior is fixed and shared across all particles. In contrast, to learn the hyperparameters, each parti-cle i carries its own hyperparameter set ϑit and corresponding  
+
+> GP
+
+prior, represented by the covariance matrix V i.During each time step t, the particle hyperparameters ϑit are updated using (24). Then, a new matrix V i for the N IG prior (9) is generated. Through (16), this affects two steps in the marginalized PF : (i) the parameter posterior (13), and (ii) the predictive sampling of the bending stiffness (22). Thus, along the time dimension, suitable hyperparameters are learned by successive sampling, weighting, and resampling ϑt.VII. E XPERIMENTAL RESULTS 
+
+In this section, we test Algorithm 1 and the prediction performance of the online-learned model on a real-world soft robot, depicted in Figure 1. Notably, the soft robot, the employed constant-curvature model, and the measurement data are the same as in [5]. After a brief description of our initialization in Sec-tion VII-A, we present and compare our results with [5] in Section VII-B. We stress that, while [5] presents an Unscented Kalman Filter (UKF ) for state estimation, we additionally learn a state-dependent bending stiffness model. Lastly, in Section VII-C, we test the accuracy of the learned model by quantitatively analyzing multi-step prediction errors. As illustrated in Figure 1, the driving system inputs u are pneumatic pressures, and the outputs y are base reaction forces and torques. For validation purposes only, we have ground-truth robot states available, obtained through optical tracking. The discretization time step of the data set is ∆t = 8 ms .
+
+A. Initialization 
+
+To initialize our model, we set a non-informative GP prior with initial hyperparameters ℓ0 = 1 , σ2 
+
+> f, 0
+
+= 100 , as well as N IG distribution parameters ψ = 4 and ν = 1 . In the reduced-rank GP , we use M = 40 basis functions and set the domain as a hypercube with Li = 1 , i = 1 , 2, 3. To comply with the latter, we apply a scaling operation to the GP inputs 
+
+q, based on our knowledge of the rough workspace size. The number of particles is set to N = 500 , and the forgetting factor is chosen as γ = 0 . We point out that, while we run the marginalized PF on 5 s of real-world data, a forgetting factor 
+
+γ > 0 might be useful for longer time sequences to avoid accumulation of potential errors. The nominal constant-curvature model f nom & hnom is adopted from [5], including its offline identified model pa-rameters. The covariance matrices Σω and Σe are tuned heuristically. For a fair comparison, we re-tuned the covariance matrices of the UKF presented in [5] heuristically, to perform well on the selected 5 s of real-world data. The overall number of hyperparameter values to be tuned is 28 for the marginalized  
+
+> PF
+
+and 23 for the UKF [5], respectively. 
+
+B. State Estimation and Model Learning 
+
+To evaluate the state estimation performance, we run Algo-rithm 1 for 5 s on highly dynamic real-world soft robot data (see Figure 2). As shown in the middle plots, the marginalized  
+
+> PF
+
+accurately estimates the robot’s current pose and velocity. To compare, the average Root Mean Squared Error ( RMSE )of the position and velocity states, as well as the overall Normalized Mean Squared Error ( NMSE ), are given in Table I. As shown, the marginalized PF yields comparable state estima-tion accuracy to the UKF proposed in [5]. The results suggest improved estimation performance with the hyperparameter learning scheme. Still, we emphasize that these differences may be affected by heuristic tuning or randomness. For the bending stiffness, no ground-truth data is available. In fact, the bending stiffness estimates have no strong physical            
+
+> Fig. 2. True and estimated hidden states of the soft robot, which is driven by the pneumatic control inputs. Simultaneously with state estimation, the marginalized PF learns a nonlinear bending stiffness model kbend (q).TABLE I COMPARISON OF THE STATE ESTIMATION ACCURACY . R ESULTS FOR THE MARGINALIZED PF SARE AVERAGED OVER 10 MONTE CARLO RUNS .
+> Method Bending stiffness model learning Hyper-parameter learning Average
+> RMSE  of positions Average
+> RMSE  of velocities NMSE
+> Marg. PF
+
+✓ ✓ 1.28 mm 18 .3 mm /s 0.51   
+
+> Marg. PF
+
+✓ ✗ 1.95 mm 21 .0 mm /s 0.64   
+
+> UKF [5]
+
+✗ - 1.33 mm 40 .6 mm /s 0.87 
+
+meaning, as auxiliary slack variables accounting for modelling errors. Still, the bending stiffness kbend (x) obeys a state-dependent relationship [5], which can be learned to improve the predictive accuracy of the overall soft robot model. In this regard, the current bending stiffness estimates along the robot’s trajectory are depicted in the bottom plot of Figure 2. As shown, the particle approximation is consistent with the  
+
+> UKF
+
+estimates from [5]. Figure 3 illustrates the learned bending stiffness GP model at time T = 5 s . In the top plots, the mean and variance of the reduced-rank GP are visualized over the generalized coor-dinates δx and δy , while δL is fixed at 0.008 m . As expected, regions with more state data points show a pronounced mean estimate and a low variance. We stress that the state data points indicated by the histograms and the black dots are the state estimates obtained by particle filtering. This demonstrates the difficulty of learning a bending stiffness model with unknown regression inputs and outputs. The bottom plot of Figure 3 compares the particle-based stiffness estimates kt, obtained by sampling (22), with the learned bending stiffness GP model at time T = 5 s . It can be seen that both particle estimates and 
+
+GP predictions are consistent. 
+
+C. Multi-Step Prediction 
+
+To assess the accuracy of the learned model, we perform multi-step forward predictions and compute the NMSE using the ground-truth state measurements. In particular, we compare 
+
+(i) the learned model f nom (xt, ut, ˆkbend (xt)) , where 
+
+ˆkbend (xt) is the current GP posterior mean (4), 
+
+(ii) the nominal model f nom (xt, ut, ˆkbend ,UKF ), where 
+
+ˆkbend ,UKF is fixed at the current UKF bending stiffness estimate, and 
+
+(iii) the nominal model f nom (xt, ut, ¯kbend ), where ¯kbend =702 .4 N /m is fixed at the average estimated bending stiffness value. Table II summarizes the NMSE values for different integrator step sizes ∆t and prediction horizons h. As shown, all models exhibit similar prediction accuracy for small step sizes and short prediction horizons. However, the nominal model (iii) 
+
+exhibits significant prediction errors if the integrator time step or the horizon length is increased. This can be attributed to strong modeling assumptions and, thus, to a too simple model for representing the complex real-world behavior of the soft robot. In comparison, we observe that both the nominal model (ii) that incorporates UKF estimates and the 
+
+GP -augmented overall model (i) provide accurate multi-step predictions. When considering larger step sizes and prediction horizons, the GP -augmented model (i) outperforms the nominal model (iii) by a factor of two or more, and outperforms the nominal model with UKF estimates (ii) by approx. 10 % .VIII. C ONCLUSION AND OUTLOOK 
+
+In this paper, we show how to estimate a soft robot’s current pose while simultaneously—in contrast to existing work— learning a bending stiffness model online. This is enabled by a recently proposed gray-box system identification tool [9], which we validate in a complex, real-world robotic system. The learned nonlinear stiffness model improves overall model quality compared to a nominal model and thereby allows for accurate multi-step forward predictions. Methodologically, we build on prior work regarding simultaneous state estimation and model learning [9], [16] and employ a particle filter, marginalized over the model parameters. We acknowledge that, in its current implementation, the estimation scheme is not suitable for real-time applications, but speed-up is possible. Moreover, further work is required to systematically tune the algorithmic parameters. Nonetheless, taking a step back, the results demonstrate that recent online inference and learning tools enable accurate, adaptive modeling, paving the way for predictive model-based control strategies. GP mean GP variance std. State estimates 
+
+Fig. 3. Mean and variance of the learned nonlinear bending stiffness GP 
+
+model (top, evaluated for δL = 0 .008 m ) and comparison of posterior GP 
+
+predictions with the particle-based estimates of the bending stiffness (bottom). The particle-based estimates and the GP predictions are consistent with each other. TABLE II COMPARISON OF STATE PREDICTION NMSE FOR THE NOMINAL AND 
+
+GP -ENHANCED CONSTANT -CURVATURE SOFT ROBOT ACROSS PRED .
+
+> HORIZONS AND DISCRETIZATION WIDTHS
+
+. M EAN & STANDARD DEVIATION ACROSS STATES ARE GIVEN .                                                                                                                                       
+
+> hModel ∆t= 1 .0 ms ∆t= 2 .5 ms ∆t= 5 .0 ms ∆t= 7 .5 ms ∆t= 10 .0 ms
+> 5Nom. & GP 0.058 (0.052) 0.103 (0.091) 0.098 (0.082) 0.089 (0.064) 0.145 (0.126)
+> Nom. & UKF est. 0.059 (0.054) 0.106 (0.094) 0.105 (0.083) 0.099 (0.069) 0.162 (0.136)
+> Nominal 0.060 (0.050) 0.113 (0.092) 0.128 (0.099) 0.137 (0.102) 0.211 (0.183)
+> 10 Nom. & GP 0.084 (0.075) 0.094 (0.080) 0.082 (0.059) 0.081 (0.052) 0.119 (0.091)
+> Nom. & UKF est. 0.087 (0.077) 0.101 (0.081) 0.093 (0.062) 0.096 (0.057) 0.135 (0.097)
+> Nominal 0.091 (0.075) 0.122 (0.095) 0.141 (0.111) 0.175 (0.158) 0.248 (0.286)
+> 20 Nom. & GP 0.096 (0.084) 0.080 (0.057) 0.083 (0.053) 0.089 (0.056) 0.305 (0.892)
+> Nom. & UKF est. 0.101 (0.085) 0.091 (0.061) 0.094 (0.052) 0.097 (0.048) 0.130 (0.071)
+> Nominal 0.115 (0.091) 0.136 (0.106) 0.196 (0.202) 0.218 (0.238) >10Pred.timeinms100
+> 0
+> 0.25
+> NMSENom.&GPmodelfor^kbend
+> Nom.&currentUKFestimate
+> Nominalmodel
+> h=20,"t=5ms
+
+ACKNOWLEDGMENT 
+
+The authors would like to thank Bj¨ orn Volkmann and Michael Meindl for their support and continued discussions on the topics. REFERENCES [1] J. Licher, M. Bartholdt, H. Krauss, T.-L. Habich, T. Seel, and M. Schappler, “Adaptive Model-Predictive Control of a Soft Continuum Robot Using a Physics-Informed Neural Network Based on Cosserat Rod Theory,” preprint. arXiv: 2508.12681 , 2025. [2] M. Hachen, C. Shentu, S. Lilge, and J. Burgner-Kahrs, “A Non-Linear Model Predictive Task-Space Controller Satisfying Shape Constraints for Tendon-Driven Continuum Robots,” IEEE Robotics and Automa-tion Letters , vol. 10, no. 3, pp. 2438–2445, 2025. [3] S. Vaskov, R. Quirynen, M. Menner, and K. Berntorp, “Friction-adaptive stochastic nonlinear model predictive control for autonomous vehicles,” Vehicle System Dynamics , pp. 1–25, 2023. [4] S. S¨ arkk¨ a and L. Svensson, Bayesian filtering and smoothing , 2nd ed. New York: Cambridge University Press, 2023. [5] M. Mehl, M. Bartholdt, S. F. G. Ehlers, T. Seel, and M. Schappler, “Adaptive State Estimation with Constant-Curvature Dynamics Using Force-Torque Sensors with Application to a Soft Pneumatic Actuator,” in Int. Conference on Robotics and Autom. , IEEE, 2024, pp. 14 939– 14 945. [6] S. Teetaert, S. Lilge, J. Burgner-Kahrs, and T. D. Barfoot, “A Sliding-Window Filter for Online Continuous-Time Continuum Robot State Estimation,” preprint. arXiv: 2510.26623 , 2025. [7] C. Della Santina, C. Duriez, and D. Rus, “Model-Based Control of Soft Robots: A Survey of the State of the Art and Open Challenges,” 
+
+IEEE Control Systems , vol. 43, no. 3, pp. 30–65, 2023. [8] S. Teetaert, S. Lilge, J. Burgner-Kahrs, and T. D. Barfoot, “A Stochas-tic Framework for Continuous-Time State Estimation of Continuum Robots,” preprint. arXiv: 2510.01381 , 2025. [9] B. Volkmann, J.-H. Ewering, M. Meindl, S. F. G. Ehlers, M. A. M¨ uller, and T. Seel, “Bayesian Inference and Learning in Nonlinear Dynamical Systems: A Framework for Incorporating Explicit and Implicit Prior Knowledge,” preprint, arXiv: 2508.15345 , 2025. [10] A. Wigren, J. W˚ agberg, F. Lindsten, A. G. Wills, and T. B. Sch¨ on, “Nonlinear System Identification: Learning While Respecting Physical Models Using a Sequential Monte Carlo Method,” IEEE Control Systems , vol. 42, no. 1, pp. 75–102, 2022. [11] R. Turner, M. Deisenroth, and C. Rasmussen, “State-Space Inference and Learning with Gaussian Processes,” in Int. Conf. on Artificial Intell. and Statistics , vol. 9, Sardinia, Italy: PMLR, 2010, pp. 868–875. [12] R. Frigola, F. Lindsten, T. B. Sch¨ on, and C. E. Rasmussen, “Bayesian Inference and Learning in Gaussian Process State-Space Models with Particle MCMC,” in Adv. Neur. Inform. Proc. Syst. , vol. 26, Curran, 2013. [13] A. Svensson, A. Solin, S. S¨ arkk¨ a, and T. B. Sch¨ on, “Computationally Efficient Bayesian Learning of Gaussian Process State Space Models,” in Int. Conf. on AI and Statistics , vol. 51, Cadiz, Spain: PMLR, 2016, pp. 213–221. [14] A. Svensson and T. B. Sch¨ on, “A flexible state–space model for learn-ing nonlinear dynamical systems,” Automatica , vol. 80, pp. 189–199, 2017. [15] J.-H. Ewering, R. E. Herrmann, N. Wahlstr¨ om, T. B. Sch¨ on, and T. Seel, “Learning Dynamics from Input-Output Data with Hamil-tonian Gaussian Processes,” in Learning for Dynamics and Control Conference , 2026. [16] K. Berntorp, “Online Bayesian inference and learning of Gaussian-process state–space models,” Automatica , vol. 129, p. 109 613, 2021. [17] K. Berntorp and M. Menner, “Online Constrained Bayesian Inference and Learning of Gaussian-Process State-Space Models,” in American Control Conf. , IEEE, 2022, pp. 940–945. [18] J.-H. Ewering, B. Volkmann, S. F. G. Ehlers, T. Seel, and M. Meindl, “Efficient Online Inference and Learning in Partially Known Nonlinear State-Space Models by Learning Expressive Degrees of Freedom Of-fline,” in Conf. on Decision and Control , IEEE, 2024, pp. 4157–4164. [19] A. Kullberg, I. Skog, and G. Hendeby, “Online Joint State Inference and Learning of Partially Unknown State-Space Models,” IEEE Trans. Signal Process. , vol. 69, pp. 4149–4161, 2021. [20] R.-S. G¨ otte and J. Timmermann, “Approximating a Laplacian Prior for Joint State and Model Estimation within an UKF,” IFAC-PapersOnLine , vol. 56, no. 2, pp. 869–874, 2023. [21] S. Lilge, T. D. Barfoot, and J. Burgner-Kahrs, “Continuum robot state estimation using Gaussian process regression on SE(3),” Int. Journal of Robotics Research , vol. 41, no. 13-14, pp. 1099–1120, 2022. [22] A. Ataka et al., “Real-time pose estimation and obstacle avoidance for multi-segment continuum manipulator in dynamic environments,” in 
+
+Int. Conf. on Intel. Robots and Systems , IEEE, 2016, pp. 2827–2832. [23] J. Y. Loo, K. C. Kong, C. P. Tan, and S. G. Nurzaman, “Non-linear System Identification and State Estimation in a Pneumatic Based Soft Continuum Robot,” in Conf. on Control Techn. and Applications , IEEE, 2019, pp. 39–46. [24] E. J. Lobaton, J. Fu, L. G. Torres, and R. Alterovitz, “Continuous Shape Estimation of Continuum Robots Using X-ray Images,” in Int. Conf. on Robotics and Autom. , IEEE, 2013, pp. 725–732. [25] G. Zhang and L. Wang, “Stochastic Adaptive Estimation in Polynomial Curvature Shape State Space for Continuum Robots,” IEEE Transac-tions on Robotics , vol. 42, pp. 261–280, 2026. [26] H. Abdelaziz, A. Nada, H. Ishii, and H. El-Hussieny, “State Estimation of Continuum Robots: A Nonlinear Constrained Moving Horizon Approach,” preprint. arXiv: 2308.03931 , 2023. [27] D. Kim, M. Park, and Y.-L. Park, “Probabilistic Modeling and Bayesian Filtering for Improved State Estimation for Soft Robots,” IEEE Trans-actions on Robotics , vol. 37, no. 5, pp. 1728–1741, 2021. [28] M. Mehl, M. Bartholdt, and M. Schappler, “Dynamic Modeling of Soft-Material Actuators Combining Constant Curvature Kinematics and Floating-Base Approach,” in Int. Conf. on Soft Robotics , IEEE, 2022, pp. 1–8. [29] C. Della Santina, A. Bicchi, and D. Rus, “On an Improved State Parametrization for Soft Robots With Piecewise Constant Curvature and Its Use in Model Based Control,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 1001–1008, 2020. [30] C. E. Rasmussen and C. Williams, Gaussian Processes for Machine Learning . MIT Press, 2005. [31] A. Solin and S. S¨ arkk¨ a, “Hilbert space methods for reduced-rank Gaussian process regression,” Statistics and Computing , vol. 30, no. 2, pp. 419–446, 2020. [32] G. Riutort-Mayol, P.-C. B¨ urkner, M. R. Andersen, A. Solin, and A. Vehtari, “Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming,” Statistics and Computing ,vol. 33, no. 1, 2023. [33] E. ¨Ozkan, V. ˇSm´ ıdl, S. Saha, C. Lundquist, and F. Gustafsson, “Marginalized adaptive particle filtering for nonlinear models with unknown time-varying noise parameters,” Automatica , vol. 49, no. 6, pp. 1566–1575, 2013. [34] K. P. Murphy, “Conjugate Bayesian analysis of the Gaussian distribu-tion,” Technical Report , 2007. [35] L. Ljung, System identification: Theory for the user , 2nd ed. N.J.: Prentice Hall, 1999.

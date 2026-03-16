@@ -1,0 +1,1116 @@
+Title: Joint Task Assistance Planning via Nested Branch and Bound (Extended Version)
+
+URL Source: https://arxiv.org/pdf/2602.13932v1
+
+Published Time: Tue, 17 Feb 2026 01:49:53 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Joint Task Assistance Planning via Nested Branch and Bound (Extended Version) 
+
+Omer Daube and Oren Salzman 
+
+Abstract — We introduce and study the Joint Task Assistance Planning problem which generalizes prior work on optimizing assistance in robotic collaboration. In this setting, two robots operate over predefined roadmaps, each represented as a graph corresponding to its configuration space. One robot, the task robot, must execute a timed mission, while the other, the assistance robot, provides sensor-based support that depends on their spatial relationship. The objective is to compute a path for both robots that maximizes the total duration of assistance given. Solving this problem is challenging due to the combinatorial explosion of possible path combinations together with the temporal nature of the problem (time needs to be accounted for as well). To address this, we propose a nested branch-and-bound framework that efficiently explores the space of robot paths in a hierarchical manner. We empirically evaluate our algorithm and demonstrate a speedup of up to two orders of magnitude when compared to a baseline approach. 
+
+I. I NTRODUCTION 
+
+In Task Assistance Planning (TAP), first introduced by Bloch and Salzman [1], we are given two robots called the task robot ( Rtask ) and the assistance robot ( Rassist ). The task robot needs to execute a task (e.g., inspecting an underground mine where there is limited communication) which requires moving in a known workspace. The assistance robot can pro-vide assistance (e.g., serve as a communication relay outside the mine in strategic locations such as shafts where there is communication to Rtask ) which is a function of the spatial configuration of both robots. 1 Because completing a task requires Rtask to continuously move in the workspace, Rassist 
+
+may also need to relocate its position in order to maximize assistance provided. Bloch and Salzman [1] consider the restricted setting where Rtask ’s trajectory is fixed and we only need to plan the trajectory of Rassist . In this work we consider a generalization of their problem (formally introduced in Sec. III) where we need to simultaneously compute the trajectories of Rtask and Rassist while maximizing the portion of Rtask ’s path for which assistance is provided. We call this 
+
+Joint Task Assistance Planning (J OINT TAP). The J OINT TAP can be used to model a variety of problems where assistance (e.g., visual perception and or maintaining communication) plays a pivotal role. One example can be found in settings where depth perception is critical, such as a tele-operated task in a confined environment, where an assistance robot equipped with a secondary camera can position itself at a different angle, helping a human operator                 
+
+> O. Daube and O. Salzman are with the Faculty of Com-puter Science, Technion, Haifa, Israel. E-mail:
+
+{omer.daube, osalzman }@cs.technion.ac.il 
+
+> 1Importantly, assistance refers to support that does not influence task execution.
+
+judge distances more accurately [2]. As a second example, illustrated in Fig. 1, we consider search-and-rescue (SAR) operations where standard transmission methods may fail [3], [4]. Consequently, assistance can take the form of a line-of-sight (LOS) communication link. In such scenarios, an assistance robot positioned outside the environment can relay communication by maintaining LOS with the operating robot while the task robot complete its mission. Thus, the mission-planner’s objective is to jointly plan the path of both Rtask 
+
+and Rassist in order to (i) complete the task and (ii) maximize assistance (i.e. maintaining communication). Unfortunately, the TAP problem is already computation-ally hard [1] rendering exact approaches to the J OINT TAP problem intractable. To this end, here we focus on the algorithmic foundations of the J OINT TAP problem and con-sider the offline discrete setting in which we compute the trajectories for both Rtask and Rassist on predefined discrete motion-planning roadmaps before execution (similar to pre-operative planning in surgical setting—see, e.g., [5]) and leave online J OINT TAP planning for future work. Our contributions include the formulation of the J OINT -TAP problem as well as an efficient Branch and Bound (BnB)-based algorithm that outperform baseline by up to two orders of magnitude. Key to the efficiency of our algorithm is a flow-based linear programming upper bound that allows to prune entire subregions of the search space. As candidate plans of the BnB are highly similar, we also introduce an incremental algorithm for optimizing subproblems and use it within our (BnB)-based algorithm. This additional optimization gives an extra speed up of up to 3×. We demonstrate our algorithm in simulation on a 4-DOF planar manipulator and a 4-DOF model of a drone in a 3D room as well as in the lab using Crazyflie 2.1+ quadrotors (Fig. 1). II. R ELATED WORK 
+
+In this section, we consider broadly related work including visual assistance, inspection planning, and assisting agents in collaborative settings which bare resemblance to the TAP and JOINT TAP problems. We defer discussing the specific work of Bloch and Salzman [1] until after the formal problem definition (Sec. III) and overview the algorithmic background they introduced (and we build upon) throughout the paper. When the assistance takes the specific form of visual as-sistance , our problem bares resemblance to problems related to robot target detection and tracking such as coverage, pursuit–evasion and surveillance [6]. Generally speaking, these can be split into collaborative and adversarial set-tings. In the former, existing works either (i) consider low-   
+
+> arXiv:2602.13932v1 [cs.RO] 15 Feb 2026 vA
+> 0vA
+> end vT
+> 0vT
+> end GAGTvT
+> mid vA
+> mid (a) vA
+> 0
+> vT
+> 0(b) vT
+> mid (c) vT
+> end
+> vA
+> end (d)
+
+Fig. 1: (a) Illustration of motivating application where Rtask (blue) and Rassist (red) need to maximize accumulated line-of-sight (LOS) (purple) while moving on their respective roadmaps GT , GA. Computed paths depicted in green. (b)-(d) Snapshots of path execution on Crazyflie drones for three timestamps t0 = 0 , t mid and tend = 1 where Rtask is located at 
+
+vT 
+
+> 0
+
+, v T
+
+> mid
+
+, v T 
+
+> end
+
+and vA 
+
+> 0
+
+, v A
+
+> mid
+
+, v A
+
+> end
+
+, respectively. As Rtask is required to move between two parts of the room, Rassist needs to strategically reposition itself causing a temporary lack of LOS at tmid (thus, vT 
+
+> mid
+
+is no visible in (b)). dimensional systems (see, e.g., [7], [8]), in contrast to the high-dimensional configuration spaces which motivate our work or (ii) consider a relatively uncluttered environment and a fixed task trajectory as in the case of planning camera motions (see, e.g., [9], [10]). In the latter, adversarial setting (see, e.g., [11]), one group of robots tracks another, whereas we focus on the cooperative setting in which the task and assistance robots work in concert. Another topic that is closely related to visual assistance is inspection planning [12], [13] or coverage planning [14], [15]. In these problems a robot (or team of robots [16]) are tasked with maximizing the coverage of a static area of interest. This differs from our setting wherein the temporal and sequential nature of assistance is paramount; it is not enough to simply see a region, but rather to assist the teammate in the workspace for as long as possible. Finally, our work can be seen as an instance of problems studying how agents can evaluate both their need for help and their ability to support others with the most closely related problem being computing the Value of Assistance (VOI) [17], [18]. VOI calls for assessing (and computing) the gain obtained by offering assistance at a particular stage of the task-robot’s execution. In contrast to our setting, this approach limits assistance to a single point along the task-robot’s trajectory, concentrating only on identifying the most beneficial location for intervention. III. P ROBLEM DEFINITIONS 
+
+Recall that in our setting we are given two robots Rtask 
+
+and Rassist called the task robot and assistance robot , re-spectively. Their possible motions are captured via graphs 
+
+GT = (VT , E T ) and GA = (VA, E A) called the task graph and assistance graph , respectively. These represent roadmaps embedded in the robot’s configuration spaces [19] where vertices and edges of GT and GA correspond to configurations and transitions of robots. Furthermore, we are given start and goal vertices vT 
+
+> 0
+
+, v T 
+
+> goal
+
+∈ V T for Rtask as well as a start vertex vA 
+
+> 0
+
+∈ VA for Rassist which encode the set of valid paths in GT and GA, respectively. Each edge e ∈ EA ∪ET has a length ℓ(e). We assume that moving along an edge e takes time that’s identical to ℓ(e) and that time and edge length are normalized to [0 , 1] .We model Rassist ’s ability to provide assistance to Rtask 
+
+via a assistance function A : VA × VT → { 0, 1} such that if Rassist is located at uA and Rtask is located at uT then 
+
+A(uA, u T ) = 1 and A(uA, u T ) = 0 indicates that Rassist can and can’t provide assistance to Rtask , respectively. To model assistance when Rassist moves along edges, we extend A as follows: Given edge e = ( u, v ) ∈ EA traversed by Rassist , we 
+
+associate Rassist with u and v if it is located along the first and second half of e, respectively. The notion of robot association is defined analogously for Rtask . Now, when Rassist and Rtask 
+
+traverse edges eA and eT , respectively, the assistance is defined with respect to their associated vertices. As assistance at edges is a function of assistance at vertices, it will be useful to extend the length function ℓ:Given path π = ⟨v0, . . . , v n⟩ in G ∈ { GT , G A} we de-fine ℓπ (vi, v j ) to be the length of a path from vi to vj . That is, 
+
+ℓπ (vi, v j ) := Pj−1 
+
+> h=i
+
+ℓ(vh, v h+1 ). To simplify the definition we set ℓπ (v−1, v 0) := 0 , ℓπ (vk, v k+1 ) := 0 , and omit π when understood from context. Moreover, we denote δ′(v, v ′) to be the shortest path length excluding the first and last half-edges between v and v′ among all paths in G.Recall that Rtask and Rassist move at constant speed and that time t is normalized such that t ∈ [0 , 1] . However, we also assume that they can stop at graph vertices. Thus, to determine their location along a given path, we need to specify how long they stop at each vertex along the path. This is captured using the notion of a timing profile .2
+
+Definition 1 (Timing Profile): Let π = ⟨v0, . . . , v k⟩ be a path in G ∈ { GT , G A}. A timing profile of π is a sequence of timestamps T = ⟨t0, . . . , t k−1⟩ s.t. ti+1 ≥ ti+0 .5·ℓ(vi, v i+2 )
+
+for all 0 ≤ i < k , where we assume t−1 = 0 , t k = 1 .
+
+Assumption. As the ultimate goal of Rtask is to complete its task, we assume that its timing profile is fully determined for a given path πT such that it is not delayed unnecessarily at vertices. Thus, for a given path we denote the corresponding timing profile by TT (πT ). This also means that once a path is fixed, we can associate each assistance vertex vA ∈ VA with a set of time intervals IA 
+
+> πT
+
+(vA), called assistance intervals, capturing the time windows during which Rtask is present at a vertex vT assisted by vA. This assumption can easily be       
+
+> 2The notion of a timing profile is relevant both to paths of Rtask in GT
+> and to paths of Rassist in GA.
+
+relaxed but we avoid this to simplify the exposition. Recall that A indicates whether assistance can or can’t be provided given two vertices. As we will see, it will be conve-nient to extend A to time intervals. Specifically, and with a slight abuse of notation, we set A : VA ×VT ×2[0 ,1] ×2[0 ,1] →
+
+[0 , 1] such that A(uA, u T , I A, I T ) := A(uA, u T ) · | IA ∩ IT |.This can be interpreted as the amount of assistance provided when Rassist resides in locations associated with uA in the time interval IA while Rtask resides in locations associated with uT in the time interval IT .Using this extended definition of A, we define the notion of reward which measures the amount of assistance Rassist 
+
+provides to Rtask while each is traversing a given path. 
+
+Definition 2 (Reward): Let πA = ⟨vA 
+
+> 0
+
+, . . . , v Ak ⟩ be a path in GA, πT = ⟨vT 
+
+> 0
+
+, . . . , v Tm⟩ be a path in GT , TA =
+
+⟨tA 
+
+> 0
+
+, . . . , t Ak−1⟩ be the timing profile of πA and let TT =
+
+⟨tT 
+
+> 0
+
+, . . . , t Tm−1⟩ be the timing profile of πT . The reward of paths πA, π T using timing profiles TA, TT is defined as 
+
+RA(πA, π T , TA, TT ) := 
+
+> k
+
+X
+
+> i=0
+> m
+
+X
+
+> j=0
+
+A(vAi , v Tj , TiA, TjT ). (1) Here, let TiA = [ tAi−1, t Ai ], and define TiT analogously. We are finally ready to formally define our problems of interest. We start with the restricted timing-focused problem and continue to our general problem. 
+
+Problem 1 (OTP): Let πA, π T be paths in GA, G T , re-spectively. Let T (πA) be the set of all possible timing profiles over πA and TT be the timing profile of πT . The 
+
+Optimal Timing Profile (OTP) problem calls for computing a timing profile T∗ 
+
+> A
+
+for πA whose reward is maximal. Namely, compute T∗ 
+
+> A
+
+such that 
+
+T∗ 
+
+> A
+
+∈ argmax  
+
+> TA∈T (πA)
+
+RA(πA, π T , TA, TT (πT )) .
+
+Problem 2 ( JOINT TAP ): Let vT 
+
+> 0
+
+∈ VT and vA 
+
+> 0
+
+∈ VA
+
+be start vertices for Rtask and Rassist , respectively, let 
+
+ΠT (vT 
+
+> 0
+
+, v T
+
+> end
+
+) be the set of paths in GT starting from vT
+
+> 0
+
+and ending at vT 
+
+> end
+
+and let ΠA(vA 
+
+> 0
+
+) be the set of paths in GA starting from vA 
+
+> 0
+
+. Furthermore, let T (πA) be the set of all possible timing profiles over path πA and recall that 
+
+TT (πT ) is the induced timing profile of path πT in GT .The Joint Task Assistance Planning ( JOINT TAP ) problem calls for computing a path π∗ 
+
+> T
+
+in GT , path π∗ 
+
+> A
+
+in GA and a timing profile T∗ 
+
+> A
+
+whose reward is maximal. Namely, compute π∗ 
+
+> T
+
+, π ∗
+
+> A
+
+, T∗ 
+
+> A
+
+s.t. 
+
+π∗ 
+
+> T
+
+, π ∗
+
+> A
+
+, T∗ 
+
+> A
+
+∈ argmax      
+
+> πA∈ΠA(vA
+> 0),πT∈ΠT(vT
+> 0,v T
+> end ),
+> TA∈T (πA)
+
+RA (πA, π T , TA, TT (πT )) .
+
+Finally, we call the special case of J OINT TAP (Prob. 2), where the task path πT is fixed the Assistance Optimal Timing Profile ( ASSISTANCE OTP ) problem. 3
+
+Example 1: To illustrate J OINT TAP, consider the instance shown in Fig. 2a. On the task graph GT , we consider two candidate paths: π↑ 
+
+> T
+
+= ⟨v0, v 1, v 2⟩ and π↓ 
+
+> T
+
+= ⟨v0, v 3, v 2⟩,
+
+> 3The A SSISTANCE OTP was studied in [1] under the name OPTP.
+
+which induce the timing profiles TT (π↑ 
+
+> T
+
+) = ⟨0, 0.1, 0.5, 0.8⟩
+
+and TT (π↓ 
+
+> T
+
+) = ⟨0, 0.2, 0.5, 0.6⟩, respectively. These profiles, together with the assistance relation A, determine the corre-sponding intervals on GA are depicted in Fig. 2. Path π↑ 
+
+> T
+
+and assistance A induce assistance intervals 
+
+[0 .1, 0.5] on u1 and [0 .5, 0.8] on u2, depicted in blue in Fig. 2b,2c. Now, Rassist can follow path π↑ 
+
+> A
+
+with timing profile 
+
+T↑ 
+
+> A
+
+= ⟨0, 0, 0.45 , 1⟩ (Fig. 2b), covering both intervals and yielding a total reward of RA(π↑
+
+> A
+
+, π ↑ 
+
+> T
+
+, T↑
+
+> A
+
+, TT (π↑ 
+
+> T
+
+)) = 0 .7.Alternatively, choosing π↓ 
+
+> T
+
+yields shorter intervals and results in lower reward of 0.25 .IV. A LGORITHMIC APPROACH 
+
+Recall that to solve the J OINT TAP problem (Prob. 2), we need to compute a task path πT , an assistance path πA,and a timing profile for πA which jointly maximize the total reward. Bloch and Salzman [1] introduced an efficient solver for A SSISTANCE OTP which, given a task path πT ,computes an assistance path πA, and a timing profile for πA
+
+which jointly to maximize total reward. Thus, a straw man approach, could be enumerating all task paths and, for each one solve the corresponding A SSISTANCE OTP problem. As we will see in Sec. VII, while solving the problem optimally, this approach is impractical due to its exponential runtime. The key shortcomings of this approach are that (i) task paths are naively enumerated and that (ii) the corresponding ASSISTANCE OTP problem is recomputed from scratch. To systematically and efficiently enumerate the set of task paths, we suggest to employ a nested branch-and-bound (BnB) framework [20], [21], [22]. BnB is a general algorith-mic framework for solving combinatorial-optimization prob-lems [23]. It explores the solution space by dividing it into smaller subproblems (branching) and uses bounds to prune regions that cannot contain better solutions (bounding). This often allows finding on optimal solution efficiently without iterating over every possible solution. Conceptually, nested BnB is a hierarchical optimization framework that applies BnB recursively at outer and inner levels of an optimization problem. The outer BnB explores a high-level search space (in our setting, this well be selecting a task path πT in GT ), while the inner BnB solves a dependent subproblem (in our setting, this will be computing the optimal assistance path πA and timing profile for each outer solution πT ). This structure enables efficient pruning based on upper bounds at both levels, allowing the algorithm to avoid exhaustive search while preserving optimality. We detail this step in Sec. VI. A key optimization we employ within our BnB instan-tiation builds upon the observation that we solve multiple, highly similar OTP problems (Prob. 1). To avoid recom-puting solutions from scratch, we suggest in Sec. V an incremental approach for solving an OTP problem P given that we have a solution to a similar Problem P ′ .V. I NCREMENTALLY SOLVING THE OTP P ROBLEM 
+
+Before we describe our approach, and to simplify this section, we present an alternative formulation to the OTP problem (Prob. 1): First, as both paths πT , π A and the timing v0
+
+> v1
+> v3
+> v2
+> 0.2
+> 0.4
+> 0.6
+> 0.2
+
+GT 
+
+> u0u1
+> u2
+> u3
+> 0.2
+> 0.1
+> 0.1
+
+GA          
+
+> (a)
+> t
+> 00.2 0.4 0.6 0.8 1
+> u0
+> u1
+> u2
+> (b)
+> t
+> 00.2 0.4 0.6 0.8 1
+> u0
+> u1
+> u3
+> (c)
+
+Fig. 2: Illustrative example and induced timing. (a) Task graph GT with start and goal vertices v0, v 2 and assistance graph GA
+
+with start vertex u0 and assistance function A (teal dashed). (b) Intervals from π↑ 
+
+> T
+
+= ⟨v0, v 1, v 2⟩ (blue) together with a timing profile on π↑ 
+
+> A
+
+(black). (c) Intervals from π↓ 
+
+> T
+
+= ⟨v0, v 3, v 2⟩ (red) with a timing profile on π↓
+
+> A
+
+. Solid black segments indicate times where assistance can be performed and dotted segments where it cannot. profile TT of Rtask are fixed, we can compute for each vertex 
+
+v ∈ πA the set of time intervals during which Rassist can assist Rtask and denote this set as IA 
+
+> πT
+
+(v). In addition, we use V(I) to denote the vertex associated with interval I (i.e., 
+
+∀I ∈ I A 
+
+> πT
+
+(v), V(I) = v). In this specific case, the reward can be written as: 
+
+RA(πA, π T , TA, TT ) := 
+
+> k
+
+X
+
+> i=0
+
+X 
+
+> I∈I A
+> πT(vi)
+
+|TiA ∩ I|. (2) Importantly, the original definition (Eq. (1)) is equivalent to this new one (Eq. (2)). In the remainder of this section we will use this reward definition and assume that an OTP problem is given in the form of an assistance path πA and the intervals IA 
+
+> πT
+
+(v) for each vertex v ∈ πA.4
+
+A. Algorithmic background 
+
+Our approach relies on the notion of critical times and 
+
+time-reward pairs [1]. Conceptually, the set of critical times capture two key transitions between intervals: arriving ex-actly at the start of an assistance interval or leaving exactly at its end. 5 Now, given an OTP problem, one can show that it is sufficient to restrict the search for an optimal timing profile to combinations of these critical times, thereby discretizing the otherwise continuous problem. Critical times can then be used to solve the OTP problem as follows: (i) compute C Ti, the set of all critical times associated with vertex vi of assistance path πA and (ii) for each vertex vi and each critical time t ∈ CTi, compute best reward r that is achievable by exiting vi at time t. This can be computed efficiently by a dynamic-programming approach that maintains so-called time-reward pairs associated with path vertices. Such a pair (t, r ) associated with vertex 
+
+vi ∈ πA represents that r is the best reward achievable by exiting vi at critical time t ∈ CTi.                              
+
+> 4This definition is the one used by Bloch and Salzman [1] since they considered the setting where πTis fixed thus avoiding the need to reason about timing profiles of two paths. Our ultimate goal, solving the J OINT TAP problem requires reasoning about both paths which is why the reward defined (Eq. 1) is in a general form.
+> 5Here, the phrase “Rassist arrives at vertex v”is used in terms of assistance (i.e., when Rassist can start to provide the assistance associated with vertex v). Specifically, following our assistance model (Sec. III), when Rassist arrives at time tto vertex viof path πA=⟨v0, . . . , v n⟩,it actually starts providing assistance at time t−12ℓ(vi−1, v i).
+
+Importantly, the critical times C Ti (which are precomputed before computing all time-reward pairs) require accounting for the start and end times of each interval in vi and of future vertices in πA. Consequently, a change in the interval set of any vertex may require updating the critical times at earlier vertices effectively necessitating a full rerun of the algorithm. As we will see shortly, our incremental approach does not require precomputing all critical times which allows for efficient solution updates when a new interval is added. 
+
+B. Algorithmic framework High-level approach: To allow for incremental changes, our algorithm will maintain a data structure which we call the history H which is an ordered list of intervals I1, I 2 . . . 
+
+ordered first by the order of vertices in πA and then according to the interval’s start time. I.e., given two intervals I, I ′ with start times t and t′, respectively such that I appears before I′
+
+then either V(I) is before V(I′) in πA or alternatively, 
+
+V(I) = V(I′) and thus t ≤ t′.Unlike the original algorithm, which precomputes the full set of critical times CTi for each vertex, our approach computes critical times on demand. Instead of maintaining a global list of all critical times per vertex, each inter-val ∈ H stores only the relevant time-reward pairs in a set called ARRIVALS that are associated with I. Im-portantly, A RRIVALS (I) contains time-reward pairs whose critical times are from intervals before I in H. The interval-centric approach (in contrast to the vertex-centric approach of Bloch and Salzman) localizes computation as each interval maintains only the critical times pertinent to itself. When a new interval Inew is added to H, we compute ARRIVALS (Inew ) based on preceding intervals that can reach it. This is done by considering the critical times: either by arriving to Inew at its start time or leaving a preceding interval at its end time. After this update, we similarly update every interval in H that comes after Inew , to account for new possible transitions originating from Inew .Once H is updated, each interval I ∈ H stores the set A RRIVALS (I) containing the possible arrival times and their corresponding rewards. This allows us to extract, for each interval, the optimal reward achievable up to that point. 
+
+Algorithmic details: We are finally ready to detail our algorithm outlined in Alg. 1. The main function IncOTP Algorithm 1 Incremental OTP Procedures  
+
+> 1:
+
+function INC OTP( H, I, π A) 
+
+> 2:
+
+for I ∈ I do  
+
+> 3:
+
+H ← InsertInterval (H, I ) 
+
+> 4:
+
+return FindMaxReward (H), H 
+
+> 5:
+
+function INSERT INTERVAL (H, I new ) 
+
+> 6:
+
+H.Insert (Inew ) 
+
+> 7:
+
+Hprev , Hpost ← SplitHistory (H, I new ) 
+
+> 8:
+
+H′ ← H prev  
+
+> 9:
+
+for Idest = [ αdest , β dest ] ∈ H post do  
+
+> 10:
+
+H′
+
+> prev
+
+, H′ 
+
+> post
+
+← SplitHistory (H′, I dest ) 
+
+> 11:
+
+for Isrc = [ αsrc , β src ] ∈ H ′ 
+
+> prev
+
+do  
+
+> 12:
+
+AddReward (Isrc , I dest , α dest ) 
+
+> 13:
+
+AddReward (Isrc , I dest , β src + ℓ(V(Isrc ), V(Idest )))  
+
+> 14:
+
+H′.Insert (Idest ) 
+
+> 15:
+
+return H′
+
+receives as input the history 6 H, a set of intervals I to add associated with assistance path πA. The function in-crementally adds 7 the intervals from I to H (Lines 2-3 and detailed in insertInterval ) and then computes the reward associated with the best timing profile (Line 4 and detailed in findMaxReward ). Recall, that when adding interval Inew into H (function 
+
+insertInterval ), we are only required to update the time-reward pairs for Inew as well as for subsequent intervals in H. Thus, after adding Inew to H (Line 6), we split H
+
+into two sets: Hprev , Hpost which contain all intervals that appear before and after Inew in H, respectively (impor-tantly, Inew ∈ H post ). This is implemented via the function 
+
+SplitHistory (Line 7). We then continue to iterate over all intervals in Hpost in order to update their time reward pairs (Line 9). For each such interval Idest ∈ H post we consider all intervals Isrc ∈Hpost that lie before Idest (Line 11). We then add time reward pairs to A RRIVALS (Idest ) corresponding to the critical times where (i) we arrive exactly at the start of Idest (Line 12), or where (ii) we leave exactly at the end of Isrc (Line 13). In either case, updating A RRIVALS (Idest ) is done by the function AddReward (Isrc , I dest , t arrive ). This function com-putes the reward of the optimal transition from Isrc to Idest ,assuming Rassist arrives to Idest at tarrive . It does so by com-puting the maximum reward achievable up to tarrive from the time-reward pairs in A RRIVALS (Isrc ). The resulting reward r
+
+is then paired with tarrive and added to A RRIVALS (Idest ).
+
+Complexity: Let n denote the total number of intervals and m the number of intervals that follow Inew in H. For each such interval Idest (there are m of them), we iterate over all preceding intervals Isrc in H, of which there are O(n).For each pair (Isrc , I dest ), we invoke AddReward twice.           
+
+> 6Any history should include the interval [0 ,0] at vertex 0with initial time-reward pair of (0 ,0) .
+> 7For simplicity, we only consider adding intervals but the entire approach can be used to remove intervals from H. This is done by replacing the
+> insert operation (Alg. 1, Line 6) to remove .
+
+AddReward computes the reward obtainable between these two intervals and performs insertion and lookup in the ARRIVALS list. Thus, each call to AddReward takes O(n)
+
+time. Consequently, the overall complexity for inserting an interval is O(mn 2). This can be improved to O(mn log n)
+
+using tailored data structure and caching. Details omitted. 
+
+Correctness (sketch): To prove that Alg. 1 computes an optimal reward, note that for each interval Ii in history H =
+
+⟨I0, . . . , I n⟩, the algorithm maintains a set of time-reward pairs A RRIVALS (Ii), where each pair corresponds to one of the two critical transition types from a preceding interval: arriving exactly at the start of Ii or leaving exactly at the end of the preceding interval. Next, consider an optimal timing profile Topt that visits the sequence of intervals ⟨Ii0 , . . . , I ik ⟩. Following Bloch and Salzman [1], we can assume that Topt only contains critical times. That is, each transition between two consecutive intervals in the sequence either arrives at the start of the latter or leaves at the end of the former. Because the algorithm populates each A RRIVALS (I) with both types of critical transitions from all former intervals, it must eventually include the correct time-reward pair (t, r )
+
+for the final interval Iid . This pair is obtained through a valid chain of transitions starting from A RRIVALS (Ii0 ),propagating forward through the sequence using only critical transitions. Since the timing and reward exactly match those guaranteed by Bloch and Salzman’s construction, we have the same sequence of intervals and the same set of critical transitions. Thus, the algorithm correctly recovers the opti-mal timing profile’s reward. VI. N ESTED BRANCH -AND -B OUND FOR JOINT TAP In this section we introduce our nested BnB algorithm for solving the J OINT TAP problem. We begin by introducing an upper bound for the outer BnB (Sec. VI-A). Specifically, a bound on the maximum reward achievable by any assistance path in GA given a specific task path πT . We then continue to describe our Nested BnB instantiation, along with additional optimizations (Sec. VI-B). We then describe how the bound and the optimizations are used in our algorithm (Sec. VI-B). 
+
+A. A Flow-based Upper Bound 
+
+As we will explain shortly (Sec. VI-B), in the outer BnB it will be useful to bound the reward obtained by any extension of a task path πT . Thus, we denote UB joint (¯ vT ) to be an upper bound on the reward that can be obtained when Rtask starts from a given task vertex ¯vT ∈ VT , and Rassist may begin from any vertex in VA.To compute UB joint (·), we introduce an equivalent formu-lation of the J OINT TAP problem given as an Integer Program (IP) encoding a network flow problem. Both the IP’s objec-tive and the fact that we solve the corresponding (relaxed) Linear Program (LP) will allow us to compute UB joint (·).First, we introduce the joint graph G×(GA, G T , ¯vT ) := (V ×, E ×) which simultaneously encodes transitions of Rtask 
+
+and Rassist . Roughly speaking, transitions in the joint graph Outer BnB (Alg. 2)                 
+
+> Inner BnB (Alg. 3)
+> Start Choose πT
+> from GT
+> Choose πA
+> from GA
+> Incremental OTP (Alg. 1)
+> Can prune
+> πA?
+> More paths π′
+> A
+> left?
+> Can prune
+> πT?
+> More paths π′
+> T
+> left?
+> End
+> GT
+> GA
+> πT
+> H
+> πA
+> H
+> RNo No No No
+> Yes Yes Yes Yes
+> H′
+
+Fig. 3: Illustration of the algorithmic framework. Solid lines denote data flow, dashed lines denote data structure updates. correspond to motions of Rtask along edges of ET , and mo-tions of Rassist along connected paths in EA. Specifically, we first define V × 
+
+> v
+
+:= VT ×VA, and we use it to define the set of vertices as V × := V × 
+
+> v
+
+∪{ s, t }. Namely, V × contains all pairs of vertices from VT and VA as well as two special vertices s
+
+and t. The set of edges is defined as E× := E× 
+
+> e
+
+∪ E× 
+
+> s
+
+∪ E×
+
+> t
+
+where (( vT , v A), ( ˜ vT , ˜vA)) ∈ E× 
+
+> e
+
+if (i) (vT , ˜vT ) ∈ ET
+
+and (ii) vA and ˜vA lie in the same connected component of GA. In addition, E× 
+
+> s
+
+:= {(s, p ) | p ∈ { ¯vT } × VA} and 
+
+E× 
+
+> t
+
+:= {(p, t ) | p ∈ V × 
+
+> v
+
+}. Namely, the set of edges E×
+
+> e
+
+connect pairs of vertices whenever Rtask can transition along an edge in ET and Rassist can move to a reachable vertex. The set of edges E× 
+
+> s
+
+connect s to every vertex such that 
+
+Rtask is located in ¯vT (regardless of the location of Rassist )while the set of edges E× 
+
+> t
+
+connect every vertex in V × 
+
+> v
+
+to t.We now define a LP that encodes a max-flow problem between s and t in a joint graph G×(GA, G T , ¯vT ):
+
+max X 
+
+> (p, ˜p)∈E×
+> e
+
+ℓ(vT , ˜vT ) ·  A(p) + A(˜ p) · f (p, ˜p), (3) s.t. X 
+
+> (p, ˜p)∈E×
+> e
+
+f (p, ˜p) · ℓ(vT , ˜vT ) ≤ 1, (4) 
+
+X 
+
+> (p, ˜p)∈E×
+> e
+
+f (p, ˜p) · δ′(vA, ˜vA) ≤ 1, (5) 
+
+X
+
+> ( ˜ p,p )∈E×
+> e
+
+f (˜ p, p ) = X 
+
+> (p, ˜p)∈E×
+> e
+
+f (p, ˜p), ∀p ∈ V × 
+
+> v
+
+, (6) 
+
+X
+
+> (p,t )∈E×
+> t
+
+f (p, t ) = X
+
+> (s,p )∈E×
+> s
+
+f (s, p ) = 1 . (7) Each variable f (p, ˜p) in the LP denotes a unit flow from vertex p = ( vT , v A) to vertex ˜p = ( ˜ vT , ˜vA). Constraints (4) and (5) ensure that the total time taken by Rtask and Rassist 
+
+does not exceed the time limit, respectively. Constraints (6)-(7) enforces standard flow conservation for every vertex (i.e., in-flow equals out-flow except for s and t have only a unit of outgoing and incoming flow, respectively). To understand the optimization (Eq. (3)) of this max-flow problem between, recall that each edge (p, ˜p) corresponds to a simultaneous transition of Rtask and Rassist and contributes a reward equal to 0.5·ℓ(vT , ˜vT ) for each of the task vertices vT
+
+and ˜vT , if indeed assistance is supplied by the corresponding assistance vertices vA and ˜vA, respectively. To compute the total reward of a given flow f (·, ·), we multiply the flow value f (p, ˜p) by the reward associated with that edge (p, ˜p).Summing these contributions over all edges gives the total reward induced by the flow. By maximizing this sum (in Eq. (3) we multiply this sum by two; this does not change the maximization), we obtain the best reward possible in G×.Instead of solving an IP, ensuring that there is one path connecting s and t, we solve this LP as a fractional flow problem, allowing paths to split and recombine freely. This removes constraints enforcing a single assistance path which permits Rassist to move fractionally and to provide full assistance over all shared edge durations. Consequently, we obtain an admissible upper bound on the true reward and this bound can be computed in polynomial time. 
+
+B. Nested BnB Framework and Optimizations Algorithm: As stated earlier, our approach solves J OINT -TAP using a nested BnB structure. The outer BnB explores partial task paths in the task graph GT , and at each node (which corresponds to a task prefix πT ), it launches an inner BnB to search for an optimal assistance path and timing profile in assistance graph GA, using ASSISTANCE OTP solver (suggested in [1]). To avoid unnecessary computation, we use the upper bound UB joint (vT ) introduced in Sec. VI-A to decide whether to launch an inner BnB at all. If this bound indicates that the current branch can’t improve the best reward found so far, the current task prefix can be safely pruned without further exploration. Moreover, the outer BnB passes into each inner BnB the best reward seen so far. This enables the nested BnB to prune the inner BnB if it cannot improve the best reward seen across all outer nodes and also ensures that the inner BnB explores only branches that may improve the global best reward. We now provide a description of our nested BnB solver for J OINT TAP (Algs. 2,3 and Fig. 3). We start with a general description, omitting the optimization which is highlighted in teal (will be explained shortly, can be ignored for now). The outer BnB (Alg. 2) performs a branch-and-bound search over GT . It initializes a FIFO queue QT of task paths (initialized to the start vertex vT 
+
+> 0
+
+), and a variable Rmax to track the best reward (initialized to 0) (Line 1). As long as there are paths in the queue QT (Line 2), the algorithm pops a path πT (Line 3) and extends it to all neighbors vTk+1 ∈ VT
+
+(Line 4) to obtain a new path π′ 
+
+> T
+
+(Line 5). Subsequently, the inner BnB (Line 7 and Alg. 3) is called to obtain the best reward R for the fixed path π′ 
+
+> T
+
+and for every path of Rassist .Once the reward is computed, we compute an upper bound UB joint (·) on the reward of any subpath of π′
+
+> T
+
+(Line 8 and Sec. VI-A). This is used to prune the subtree extending UB joint (·) in case the best reward Rmax can’t Algorithm 2 Nested BnB J OINT TAP Solver 
+
+Input: Assistance A; graphs GA, G T ; start vertices vA 
+
+> 0
+
+, v T
+
+> 0
+
+Output: Optimal reward Rmax  
+
+> 1:
+
+QT ← { (⟨vT 
+
+> 0
+
+⟩, ∅)}; Rmax ← 0 
+
+> 2:
+
+while QT̸ = ∅ do  
+
+> 3:
+
+(πT = ⟨vT 
+
+> 0
+
+, . . . , v Tk ⟩, HπT ) ← QT .pop ()  
+
+> 4:
+
+for each vTk+1 s.t. (vTk , v Tk+1 ) ∈ ET do ▷ Branch  
+
+> 5:
+
+π′ 
+
+> T
+
+← ⟨ vT 
+
+> 0
+
+, . . . , v Tk+1 ⟩ 
+
+> 6:
+
+I ← ComputeIntervals (vTk+1 , A) 
+
+> 7:
+
+R, Hπ′ 
+
+> T
+
+← IB (πT , G A, v A 
+
+> 0
+
+, Rmax , HπT , I) ▷ Alg. 3  
+
+> 8:
+
+if R + UB joint (vTk+1 ) ≤ R max then continue ▷ Prune  
+
+> 9:
+
+Rmax ← max {R max , R}  
+
+> 10:
+
+QT .push ((π′ 
+
+> T
+
+, Hπ′ 
+
+> T
+
+)) 
+
+> 11:
+
+return Rmax 
+
+Algorithm 3 IB (Inner BnB) 
+
+Input: Task path πT ; Assistance graph GA;. start vertex vA 
+
+> 0
+
+; current reward Rcurr ;. list of histories Hπ′ 
+
+> T
+
+; intervals I of last vertex in πT
+
+Output: Optimal reward Rmax ; list of histories Hπ′ 
+
+> T
+> 1:
+
+QA ← {⟨ vA 
+
+> 0
+
+⟩} ; Rmax ← R curr ; Hπ′ 
+
+> T
+
+← ∅  
+
+> 2:
+
+while QA̸ = ∅ do  
+
+> 3:
+
+πA = ⟨vA 
+
+> 0
+
+, . . . , v Ak ⟩ ← QA.pop ()  
+
+> 4:
+
+for each vAk+1 s.t. (vAk , v Ak+1 ) ∈ EA do ▷ Branch  
+
+> 5:
+
+π′ 
+
+> A
+
+← ⟨ vA 
+
+> 0
+
+, . . . , v Ak+1 ⟩ 
+
+> 6:
+
+R ← OTP (π′
+
+> A
+
+, π T , A) ▷ See Bloch and Salzman [1]  
+
+> 7:
+
+R, Hπ′ 
+
+> T
+
+(π′
+
+> A
+
+) ← IncOTP (HπT (π′
+
+> A
+
+), I, π ′
+
+> A
+
+) ▷ Alg.1  
+
+> 8:
+
+if UB A(π′
+
+> A
+
+) ≤ R max then continue ▷ Prune  
+
+> 9:
+
+Rmax ← max {R max , R}  
+
+> 10:
+
+QA.push (π′
+
+> A
+
+) 
+
+> 11:
+
+return Rmax , Hπ′
+
+> T
+
+be improved (Line 8). Otherwise, the maximum reward is updated (Line 9). The new path π′ 
+
+> T
+
+is added to QT for further exploration (Line 10). Once the task search terminates, the best reward Rmax is returned (Line 11). The inner BnB (Alg. 3) performs a branch-and-bound search over the assistance graph GA. It initializes a queue QA
+
+of assistance paths (initialized to the start vertex V A 
+
+> 0
+
+), and a variable Rmax to track the best reward (initialized to the current-best reward Rcurr of the outer BnB) (Line 1). As long as there are paths in the queue QA (Line 2), the algorithm pops a path πA (Line 3) and extends it to all neighbors vAk+1 
+
+in GA (Line 4) to obtain a new path π′ 
+
+> A
+
+(Line 5). The reward R for π′ 
+
+> A
+
+and πT is computed using an OTP solver (Line 6) and if a bound on the reward obtainable from the given assistance path π′ 
+
+> A
+
+(Line 8) cannot improve upon the current-maximal reward Rmax , the node is pruned (Line 8). Here, we use the OTP solver and bound UB A(·)
+
+introduced by Bloch and Salzman [1]. Otherwise, the inner maximum reward is updated (Line 9) and the new path π′
+
+> A
+
+is added to QA (Line 10). Once the inner BnB terminates, the best reward Rmax is returned to the outer BnB (Line 11). 
+
+Using incremental OTP: We suggest the following opti-mization (highlighted in teal in Alg. 2 and Alg. 3): As the outer BnB explores different task path prefixes, each inner BnB differs from its parent by the addition of a single task vertex. To exploit this, we harness our incremental OTP solver (Sec. V). Specifically, in the outer BnB, we save for each branch πT a list of histories HπT . Each history in this list, denoted HπT (πA), represents the history of all intervals IA 
+
+> πT
+
+created by πT for the vertices in the assistance path πA. Thus, we store in the queue QT , along with πT ,the corresponding list of histories (Alg. 2, Line 3 and 10). Each time we invoke the inner BnB for a child π′ 
+
+> T
+
+of πT ,we use the list of histories HπT of πT to consider only the new intervals created by the last vertex in π′ 
+
+> T
+
+. This is done using function ComputeIntervals (Line 6. Description omitted). We then compute the reward of the optimal timing profile for πA and π′ 
+
+> T
+
+based on the prior calculation for πA
+
+and πT , and use the updated history to create the new list of histories Hπ′ 
+
+> T
+
+for π′ 
+
+> T
+
+(Alg. 3, Line 7; replaces Line 6). VII. E MPIRICAL EVALUATION 
+
+We consider the J OINT TAP problem of LOS-maintenance (Sec. I and Fig. 1) for both (i) a toy, 2D setting where Rassist 
+
+and Rtask are modeled as 4-DOF planar manipulators and (ii) a simulated 3D setting where Rassist and Rtask are modeled as Crazyflie 2.1+ drones—a lightweight, open-source nano-quadrotor platform. See (Fig. 4) for representative simulated environments. We also conducted real-world evaluation in the lab using two Crazyflie 2.1+ drones (see accompanying video). For each simulated scenario, we construct ten pairs of roadmaps, GA and GT where GA is constructed using the 
+
+RRG algorithm [24], while GT is generated by specifying a sequence of predefined waypoints (representing the general task need to be completed) and running the RRG algorithm between consecutive waypoints. We compare three different algorithms DFS , BnB and 
+
+BnB-Inc . DFS is a baseline algorithm that exhaustively enumerates all possible task paths in GT using a depth-first search (DFS) approach, halting when the path length exceeds 1. Reward for each path in GT is computed using the state-of-the-art A SSISTANCE OTP algorithm [1]. Importantly, 
+
+DFS is optimal and equivalent to our Nested BnB algorithm when using a trivial upper bound of 1 and omitting all optimizations. BnB and BnB-Inc are our proposed approach (Alg. 2) with and without the optimizations, respectively. Algorithms were implemented in C ++ 8, and experiments were conducted on a Dell Inspiron 5410 laptop with 16 GB of RAM. Each algorithm was given a timeout of one hour. We present results for representative scenarios in Fig. 5. Results depict reward and runtime as a function of graph size (we keep |GT | = |GA| in all experiments). Across all plots reward (which is identical for all algo-rithms as they are optimal) grows with graph size but this incurs a dramatic increase in runtime for all algorithms. When no results are provided, the timeout has been reached. 
+
+> 8github.com/omerdaube/JointTAP
+
+(a) (b) (c) 
+
+(d) (e) (f) 
+
+Fig. 4: Visualization of representative simulated environ-ments for planar manipulator (a)-(c) and drones (d)-(f). Each consists one instance of GA (red) and GT (blue), the robots 
+
+Rtask ,Rassist (black at their start vertices) and obstacles (gray). The task of Rtask is to move from start configuration (black) to its target configuration (green) while passing through waypoints (yellow, then brown) and staying on GT . This should be done while maximizing the overall time its end effector is within Line of Sight of Rassist .Key to the efficiency of BnB and BnB-Inc when compared to DFS is the the use of UB joint . UB joint both allows to prune paths in the outer BnB ( GT ) and to obtain effective rewards that, in turn, prune paths in the inner BnB ( GA) Indeed, as can be seen in all plots, DFS is only able to solve instances of relatively small size and requires roughly two orders of magnitude more time than BnB-Inc .The results depict the effectiveness of the optimization. While OTP can be solved efficiently, the number of times it is required may incur computational overhead. By reusing results from previous computations, we obtain a speed up of roughly 3× when comparing BnB with BnB-Inc .CONCLUSION 
+
+In this paper, we introduced a new algorithmic framework for TAP that combines an incremental subproblem solver with a nested branch-and-bound search. The method provides optimality guarantees, and our empirical evaluation demon-strates its ability to compute coordinated plans on moderately sized instances. However, the approach incurs high compu-tational cost on very large graphs. Future work will focus on improving scalability through stronger heuristics for this problem. We foresee the work presented here being used in alternative problem formulations such as the online setting or for alternative cost functions (e.g., when minimizing the maximum time a path is uncovered). REFERENCES [1] E. Bloch and O. Salzman, “Offline task assistance planning on a graph: Theoretic and algorithmic foundations,” 2024. [Online]. Available: https://arxiv.org/abs/2409.06373 Reward DFS BnB BnB-Inc           
+
+> 020 40 60 80 100
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Graph Size [Vertices]
+> Runtime [min]
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> 020 40 60 80 100
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Graph Size [Vertices]
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> Quality [Reward]
+
+(a) Results for Fig. 4a (b) Results for Fig. 4b           
+
+> 020 40 60 80 100
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Graph Size [Vertices]
+> Runtime [min]
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> 020 40 60 80 100
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Graph Size [Vertices]
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> Quality [Reward]
+
+(c) Results for Fig. 4c (d) Results for Fig. 4d           
+
+> 020 40 60 80 100
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Graph Size [Vertices]
+> Runtime [min]
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> 020 40 60 80 100
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Graph Size [Vertices]
+> 0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1
+> Quality [Reward]
+
+(e) Results for Fig. 4e (f) Results for Fig. 4f 
+
+Fig. 5: Average running time and reward (left and right 
+
+y-axis, respectively) as a function of graph size. (a)-(f) correspond to environments (a)-(f) in Fig. 4. 
+
+[2] X. Xiao, J. Dufek, and R. R. Murphy, “Autonomous visual assistance for robot operations using a tethered UAV,” in Field and Service Robotics . Springer, 2021, pp. 15–29. [3] M. Lyu, Y. Zhao, C. Huang, and H. Huang, “Unmanned aerial vehicles for search and rescue: A survey,” Remote Sensing , vol. 15, no. 13, p. 3266, 2023. [4] R. R. Murphy, S. Tadokoro, D. Nardi, A. Jacoff, P. Fiorini, H. Choset, and A. M. Erkmen, “Search and rescue robotics,” in Springer hand-book of robotics . Springer, 2008, pp. 1151–1173. [5] R. Alterovitz, J. Hoelscher, and A. Kuntz, “Medical needles in the hands of AI: advancing toward autonomous robotic navigation,” Sci. Robotics , vol. 10, no. 104, 2025. [6] C. Robin and S. Lacroix, “Multi-robot Target Detection and Tracking: Taxonomy and Survey,” Autonomous Robots , vol. 40, no. 4, pp. 729– 760, 2016. [7] G. J. Laguna and S. Bhattacharya, “Path planning with incremental roadmap update for visibility-based target tracking,” in IROS , 2019, pp. 1159–1164. [8] S. M. LaValle, H. H. Gonz´ alez-Ba˜ nos, C. Becker, and J. Latombe, “Motion strategies for maintaining visibility of a moving target,” in 
+
+ICRA . IEEE, 1997, pp. 731–736. [9] D. Nieuwenhuisen and M. H. Overmars, “Motion planning for camera movements,” in ICRA , 2004, pp. 3870–3876. [10] D. Rakita, B. Mutlu, and M. Gleicher, “An autonomous dynamic camera method for effective remote teleoperation,” in Proceedings of the 2018 ACM/IEEE International Conference on Human-Robot Interaction , 2018, pp. 325–333. [11] T. H. Chung, G. A. Hollinger, and V. Isler, “Search and pursuit-evasion in mobile robotics - A survey,” Auton. Robots , vol. 31, no. 4, pp. 299– 316, 2011. [12] M. Fu, A. Kuntz, O. Salzman, and R. Alterovitz, “Toward asymptotically-optimal inspection planning via efficient near-optimal graph search,” in RSS , 2019. [13] M. Fu, O. Salzman, and R. Alterovitz, “Computationally-efficient roadmap-based inspection planning via incremental lazy search,” in 
+
+ICRA , 2021, pp. 7449–7456. [14] R. Almadhoun, T. Taha, L. Seneviratne, J. Dias, and G. Cai, “A survey on inspecting structures using robotic systems,” vol. 13, no. 6, 2016. [15] E. Galceran and M. Carreras, “A survey on coverage path planning for robotics,” vol. 61, no. 12, pp. 1258–1276, 2013. [16] F. Ropero, P. Mu˜ noz, and M. D. R-Moreno, “TERRA: A path plan-ning algorithm for cooperative UGV–UAV exploration,” Engineering Applications of Artificial Intelligence , vol. 78, pp. 260–272, 2019. [17] A. Amuzig, D. Dovrat, and S. Keren, “Value of assistance for mobile agents,” in IROS , 2023, pp. 1594–1600. [18] M. Masarwy, Y. Goshen, D. Dovrat, and S. Keren, “Value of assistance for grasping,” in The First MARW: Multi-Agent AI in the Real World Workshop at AAAI 2025 , 2025. [Online]. Available: https://openreview.net/forum?id=fq1GAwQlqT [19] O. Salzman, “Sampling-based robot motion planning,” Commun. ACM , vol. 62, no. 10, pp. 54–63, 2019. [20] M. Brown, D. Windridge, and J.-Y. Guillemaut, “Globally optimal 2d-3d registration from points or lines without correspondences,” in 
+
+ICCV , 2015, pp. 2111–2119. [21] D. Campbell, L. Petersson, L. Kneip, and H. Li, “Globally-optimal in-lier set maximisation for camera pose and correspondence estimation,” 
+
+IEEE PAMI , vol. 42, no. 2, pp. 328–342, 2018. [22] J. Yang, H. Li, D. Campbell, and Y. Jia, “Go-ICP: A globally optimal solution to 3d ICP point-set registration,” IEEE PAMI , vol. 38, no. 11, pp. 2241–2254, 2015. [23] J. Clausen, “Branch and bound algorithms-principles and examples,” 
+
+Department of CS, University of Copenhagen , pp. 1–30, 1999. [24] S. Karaman and E. Frazzoli, “Sampling-based algorithms for optimal motion planning,” Int. J. of Rob. Res. , vol. 30, no. 7, pp. 846–894, 2011.

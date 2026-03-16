@@ -1,0 +1,2164 @@
+Title: WildOS: Open-Vocabulary Object Search in the Wild
+
+URL Source: https://arxiv.org/pdf/2602.19308v1
+
+Published Time: Tue, 24 Feb 2026 02:24:10 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+<Society logo(s) and publica-tion title will appear here. >
+
+Received XX Month, XXXX; revised XX Month, XXXX; accepted XX Month, XXXX; Date of publication XX Month, XXXX; date of current version XX Month, XXXX. 
+
+> Digital Object Identifier 10.1109/XXXX.2022.1234567
+
+# WildOS: Open-Vocabulary Object Search in the Wild 
+
+Hardik Shah 1,2 , Erica Tevere 1, Deegan Atha 3, Marcel Kaufmann 1, Shehryar Khattak 3,Manthan Patel 2, Marco Hutter 2, Jonas Frey 2,4,5 , Patrick Spieler 1     
+
+> 1Jet Propulsion Laboratory (JPL), California Institute of Technology (Caltech), Pasadena, CA 91011, USA
+> 2Swiss Federal Institute of Technology (ETH Z ¨ urich), Robotic Systems Lab, Z ¨ urich 8092, Switzerland
+> 3FieldAI Inc. 3 Morgan, Irvine, CA, USA. Work Performed at NASA JPL
+> 4Stanford University, Autonomous Systems Lab, Stanford, CA 94305, USA
+> 5University of California Berkeley, Berkeley, CA 94720, USA The research was carried out at the Jet Propulsion Laboratory, California Institute of Technology, under a contract with the National Aeronautics and Space Administration (80NM0018D0004). The work was supported in part by the Luxembourg National Research Fund (Ref. 18990533) and the Swiss National Science Foundation (SNSF) as part of the projects No.200021E 229503 and No.227617. Hardik Shah was supported by the Zeno Karl Schindler Foundation Master’s Thesis Grant during this work.
+
+ABSTRACT 
+
+Autonomous navigation in complex, unstructured outdoor environments requires robots to operate over long ranges without prior maps and limited depth sensing. In such settings, relying solely on geometric frontiers for exploration is often insufficient; In such settings, the ability to reason semantically about 
+
+where to go and what is safe to traverse is crucial for robust, efficient exploration. This work presents WildOS, a unified system for long-range, open-vocabulary object search that combines safe geometric exploration with semantic visual reasoning. WildOS builds a sparse navigation graph to maintain spatial memory, while utilizing a foundation-model-based vision module, ExploRFM, to score frontier nodes of the graph. ExploRFM simultaneously predicts traversability, visual frontiers, and object similarity in image space, enabling real-time, onboard semantic navigation tasks. The resulting vision-scored graph enables the robot to explore semantically meaningful directions while ensuring geometric safety. Furthermore, we introduce a particle-filter-based method for coarse localization of the open-vocabulary target query, that estimates candidate goal positions beyond the robot’s immediate depth horizon, enabling effective planning toward distant goals. Extensive closed-loop field experiments across diverse off-road and urban terrains demonstrate that WildOS enables robust navigation, significantly outperforming purely geometric and purely vision-based baselines in both efficiency and autonomy. Our results highlight the potential of vision foundation models to drive open-world robotic behaviors that are both semantically informed and geometrically grounded. Project Page: leggedrobotics.github.io/wildos 
+
+INDEX TERMS Autonomous Search, Field Robotics, Long Range Navigation, Open-Vocabulary Naviga-tion, Semantic Scene Understanding, Vision-Based Navigation 
+
+I. INTRODUCTION 
+
+# OUTDOOR autonomous robots are increasingly being deployed for tasks such as search-and-rescue, remote inspection, and environmental monitoring–settings where prior maps are unavailable and human supervision is limited. In these scenarios, robots must reason not only about how 
+
+to navigate safely, but also where to go next in pursuit of semantically meaningful goals. We study this problem in the context of long-range, open-vocabulary object search in large, unstructured environments (Fig. 1(a)), where a robot must locate and reach a target object described in natural language, such as “find the house,” using only onboard sensing and without global maps. This problem is challenging for several reasons. First, the robot perceives the world only through a limited local horizon determined by the sensing range of its depth or LiDAR system. As illustrated in Fig. 1(b,c), the local metric costmap typically covers only a few meters around the robot. Beyond this range, depth information becomes sparse and noisy, leaving the remainder of the environment unknown. Existing navigation systems [1]  
+
+> This work is licensed under a Creative Commons Attribution 4.0 License. For more information, see https://creativecommons.org/licenses/by/4.0/ VOLUME , 1
+> arXiv:2602.19308v1 [cs.RO] 22 Feb 2026 Author et al.:
+
+FIGURE 1: (a) WildOS enables autonomous semantic navigation in diverse unstructured outdoor environments. (b, c) 
+
+Due to the limited range of geometric sensing, robots can only reliably perceive nearby regions within a depth horizon (blue), leading to myopic exploration and (e) difficulty localizing distant targets (e.g., a “house”) beyond sensing range. 
+
+(b, c) Conventional exploration (dashed path) relies on geometric frontiers (blue dots) at the boundary between known and unknown space, which ignores long-range semantic and traversability cues. WildOS (green path) augments geometric exploration with long-range visual reasoning using a vision foundation model, defining a visual horizon (red) that extends beyond depth sensing and predicts visual traversability, visual frontiers (red dots), and open-vocabulary object similarity in image space. (d) During deployment, a sparse navigation graph is built from geometry and frontier nodes are scored using vision, while a particle-filter-based goal localization module (yellow particles) estimates candidate goal locations beyond the depth horizon, enabling safe, efficient planning toward distant semantic goals. handle this by heuristically assigning a constant traversal cost to unknown regions and planning straight toward the goal. While effective in simple open terrain, this strategy often leads to myopic, or highly inefficient paths when obstacles– such as fences or undergrowth–block the direct route. Second, purely geometry-based exploration neglects the 
+
+semantic information readily available in images. Consider Fig. 1(b,c): beyond the depth horizon, the image provides rich visual cues about open regions or “affordable” gaps in the scene – what recent work [2] terms visual frontiers . These frontiers capture affordances such as openings between ob-stacles or safe continuations of the path, enabling decisions that resemble human reasoning: preferring to move toward visually navigable regions rather than blindly following the goal direction. However, existing vision-based methods, while effective locally, operate in a memoryless manner and do not retain information about previously explored regions, frequently resulting in oscillations or repeated exploration of the same areas. Third, the robot must maintain a representation of ex-plored versus unexplored regions over very long ranges. Dense voxel or metric maps are memory-intensive and do not scale well to large outdoor environments. Sparse, graph-based representations, in contrast, provide a memory-efficient structure for maintaining both topological connec-tivity and exploration history. Yet, previous works have not integrated vision-based reasoning within such a graph framework, limiting their ability to combine geometric safety with long-range semantic awareness. Finally, a key challenge unique to open-vocabulary object search lies in localizing goal objects that may lie far beyond accurate depth sensing. As shown in Fig. 1(e), the robot can visually detect an object but cannot reliably localize it in 3D space due to the lack of valid range measurements. This prevents existing open-vocabulary mapping methods from  
+
+> 2VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+providing usable localization for long-range planning. Given these challenges, we ask: 
+
+How can a robot unify visual and geometric reasoning to perform efficient, long-range, open-vocabulary object search in unstructured outdoor environments? 
+
+To answer this question, we present WildOS -a unified, real-time system that combines the complementary strengths of visual and geometric perception for long-range navigation and object search (Fig. 1(d)). At its core, WildOS maintains a 
+
+navigation graph that stores explored regions and identifies frontier nodes at the boundary of the known space. Each frontier node is scored using visual information derived from ExploRFM –our foundation-model-based vision mod-ule that predicts visual frontiers, traversability, and open-vocabulary object similarity directly in the image space. The resulting vision-scored graph allows WildOS to plan through semantically meaningful, visually promising directions while retaining the geometric safety and spatial memory of the graph structure. Furthermore, WildOS introduces a particle-filter-based triangulation approach for coarse 3D localization of open-vocabulary goal objects beyond the robot’s depth horizon. This enables goal-aware planning even when the object lies far outside the depth sensing range. Through extensive field experiments in unstructured off-road and urban terrains, we demonstrate that WildOS signif-icantly improves efficiency and robustness over both purely geometric and purely vision-based baselines. As summarized in Fig. 1, our system attempts to naturally exhibit human-like navigation behavior, such as selecting openings between obstacles early, turning back intelligently upon encounter-ing dead-ends, and maintaining consistent progress toward semantically meaningful goals. In summary we make the following key contributions: 
+
+• WildOS : A unified, real-time system for long-range, open-vocabulary object search that integrates geometric and visual reasoning through a vision-scored navigation graph. 
+
+• ExploRFM Module : A foundation-model-based net-work that jointly predicts traversability, visual fron-tiers, and object similarity in image space for onboard decision-making. 
+
+• Vision-Scored Graph : A novel topological mapping approach that scores geometric frontiers with semantic cues, prioritizing exploration toward visually promising regions. 
+
+• Beyond-Horizon Object Localization : A particle-filter estimator that localizes targets situated outside the robot’s depth range, enabling goal-aware planning to-ward distant visual cues. 
+
+• Field Validation & Dataset : Extensive closed-loop experiments demonstrating improved performance over SOTA baselines in complex off-road/urban terrain, sup-ported by a new manually annotated dataset for visual frontiers. 
+
+> II. RELATED WORK
+> A. Exploration and Graph-Based Planning
+
+Autonomous exploration enables a robot to map an unknown environment by iteratively selecting navigation goals to max-imize coverage. Early approaches addressed this problem us-ing 2D occupancy grids [3], with [4] introducing the concept of frontier-based exploration. A frontier is defined as the boundary separating known free space from unknown space; by navigating to these boundaries, the robot systematically maximizes map coverage. While 2D representations suffice for flat indoor settings, unstructured outdoor environments require explicit modeling of terrain complexity. This necessitated the adoption of 2.5D elevation maps [5], which capture height and slope information essential for ground robot traversability. To further handle rough terrain, risk-aware frameworks such as the STEP planner [6] augment these maps with ex-plicit traversal cost layers, ensuring that selected exploration goals are not only geometrically reachable but also safe. However, 2.5D maps fail to accurately capture complex vertical structures like overhangs or tunnels. Consequently, scenarios requiring full spatial reasoning—most notably for aerial robots—employ dense volumetric representations like OctoMap [7] and TSDF-based Voxblox [8] to generate frontiers in full 3D space. To improve the efficiency of coverage beyond simple frontier selection, Next-Best-View (NBV) planners [9]–[12] formulate exploration as an optimization problem. Instead of simply moving to the nearest boundary, these methods sam-ple candidate viewpoints within a receding horizon and select the one that maximizes expected volumetric information gain by ray casting. While this produces highly efficient local paths, calculating information gain over dense volumetric maps is computationally expensive, limiting the system’s ability to plan over long horizons or large areas. Scaling exploration to kilometer-scale environments re-quires decoupling local coverage from global spatial mem-ory. Graph-based exploration methods address this by build-ing a sparse topological graph of the explored environment. The Graph-Based Planner (GB-Planner) [13] constructs a global graph where nodes represent navigable space and edges represent connectivity. This structure allows the robot to efficiently plan return paths or reposition to distant fron-tiers without processing the full metric map history. These graph-based architectures proved robust during the DARPA Subterranean Challenge, where teams successfully deployed them to explore kilometers of caves, tunnels, and urban underground environments [14], [15]. Despite their success in large-scale geometric coverage, these planners remain limited by the robot’s active sensor horizon. Frontiers are identified strictly based on LiDAR or depth sensor boundaries, treating all unobserved space as uniform. Consequently, these methods cannot leverage visual cues–such as a clear path visible in RGB images beyond the depth range–to prioritize promising directions. WildOS  
+
+> VOLUME , 3Author et al.:
+
+builds upon the robust topological structure of graph-based planners but incorporates a Vision Foundation Model (VFM) to score frontiers, enabling the robot to pursue promising semantic goals that lie beyond the geometric horizon. 
+
+> B. Open-Vocabulary Mapping and Localization
+
+Open-vocabulary mapping aims to ground semantic concepts in 3D space by associating vision-language features with geometric representations. Standard approaches [16]–[18], typically developed for indoor settings, project pixel-aligned CLIP embeddings [19] onto dense point clouds or voxel grids. Alternatively, some approaches [20], [21] abstract these features into open-vocabulary 3D scene graphs, orga-nizing the environment into objects, rooms, and floors. While these methods enable zero-shot queries of the environment (e.g., ”find the red mug on the table”) they rely on high-fidelity, pre-built maps and computationally intensive offline processing, making them unsuitable for real-time applica-tions of field robots operating in unknown environments. Recent works have attempted to extend these capabili-ties to handle partial observability and coarser localization. TagMap [22] decomposes the scene into a grid of voxels and identifies objects by intersecting the camera frustums of tagged views. While this provides a mechanism for coarse localization similar to triangulation, it scales poorly to large, unstructured outdoor environments due to usage of voxel-based representation. Similarly, RayFronts [23] projects vision-language features into a 3D grid, explicitly handling pixels with invalid depth by projecting them to the boundaries of the voxel map. Although it extends open-vocabulary mapping beyond the depth range, it does not estimate a coarse 3D goal position and scales poorly to large outdoor scenes. We address real-time open-vocabulary target localization in previously unseen environments by introduc-ing a particle-filter-based estimator that predicts coarse 3D goal locations beyond the robot’s depth sensing range, en-abling goal-directed planning toward distant semantic cues. 
+
+> C. Object-Goal Navigation
+
+Navigation research has evolved from reaching specific geometric coordinates (PointGoal) to locating instances of specific semantic categories, a task formalized as Object Goal Navigation (ObjectNav) [24], [25]. Unlike geometric navigation, ObjectNav requires the robot to explore the environment, semantically identify targets, and navigate to them without a prior map. The dominant paradigm for solving ObjectNav in indoor environments relies on end-to-end Reinforcement Learning (RL), driven by simulators such as Habitat [26] and Gib-son [27]. In these settings, agents learn policies that map raw visual observations directly to control actions [28]. While powerful in simulation, these end-to-end agents often strug-gle to generalize to real-world dynamics and lack the explicit safety guarantees required for field robotics. Consequently, modular approaches have gained traction, decoupling the problem into semantic mapping and geometric planning. The Semantic Exploration (SemExp) framework [29] builds a top-down semantic map and selects long-term goals to maximize semantic coverage. Similarly, PONI [30] learns a potential function to predict where objects are likely to be found based on structural cues (e.g., finding a chair near a table). ForesightNav [31] introduces an imagination strategy using a neural network that leverages current and past observations to predict unobserved regions of the envi-ronment in the form of a Bird’s Eye View (BEV) map infused with CLIP [19] features. Although effective, these methods rely on learned semantic relationships between objects and structured indoor layouts–assumptions that often break down in large-scale, unstructured real-world terrains and do not readily scale to long-range exploration. Recently, Vision-Language Models (VLMs) have been employed to extend object-goal navigation beyond indoor settings. Works such as Uni-NaVid [32] and NaVILA [33] integrate VLMs with locomotion policies, enabling robots to follow open-ended instructions such as ” navigate to the trash can ”. However, these approaches are largely reactive; they typically lack persistent spatial memory. If the target object is not currently visible in the frame, or if the robot must search a large area without continuous explicit goal commands, these methods often fail to accomplish the task. Hierarchical planners [21], [34] utilize open-vocabulary semantic graphs to perform object-goal navigation, but they fundamentally rely on pre-built maps of the environment limiting their applicability to exploration-driven object search. 
+
+> D. Vision-Based and Long-Range Navigation
+
+A prominent line of research focuses on end-to-end learn-ing for navigation, where policies map visual observations directly to control actions [35]–[37]. These methods learn generalizable behaviors from large-scale diverse datasets, enabling robots to navigate towards image goals in novel environments. Building on this, NoMaD [38] introduces a goal-masked diffusion policy to handle exploration without explicit goal images. More recently, [39] incorporates lan-guage conditioning into these end-to-end policies, allowing for open-ended instruction following. VLD [40] introduces a decoupled framework that trains a self-supervised distance predictor on internet-scale videos to guide a reinforcement learning policy, enabling scalable navigation with both image and text goals. Another line of research explicitly estimates traversability for planning. Approaches such as [41]–[43] utilize self-supervised learning to predict traversability directly in image space, associating visual features with proprioceptive feed-back. In contrast, methods like [1], [44] estimate traversabil-ity in BEV metric maps, generating dense cost grids that bet-ter handle occlusions and enable robust multi-camera fusion. More recent works, such as SALON [45] and CREStE [46], extend this paradigm by leveraging foundation models to  
+
+> 4VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+rapidly align these BEV maps with human preferences or to novel environments. Long-range navigation seeks to extend this planning hori-zon beyond the local metric map. [47] addresses this by explicitly predicting traversability and elevation maps up to 100 m by performing fusion of multiple cameras and LiDARs in BEV. LRN [2] introduces the concept of visual frontiers –regions in the image space that appear navigable and extend beyond the visible horizon. At each timestep, the robot selects the frontier aligned best with the goal heading. However, LRN assumes implicit reachability and lacks a mechanism to assess traversability, which can lead to scoring frontiers that lie behind non-traversable obstacles. Furthermore, it has no spatial memory of previously explored or rejected frontiers, which limits robustness in ambiguous scenarios such as dead-ends. WildOS overcomes these lim-itations by grounding visual frontiers within a persistent navigation graph. By combining the long-range semantic insight of VFMs with the memory of a graph-based planner, our system effectively bridges the gap between far-field perception and safe, consistent global exploration. 
+
+> III. Problem Statement
+
+We address the problem of long-range object search in large-scale, unstructured outdoor environments. The robot, equipped with an RGB camera and a LiDAR sensor, must locate an object specified by a natural language query -
+
+Qgoal (e.g., “find the water tank ”). The target object lies at an unknown location in a static environment E that is not known a priori. At each timestep t, the robot obtains a multi-modal observation 
+
+Ot = {It, T geo  
+
+> t
+
+, xt},
+
+where It ∈ RH×W ×3 denotes the RGB image, T geo  
+
+> t
+
+is the local geometric traversability map in the robot’s frame pro-viding accurate traversability information within a distance of rmax around the robot, and xt ∈ SE(3) represents its pose. The robot executes an action at ∈ A according to a policy 
+
+π : Ot 7 → at, resulting in a new state xt+1 .The operator provides an approximate prior location or heading g0 corresponding to the text query to initiate a directed search. The search task concludes successfully at time T if the robot’s final position xT is within a predefined reachability distance dreach of the target object specified by the textual goal Qgoal .
+
+> Objective.
+
+The goal is to find a trajectory ξ = {x0, . . . , xT } that minimizes the expected navigation cost to reach the target object: 
+
+J(ξ) = EE
+
+"T −1X
+
+> t=0
+
+C(xt, a t, xt+1 )
+
+#
+
+, (1) where C denotes a task-dependent cost function incorpo-rating travel distance, traversability, and safety constraints. The expectation EE is taken over the distribution of possible unknown environments. The optimization is subject to sensor and computation limits that constrain planning to a local horizon H ≪ T .
+
+> Challenges.
+
+This setting presents several challenges: 
+
+• Limited Sensing Range: Despite LiDARs range up to 
+
+150 m or so, their density is very low and insufficient for decision making beyond a shorter range. The local costmap T geo  
+
+> t
+
+is restricted to rmax ≈ 10 m , while the target object may lie several hundred meters away or occluded behind obstacles. 
+
+• Outdoor Unstructured Environments: The environ-ment can be characterized by hazards (e.g. fences, dense foliage) that require semantic reasoning to de-termine traversability beyond simple geometric models. This complexity, along with possible dead-ends in the environment, mandates long-range planning to prevent inefficient detours and backtracking. 
+
+• Onboard Computation and Localization Con-straints: All perception, mapping, and planning must run in real time on the robot’s onboard computer without external communication or cloud access. In addition, global positioning signals (e.g., GNSS) are un-available, requiring the robot to rely solely on onboard sensing and state estimation for localization during long-range navigation. Consequently, the robot must efficiently explore and plan beyond its immediate sensor range using visual and geomet-ric cues to infer likely object locations and reachable paths. Our formulation thus generalizes standard goal-directed nav-igation to the open-vocabulary object search problem in long-range outdoor settings. 
+
+> IV. METHODOLOGY
+> A. Overview
+
+The overall architecture of WildOS is illustrated in Fig. 2, consisting of five main components: 
+
+> 1) Navigation Graph Construction
+
+The local traversability map T geo  
+
+> t
+
+is incrementally integrated into a navigation graph Gnav  
+
+> t
+
+= ( Vt, E t), where nodes vi ∈
+
+Vt represent reachable locations, and edges (vi, v j ) ∈ Et
+
+encode traversability costs. Nodes lying at the boundary between explored and unexplored regions are identified as 
+
+frontier nodes Fgeo  
+
+> t
+
+⊂ Vt, which serve as candidates for exploration. This graph provides a memory-rich, geometry-based representation of visited regions but is limited by the range of T geo  
+
+> t
+
+i.e. rmax , resulting in locally optimal but myopic exploration behavior.  
+
+> VOLUME , 5Author et al.:
+
+RGB (I t ) Scoring Function 
+
+Navigation Graph (G tnav )
+
+> Project valid Frontier Nodes in Image
+> - Frontier Node 0
+> - Frontier Node 1
+> - Frontier Node 2
+
+Goal Object Query (Q goal )
+
+Triangulator 
+
+Planner 
+
+“House” 
+
+> Object Similarity
+> Visual Traversability
+> Visual Frontiers
+> Goal Triangulation (p goal )
+
+Scored Navigation Graph (G tscore )
+
+0.9 
+
+0.7 
+
+0.6 
+
+Traversability Map (T tgeo )
+
+Graph Construction 
+
+Robot Pose ( xt ) 
+
+> Observations (O t)
+> Learned Visual Module
+> Fusion Module
+
+High-Level Path & Local Goal 
+
+0.9       
+
+> - Frontier Nodes - Free Nodes - Graph Edges
+> - Query Localization - Planned Path
+> - Current Node ( xT)
+> - Planner Goal - Local Nav2 Goal
+> - Robot Pose
+> - Visual Frontier - Traversabile Region
+> - Module Input - Module Output
+
+ExploRFM 
+
+FIGURE 2: Method Overview consisting of five main components: 1) WildOS incrementally builds a sparse navigation graph from geometric sensing to maintain persistent spatial memory and identify geometric frontier nodes for safe exploration (Sec. IV-B). 2) To reason beyond the limited depth horizon, a learned vision-language module, ExploRFM, processes the current image and text query to predict visual traversability, visual frontiers, and open-vocabulary object similarity over a long-range visual horizon (Sec. IV-C). 3) Object detections from multiple viewpoints are fused by a probabilistic goal triangulation module to estimate a coarse 3D target location beyond direct sensor range (Sec. IV-D). 4) Geometric frontier nodes are then projected into the image and scored using the visual-semantic cues and the current goal estimate, producing a semantically scored navigation graph (Sec. IV-E). 5) Finally, a hierarchical planner selects and executes actions by planning over the scored graph and generating locally safe motions toward intermediate goals (Sec. IV-F). 
+
+2) Learned Visual Module (“ ExploRFM ”) 
+
+To reason beyond rmax and incorporate semantic under-standing, we introduce a vision-language model named Ex-ploRFM — the Exploration and Object Reasoning Foun-dation Model . Given the current RGB frame It and the text query Qgoal describing the target object, ExploRFM produces three dense prediction maps: 
+
+T vis  
+
+> t
+
+∈ [0 , 1] H×W , (visual traversability map) 
+
+Fvis  
+
+> t
+
+∈ [0 , 1] H×W , (visual frontier score map) 
+
+Svis  
+
+> t
+
+∈ { 0, 1}H×W , (object similarity mask) .
+
+Here, T vis  
+
+> t
+
+estimates the semantic traversability of each pixel distinguishing between safe (e.g. grass, road) and unsafe (e.g. water, bushes) regions, Fvis  
+
+> t
+
+highlights semantic regions likely to lead to novel observations or unexplored spaces, and Svis  
+
+> t
+
+localizes the region in the image corresponding to the object described by Qgoal . While these maps provide semantic understanding over a much larger spatial range than rmax , they lack the geometric consistency and safety guarantees of the navigation graph. 
+
+3) Goal Triangulation Module 
+
+Detections in Svis  
+
+> t
+
+from multiple viewpoints {I0, . . . , I t} are used to triangulate a coarse 3D estimate of the goal position 
+
+ˆpgoal via a probabilistic weighting approach, inspired by particle filtering. This coarse localization provides a prob-abilistic prior over the object’s position even when it lies beyond direct sensor range. 
+
+4) Fusion Module: Cross-Modal Frontier Scoring 
+
+To combine the complementary strengths of the two modali-ties - geometry and vision, we project each geometric frontier  
+
+> 6VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+node vi ∈ F geo  
+
+> t
+
+from world coordinates into the image plane of It. For nodes with valid projections, we assign a visual-semantic exploration score 
+
+si = fscore 
+
+ T vis  
+
+> t
+
+, Fvis  
+
+> t
+
+, π (xvi ), ˆpgoal , xt
+
+ , (2) where π(·) denotes the camera projection. This yields a 
+
+scored navigation graph Gscore  
+
+> t
+
+, where each frontier node is annotated with a semantic exploration likelihood derived from vision and is conditioned on the goal estimate ˆpgoal .
+
+5) Planning and Control 
+
+A high-level planner plans a path using the scored navigation graph Gscore  
+
+> t
+
+to the coarse goal estimate ˆpgoal (If the target object has not yet been observed, the planner falls back to the approximate prior goal g0 provided at mission start.) An intermediate short-range goal glocal  
+
+> t
+
+on the path is passed to a local planner that computes a safe, dynamically feasible path and outputs control commands to the robot. This hierarchical design allows the robot to combine short-range geometric safety with long-range semantic reasoning, enabling efficient, vision-informed exploration and object search in large outdoor environments. 
+
+B. Navigation Graph 
+
+1) Motivation 
+
+Dense voxel-based maps are computationally expensive to maintain in large outdoor environments. To achieve scalable, memory-efficient exploration, we represent free-space con-nectivity as a sparse graph where nodes correspond to reach-able regions and edges encode traversability relationships. 
+
+2) Graph Definition 
+
+At time t, the navigation graph is 
+
+Gnav  
+
+> t
+
+= ( Vt, E t),
+
+where vi ∈ Vt represents a collision-free location in the environment and (vi, v j ) ∈ Et encodes a collision-free traversable edge between two nodes. Each node vi stores: 
+
+rfi (free radius) , rei (explored radius) ,
+
+updated using signed distance fields (SDFs) to obstacles and unknown regions. The free radius rfi denotes the distance from vi to the nearest obstacle or unknown cell. It is capped by a constant rf
+
+> max
+
+. The explored radius rei captures how far the environment around vi has been observed ensuring persistent memory of previously explored regions. Nodes adjacent to unknown regions form the geometric frontier set: 
+
+Fgeo  
+
+> t
+
+= { vi ∈ Vt | vi.isFrontier = true }.
+
+3) Graph Update Procedure 
+
+The graph is updated incrementally at each timestep using the current local traversability map T geo  
+
+> t
+
+as shown in Algo-rithm 1, and summarized in Figure 3. The main components of an update step include: 1) Update the free and explored radii of each node (Algorithm 2) 2) Sample new nodes in the free cells of the local map ensuring they are not at redundant locations (Algo-rithm 3) 3) Detect frontier cells in the local map and update nodes near the frontier cells to frontier nodes. (Algorithm 4) 4) Densify the graph by connecting all the nodes using collision-free edges (Algorithm 5) This graph-based formulation enables long-term memory and scalable mapping critical for long-range navigation. By encoding both geometric traversability and exploration history in a sparse structure, Gnav  
+
+> t
+
+provides a compact yet informative abstraction of the environment, enabling efficient integration with the semantic scoring and planning layers that follow. 
+
+Algorithm 1 Update Navigation Graph  
+
+> 1:
+
+function UPDATE NAVIGATION GRAPH (Gnav 
+
+> t−1
+
+, T geo  
+
+> t
+
+) 
+
+> 2:
+
+SDF unk  
+
+> t
+
+, SDF obs  
+
+> t
+
+← COMPUTE SDF( T geo  
+
+> t
+
+) 
+
+> 3:
+
+Gnav  
+
+> t−1
+
+← UPDATE NODES (Gnav 
+
+> t−1
+
+) 
+
+> 4:
+
+Vnew ← SAMPLE NEW NODES (T geo  
+
+> t
+
+, G nav 
+
+> t−1
+
+, N samples ) 
+
+> 5:
+
+Vt ← Vt−1 ∪ Vnew  
+
+> 6:
+
+Vt ← UPDATE FRONTIER NODES (T geo  
+
+> t
+
+, V t) 
+
+> 7:
+
+Enew  
+
+> t
+
+← BUILD EDGES (Vt, T geo  
+
+> t
+
+) 
+
+> 8:
+
+Et ← Et−1 ∪ Enew  
+
+> t
+> 9:
+
+return Gnav  
+
+> t
+
+= ( Vt, E t)
+
+Algorithm 2 Update Nodes  
+
+> 1:
+
+function UPDATE NODES (Gnav 
+
+> t−1
+
+) 
+
+> 2:
+
+for all vi ∈ Vt−1 within map bounds do  
+
+> 3:
+
+rfi ← min( SDF obs  
+
+> t
+
+(vi), SDF unk  
+
+> t
+
+(vi), r f
+
+> max
+
+) 
+
+> 4:
+
+rei ← max( rei , SDF unk  
+
+> t
+
+(vi))  
+
+> 5:
+
+if rfi = 0 then ▷ Node lies inside obstacle  
+
+> 6:
+
+Remove vi and associated edges from Gnav  
+
+> t−1
+> 7:
+
+return Gnav 
+
+> t−1
+
+C. ExploRFM 
+
+We design ExploRFM (Exploration and Object Reasoning Foundation Model ) to provide long-range semantic percep-tion that complements LiDAR-based geometry. Given the current RGB frame It and a goal text query Qgoal , ExploRFM predicts three dense outputs — a visual traversability map (T vis  
+
+> t
+
+), a visual frontier score map ( Fvis  
+
+> t
+
+), and an object-similarity mask ( Svis  
+
+> t
+
+), as illustrated in Figure 4.  
+
+> VOLUME , 7Author et al.:
+
+FIGURE 3: Navigation Graph Construction (a) Node Sampling in free cells of T geo  
+
+> t
+
+, and assigning rfi (free radius). Invalid samples are shown in red. (b) rei (explored radius) for each node. (c) Identifying frontier cells and assigning them to nodes to get Fgeo  
+
+> t
+
+. (d) redge for the current node. (e) Dense graph obtained after first iteration of graph construction. (f) Robot pose xt update and shift of T geo  
+
+> t
+
+. (g) Node Sampling and update rfi , r ei (h) Detect new frontier cells and remove invalid ones. Invalid ones shown in red - present in known regions, present within explored radius of another node. (i) Assign frontier cells to nodes, and update frontier nodes.  
+
+> 8VOLUME ,
+
+<Society logo(s) and publication title will appear here. >Vision Foundation Model 
+
+W p
+
+H p
+
+D b
+
+> Hp
+> Dl
+
+# “Water Tank” Text Foundation Model 
+
+> Dl
+
+MLP (φ align )
+
+> Cosine Similarity
+
+Traversability Head (f trav )
+
+Frontier Head (f front ) Text-Aligned Visual Feats 
+
+## Visual Frontiers ( F tvis )
+
+RADIO 
+
+> SigLIP-2
+
+## F tlang 
+
+## F tradio 
+
+W
+
+H
+
+RGB Image (I t )  
+
+> Goal Query (Q goal )
+> Wp
+
+## Object Mask ( S tvis )Traversability ( T tvis )
+
+FIGURE 4: ExploRFM Architecture. ExploRFM builds upon the RADIO vision foundation model to jointly reason about traversability, semantic frontiers, and goal-object localization from a single RGB frame and language query. 
+
+Algorithm 3 Sample New Nodes  
+
+> 1:
+
+function SAMPLE NEW NODES (T geo  
+
+> t
+
+, G nav 
+
+> t−1
+
+, N samples ) 
+
+> 2:
+
+Vnew ← ∅  
+
+> 3:
+
+for k = 1 to Nsamples do  
+
+> 4:
+
+prand ∼ Uniform (FreeRegion (T geo  
+
+> t
+
+))  
+
+> 5:
+
+if min( SDF obs  
+
+> t
+
+(prand ), SDF unk  
+
+> t
+
+(prand )) > r trav 
+
+then  
+
+> 6:
+
+if ∀vj ∈ Vt−1, ∥prand − pvj ∥ > r fj then  
+
+> 7:
+
+Vnew ← Vnew ∪ { vrand } 
+
+> 8:
+
+return Vnew 
+
+T vis  
+
+> t
+
+∈ [0 , 1] H×W provides a semantic “safety score” for each image pixel (higher the score, safer the terrain), estimating how safe it is for the robot to traverse that region based on scene semantics. Unlike LiDAR-based traversabil-ity, which is strictly geometric, this prediction accounts for visual appearance — e.g., distinguishing between grass , dirt ,or water — and allows reasoning about safe terrain even beyond the LiDAR’s effective range. 
+
+Fvis  
+
+> t
+
+∈ [0 , 1] H×W , inspired by LRN [2], localizes regions in the image that correspond to candidate locations for further exploration — such as the end of a trail, an opening between trees, or a road turning at a curve (higher value indicating a greater probability of the pixel being a visual frontier). We observe that such frontiers consistently emerge at the horizon of traversable regions and can be formally understood as regions in the image space lying at the boundary of the traversable contour that also align with candidate expert trajectories. Typically, these are areas at the traversable boundary which have depth discontinuities greater than the robot size. In practice, these cues help the robot identify promising semantic directions for exploration using the prior knowledge embedded in large vision models. 
+
+1) Backbone 
+
+ExploRFM adopts the RADIO [48] vision foundation model as its core. RADIO is a ViT-based model that distills features from three complementary pretrained backbones: DINO [49] (geometry and visual texture), CLIP [19] (vision–language alignment), and SAM [50] (boundary and segmentation cues). Given an RGB frame It, RADIO produces a dense patch-level feature map 
+
+Fradio  
+
+> t
+
+∈ RHp×Wp×Db , where Hp = Hp , W p = Wp ,
+
+with p as the patch size and Db the feature dimension.  
+
+> VOLUME , 9Author et al.:
+
+Algorithm 4 Detect and Update Frontier Nodes  
+
+> 1:
+
+function UPDATE FRONTIER NODES (T geo  
+
+> t
+
+, V t) 
+
+> 2:
+
+/* Step 1: Cleanup of invalidated frontier points */  
+
+> 3:
+
+for all vi ∈ Vt with vi.isFrontier = true do  
+
+> 4:
+
+vi.frontierPoints new ← ∅  
+
+> 5:
+
+for all pf ∈ vi.frontierPoints do  
+
+> 6:
+
+if pf is not in Known region of T geo  
+
+> t
+
+and 
+
+within map bounds then  
+
+> 7:
+
+Add pf to vi.frontierPoints new  
+
+> 8:
+
+vi.frontierPoints ← vi.frontierPoints new  
+
+> 9:
+
+/* Step 2: Update node frontier status */  
+
+> 10:
+
+for all vi ∈ Vt do  
+
+> 11:
+
+if vi.frontierPoints is ∅ then  
+
+> 12:
+
+vi.isFrontier ← false  
+
+> 13:
+
+else  
+
+> 14:
+
+vi.isFrontier ← true  
+
+> 15:
+
+/* Step 3: Detect and assign new frontier points */  
+
+> 16:
+
+Fcells ← BOUNDARY BETWEEN (Free, Unknown) in 
+
+T geo  
+
+> t
+> 17:
+
+for all cf ∈ F cells do  
+
+> 18:
+
+pcf ← center position of cf 
+
+> 19:
+
+/* Skip if within explored radius of any node */  
+
+> 20:
+
+if ∃ vj ∈ Vt : ∥pvj − pcf ∥ ≤ rej then  
+
+> 21:
+
+continue  
+
+> 22:
+
+/* Find nearest collision-free node */  
+
+> 23:
+
+v∗ ← arg min vi∈Vt, CollisionFree (vi,c f ) ∥pvi − pcf ∥ 
+
+> 24:
+
+if v∗ exists then  
+
+> 25:
+
+Add pcf to v∗.frontierPoints  
+
+> 26:
+
+v∗.isFrontier ← true  
+
+> 27:
+
+return Vt
+
+Algorithm 5 Build Edges  
+
+> 1:
+
+function BUILD EDGES (Vt, T geo  
+
+> t
+
+) 
+
+> 2:
+
+Enew  
+
+> t
+
+← ∅  
+
+> 3:
+
+for all vi ∈ Vt do  
+
+> 4:
+
+Ni ← GET SPATIAL NEIGHBORS (vi, V t, r edge ) 
+
+> 5:
+
+for all vj ∈ N i do  
+
+> 6:
+
+if CollisionFree( vi, v j ) then  
+
+> 7:
+
+Enew  
+
+> t
+
+← Enew  
+
+> t
+
+∪ { (vi, v j )} 
+
+> 8:
+
+return Enew 
+
+> t
+
+2) Language-Aligned Feature Space 
+
+To allow reasoning conditioned on text queries, we follow RayFronts [23] to make RADIO’s spatial features language-aligned. Specifically, we: (1) replace the final self-attention layer with the NACLIP [51] variant using KK ⊤ to enhance local spatial consistency, and (2) use RADIO’s SIGLIP summary adaptor to project the patch embeddings into a language-aligned space: 
+
+Flang  
+
+> t
+
+= ϕalign (Fradio  
+
+> t
+
+) ∈ RHp×Wp×Dl ,
+
+where ϕalign is the pretrained MLP adaptor and Dl the language-aligned feature dimension. For object localization, the text query Qgoal is encoded via the Siglip-2 [52] text encoder: 
+
+qgoal = ψtext (Qgoal ) ∈ RDl .
+
+The object similarity map is computed via cosine similarity: 
+
+Svis  
+
+> t
+
+(u, v ) = 
+
+(
+
+1, if cos( Flang  
+
+> t
+
+(u, v ), qgoal ) > τ sim ,
+
+0, otherwise ,
+
+and upsampled to the image resolution (H, W ).
+
+3) Traversability and Frontier Heads 
+
+Since Fradio  
+
+> t
+
+is at patch resolution, we use two independent deconvolutional CNN heads to upsample and predict per-pixel maps: 
+
+T vis  
+
+> t
+
+= ftrav 
+
+ Fradio 
+
+> t
+
+,
+
+Fvis  
+
+> t
+
+= ffront 
+
+ Fradio 
+
+> t
+
+,
+
+We discuss the architecture of the CNN heads and training details in Sec. V-B. 
+
+D. Coarse Goal Query Localization 
+
+FIGURE 5: Coarse goal query localization . Ray-distance weighting based triangulation. Particles with darker shades get a higher weight. While an object that falls within the LiDAR depth range can be trivially localized by taking the median depth of LiDAR points within the object mask Svis  
+
+> t
+
+, our objective is to estimate a coarse 3D location of the queried object 
+
+Qgoal even when it lies beyond LiDAR visibility. This enables early, directed exploration toward the target. We propose a lightweight triangulation framework in-spired by voxel-based ray intersection [23] and camera-frustum voting [22], adapted to outdoor-scale environments  
+
+> 10 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+through a particle-based approximation. Given multiple cam-era poses where the queried object is detected, we generate and fuse probabilistic 3D hypotheses to infer a coarse goal location. 
+
+> 1) Notation and Particle Projection
+
+Let V = {(Svis  
+
+> i
+
+, Tcam  
+
+> i
+
+)}Ni=1 denote the set of valid views where the object mask Svis  
+
+> i
+
+has nonzero area. Here, Tcam  
+
+> i
+
+=[Ri | ti] ∈ SE (3) is the camera pose at time i, and K denotes the camera intrinsics. The goal is to estimate ˆpgoal ∈ R3 from these multi-view observations. We first generate 3D particle hypotheses corresponding to pixels within the object masks using Algorithm 6. 
+
+Algorithm 6 ProjectParticles (V, N p, d min , d max ) 
+
+> 1:
+
+P ← ∅  
+
+> 2:
+
+for each (Svis  
+
+> i
+
+, Tcam  
+
+> i
+
+) ∈ V do  
+
+> 3:
+
+Sample Np random pixels (u, v ) from Svis  
+
+> i
+> 4:
+
+for each sampled pixel (u, v ) do  
+
+> 5:
+
+Sample depth d ∼ U (dmin , d max ) 
+
+> 6:
+
+Compute 3D point in camera frame: pcam =
+
+d K−1[u, v, 1] ⊤ 
+
+> 7:
+
+Transform to world frame: pworld = Ripcam + ti 
+
+> 8:
+
+P ← P ∪ { pworld } 
+
+> 9:
+
+return P ▷ Set of 3D particle hypotheses 
+
+Each particle pk ∈ P represents a plausible 3D location of the queried object based on multi-view appearance. 
+
+> 2) Triangulation
+
+We compute the coarse object location by weighting each particle according to its alignment with the principal rays from the cameras, using Algorithm 7 and as illustrated in Figure 5. 
+
+Algorithm 7 RayWeightedTriangulation (P, V) 
+
+> 1:
+
+Initialize weights wk = 0 for all pk ∈ P  
+
+> 2:
+
+for each pk ∈ P do  
+
+> 3:
+
+for each view (Svis  
+
+> i
+
+, Tcam  
+
+> i
+
+) do  
+
+> 4:
+
+Let ri be the ray from camera center to mask centroid  
+
+> 5:
+
+Compute shortest distance dik between pk and 
+
+ri 
+
+> 6:
+
+wk += 1  
+
+> dik +ε
+> 7:
+
+Estimate coarse location: 
+
+ˆpgoal =
+
+P 
+
+> k
+
+wkpk
+
+P 
+
+> k
+
+wk 
+
+> 8:
+
+return ˆpgoal 
+
+This formulation naturally favors particles consistent with the viewing rays of multiple observations and mitigates spurious detections from false-positive masks. The resulting 
+
+ˆpgoal serves as the goal for the planner until the object appears within LiDAR range for precise localization. 
+
+> E. Constructing the Scored Navigation Graph
+
+We construct a scored navigation graph Gscore  
+
+> t
+
+by integrating geometric frontiers with visual-semantic cues obtained from ExploRFM. At time t, the scored navigation graph is defined as 
+
+Gscore  
+
+> t
+
+= ( Vt, E t, St, Dt),
+
+where Vt and Et denote the sets of nodes and edges in Gnav  
+
+> t
+
+.The functions 
+
+St : Fgeo  
+
+> t
+
+→ [0 , 1] and Dt : Fgeo  
+
+> t
+
+→ R+
+
+assign to each geometric frontier node vi ∈ F geo  
+
+> t
+
+a visual-semantic score St(vi) (computed via Eq. 5) and the distance 
+
+Dt(vi) from the robot’s current pose xT at which the score was last updated. 
+
+> 1) From Global Objective to Local Frontier Selection
+
+We recall from Eq. (1) that the objective of the planner is to find a trajectory ξ = {x0, . . . , xT } that minimizes the expected navigation cost 
+
+J(ξ) = EE
+
+"T −1X
+
+> t=0
+
+C(xt, a t, xt+1 )
+
+#
+
+,
+
+where C(·) measures travel effort, traversability, and safety, and the expectation is taken over the unknown environment 
+
+E. Since planning is constrained to a limited local horizon 
+
+H ≪ T by onboard sensing and computation, the robot must periodically choose a frontier node through which it will exit the current local map and continue exploration. Accordingly, the global optimization can be decomposed into a sequence of local decisions. At time t, the planner selects a frontier node vi ∈ F geo  
+
+> t
+
+that minimizes the expected total cost to reach the goal, composed of a locally known cost and a heuristic cost to continue beyond the local map. 
+
+> 2) Depth and Visual Horizons
+
+To model perceptual limits, we define two horizons. The 
+
+depth horizon Hd represents the maximum range within which geometric mapping and traversability information are reliable—essentially the effective range of the elevation map 
+
+Et i.e. rmax . All geometric frontiers Fgeo  
+
+> t
+
+therefore lie within this depth horizon. Beyond Hd, the robot’s geometric understanding ceases, but its vision model still provides semantic and traversability cues over a farther range. We define this as the visual horizon 
+
+Hv > H d, where visual frontiers Fvis  
+
+> t
+
+appear at the boundary between semantically traversable and unknown regions in image space. The long-range exploration goal ˆpgoal typically lies beyond Hv , requiring the robot to reason across both horizons to plan effectively.  
+
+> VOLUME , 11 Author et al.:
+
+FIGURE 6: Scoring the navigation graph using images. (a) Heuristic Formulation for Distance-to-goal, and heading similarity for approximation of visual frontier to goal cost ( Cgoal ) (b) In-image grid search in the traversable region for approximation of geometric frontier to visual frontier cost ( Ctrans )
+
+3) Frontier Cost Formulation 
+
+Within this framework, the cost of reaching the goal can be decomposed into two components (Figure 6a): a known local cost Clocal that lies entirely within the geometric map, and an unknown heuristic cost Cheuristic beyond Hd. Traditionally, 
+
+Cheuristic is approximated by the Euclidean distance from the frontier to the goal [1]. Instead, we exploit the visual modality to estimate this cost more meaningfully using semantic and traversability cues available up to the visual horizon. Specifically, the planner seeks the frontier node minimiz-ing the expected total cost: 
+
+v∗ = argmin  
+
+> vi∈F geo
+> t
+> fj∈F vis
+> t
+
+h
+
+Clocal (xT , v i)+ Ctrans (vi, f j )+ Cgoal (fj , ˆpgoal )
+
+i
+
+,
+
+(3) where xT is the current robot pose, Clocal denotes the known cost to reach vi within the local traversability graph, Ctrans 
+
+represents the transition cost from vi to a visual frontier fj ,and Cgoal is an approximate cost from fj to the final goal. 
+
+4) Approximating Transition and Goal Costs 
+
+Because geometric cost information is unavailable beyond 
+
+Hd, we approximate these two terms using the robot’s visual-semantic representation: 
+
+• Transition cost Ctrans (vi, f j ) is estimated using the 
+
+minimum-cost image path (MCIP) between the pro-jected frontier π(vi) and a visual frontier pixel fj ,constrained to pixels satisfying T vis  
+
+> t
+
+> τ trav (Figure 6b). This MCIP reflects the shortest traversable path in image space and forms the basis of the reachability confidence Rconf .
+
+• Goal cost Cgoal (fj , ˆpgoal ) is approximated by the angu-lar similarity between the goal direction (from vi to 
+
+ˆpgoal ) and the direction of fj , captured by the goal confidence Gconf (Figure 6a). These visual approximations enable a composite frontier score si ∈ [0 , 1] , where higher si implies lower expected traversal cost. The resulting heuristic cost for planning beyond the local map is then expressed as: Cost (xT , ˆpgoal ) = argmin 
+
+> vi∈F geo
+> t
+
+h
+
+d(xT , v i) + z(si) d(vi, ˆpgoal )
+
+i
+
+,
+
+(4) where d(·, ·) denotes Euclidean distance and z(·) is amonotonically decreasing scaling function that downweights distant frontiers with high semantic confidence. In essence, Eq. (3) provides a cross-modal cost formula-tion that links the robot’s geometric understanding (within 
+
+Hd) and visual reasoning (up to Hv ), thereby motivating the design of our scored navigation graph. 
+
+5) Defining the Visual-Semantic Scoring Function 
+
+We treat each pixel in Fvis  
+
+> t
+
+as a visual frontier candidate fj .We define the projection of the node π(vi) as valid if the projection is within image bounds, is not behind the camera and if the node lies within a maximum scoring distance dscore max  
+
+> 12 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+from the robot xT . We define the scoring function fscore 
+
+introduced in Eq. (2) for each frontier node vi ∈ F geo  
+
+> t
+
+as follows: 
+
+fscore (vi) = 
+
+
+
+sdef ,
+
+if π(vi) invalid and vi /∈ F geo 
+
+> t−1
+
+.
+
+max  
+
+> p∈X
+
+[Gconf (ˆ pgoal , v i, p ) Rconf (π(vi), p ) Fconf (p)] ,
+
+if π(vi) valid and d(xT , v i) < Dt−1(vi).
+
+St−1(vi),
+
+if π(vi) invalid or d(xT , v i) ≥ D t−1(vi).
+
+(5) where X is the set of image pixels p = ( px, p y ), sdef is a default score assigned to newly discovered frontiers, and: 
+
+0.5 ≤ Gconf (ˆ pgoal , v i, p ) ≤ 1,
+
+0 ≤ Rconf (π(vi), p ) ≤ 1,
+
+0 ≤ Fconf (p) ≤ 1.
+
+6) Confidence Components 
+
+Each term in the product Gconf Rconf Fconf contributes a spe-cific modality-driven confidence measure: 
+
+(a) Goal Confidence. This measures alignment between the frontier heading hp and the goal heading hgoal (vi, ˆpgoal ):
+
+Gconf (ˆ pgoal , v i, p ) = 3 + hp · hgoal (ˆ pvi , ˆpgoal )4 , (6) where hp is the normalized ray through pixel p computed via K−1[px, p y , 1] T , and hgoal (vi) is the normalized vector from vi toward ˆpgoal . This ensures 0.5 ≤ Gconf ≤ 1 i.e. non-zero score for a frontier pointing away from the goal which would be required in scenarios where the optimal path must go in the opposite direction of the goal due to geometric constraints like deadends. 
+
+(b) Reachability Confidence. The reachability confidence between π(vi) and p is, computed over the image grid graph restricted to pixels with T vis  
+
+> t
+
+> τ trav :
+
+w(p) = 1
+
+T vis  
+
+> t
+
+(p) + ε , (7) 
+
+Rconf (π(vi), p ) = 1 − tanh 
+
+ MCIP (π(vi), p )
+
+H + W
+
+
+
+, (8) where MCIP (π(vi), p ) denotes the minimum-cost image path distance between π(vi) and p, with edge weights w(p).
+
+(c) Frontier Confidence. This term suppresses unreliable or low-confidence frontier predictions: 
+
+Fconf (p) = 
+
+(Fvis  
+
+> t
+
+(p), if Fvis  
+
+> t
+
+(p) > τ front ,
+
+0, otherwise. (9) We provide an overview of the full scoring pipeline in Algorithm 8. 
+
+Algorithm 8 Scored Frontier Graph Construction 
+
+Require: Gnav  
+
+> t
+
+, T vis  
+
+> t
+
+, Fvis  
+
+> t
+
+, It, xT , ˆpgoal , St−1, Dt−1 
+
+> 1:
+
+for each vi ∈ F geo  
+
+> t
+
+do  
+
+> 2:
+
+if π(vi) invalid and vi /∈ F geo  
+
+> t−1
+
+then  
+
+> 3:
+
+St(vi) ← sdef  
+
+> 4:
+
+Dt(vi) ← ∞  
+
+> 5:
+
+else if π(vi) valid and (( vi /∈ F geo 
+
+> t−1
+
+) or ( d(xT , v i) <
+
+Dt−1(vi))) then  
+
+> 6:
+
+for each pixel p ∈ X where T vis  
+
+> t
+
+(p) > τ trav do  
+
+> 7:
+
+compute Gconf (ˆ pgoal , v i, p ), Rconf (π(vi), p ),
+
+Fconf (p) 
+
+> 8:
+
+si(p) ← Gconf (ˆ pgoal , v i, p ) Rconf (π(vi), p ) Fconf (p) 
+
+> 9:
+
+St(vi) ← max p∈X si(p) 
+
+> 10:
+
+Dt(vi) ← dist (xT , v i) 
+
+> 11:
+
+else  
+
+> 12:
+
+St(vi) ← S t−1(vi) 
+
+> 13:
+
+Dt(vi) ← D t−1(vi) 
+
+> 14:
+
+return Gscore  
+
+> t
+
+= ( Vt, E t, St, Dt)
+
+7) Implementation Detail: Goal-Agnostic Scoring 
+
+The frontier scoring function defined in Eq. (2) 
+
+si = fscore 
+
+ T vis  
+
+> t
+
+, Fvis  
+
+> t
+
+, π (xvi ), ˆpgoal , xt
+
+ ,
+
+is implemented so that it is goal-agnostic , i.e. it does not explicitly depend on the goal estimate ˆpgoal . This design choice is motivated by the fact that the goal localization module continuously updates ˆpgoal as new observations ar-rive. If the score St(vi) were conditioned on a previous (and potentially outdated) goal estimate, it would become invalid once the goal position changes, requiring costly re-scoring of all frontier nodes. To address this, we employ a goal-agnostic multi-heading scoring strategy. Instead of computing a single scalar score for a specific goal direction, we evaluate fscore 
+
+across a discretized set of possible goal headings around each frontier node vi. The continuous space of possible goal head-ing directions (a full 360 ◦ around vi) is uniformly divided into Nbins angular bins. For each bin bk ∈ { 1, 2, . . . , N bins },we define a representative goal heading vector h(k)
+
+> goal
+
+, corre-sponding to the center of the angular sector. A distinct score is then computed for each bin: 
+
+s(k) 
+
+> i
+
+= fscore 
+
+
+
+T vis  
+
+> t
+
+, Fvis  
+
+> t
+
+, π (xvi ), h(k)
+
+> goal
+
+, xt
+
+
+
+,k = 1 , . . . , N bins .
+
+(10) Consequently, the score attribute of the scored navigation graph becomes a vector of floating-point values rather than a scalar: 
+
+St(vi) =  s(1)  
+
+> i
+
+, s (2)  
+
+> i
+
+, . . . , s (Nbins )
+
+> i
+
+, vi ∈ F geo  
+
+> t
+
+.
+
+The formal definition of the scored navigation graph is thus updated to: 
+
+Gscore  
+
+> t
+
+= ( Vt, E t, St, Dt), St : Fgeo  
+
+> t
+
+→ [0 , 1] Nbins . 
+
+> VOLUME , 13 Author et al.:
+
+(b) Distance Computation to Goal 
+
+(a) Navigation Graph with External Edges to Goal (c) Planned Path to Goal  
+
+> - Unexplored Cell
+> - Explored Cell
+> - Obstacle
+> - Robot Position & Orientation
+> - Free Node
+> - Frontier Node
+> - Frontier Cell
+> - Node Explored Radius
+> - Frontier Edge
+> - Interior Edge - Planned Path
+> - Exterior Edge to Goal
+> - Distance to Goal
+> - Goal
+> 0.6
+> 0.9
+> 0.8
+> 0.6
+> 0.9
+> 0.8
+> 0.6
+> 0.9
+> 0.8
+
+FIGURE 7: Planning using the Scored Graph. (a) Visualizing edges to the auxiliary goal node. (b) Computing cost of edges from frontier nodes to the goal node using shortest collision-free path search in a coarse grid. A darker color implies a higher traversal cost. (c) Final high-level path after Dijkstra’s algorithm on the graph. 
+
+F. Planner 
+
+Given the scored navigation graph Gscore  
+
+> t
+
+and a target goal position ˆpgoal , the objective is to compute a high-level path that guides the robot towards the goal by leveraging both geometric connectivity and visual information. 
+
+1) Cost Formulation 
+
+We employ the cost function previously defined in Eq. (4), where the total cost to the goal is decomposed into ageometric distance term and a visually modulated heuristic: Cost (xT , ˆpgoal ) = argmin 
+
+> vi∈F geo
+> t
+
+h
+
+d(xT , v i) + z(si) d(vi, ˆpgoal )
+
+i
+
+,
+
+where d(·, ·) denotes Euclidean distance, and z(·) is amonotonically decreasing scaling function that adjusts the contribution of the heuristic based on the visual–semantic score si. We empirically use 
+
+z(si) = 1 − α log( si + ϵ), (11) where α > 0 and ϵ is a small constant to ensure numerical stability. 
+
+2) Graph Construction for Planning 
+
+Planning over Gscore  
+
+> t
+
+can be reduced to a shortest-path search if we introduce an auxiliary goal node ˆvgoal and connect each geometric frontier node vi ∈ F geo  
+
+> t
+
+to ˆvgoal through an additional edge egoal (vi). The traversal cost of this edge is defined as 
+
+C(egoal (vi)) = z(s(j) 
+
+> i
+
+) ˜d(vi, ˆpgoal ), 
+
+> 14 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+where s(j) 
+
+> i
+
+denotes the score of the frontier node corre-sponding to the goal heading bin j, and ˜d(vi, ˆpgoal ) is an approximation of the traversable distance from vi to the goal. 
+
+> 3) Safe Distance Approximation
+
+The naive Euclidean distance between vi and ˆpgoal can underestimate the true traversal cost if the straight line passes through previously explored or occupied regions. To correct for this, we construct a coarse occupancy grid Gcoarse around 
+
+Gscore  
+
+> t
+
+:
+
+• Cells intersecting the explored radius of any node are marked as explored (occupied). 
+
+• The remaining cells are marked unexplored (free). Edges from cells on the boundary of Gcoarse to the goal are only added if they do not intersect explored cells. The distance ˜d(vi, ˆpgoal ) is then computed as the shortest collision-free path length in this coarse grid, ensuring the goal cost is never under-approximated (see Figure 7). 
+
+> 4) Graph Search
+
+With these augmented edges, standard graph search algo-rithms (e.g. Dijkstra’s or A*) can be directly applied to 
+
+Gscore  
+
+> t
+
+. The start node is chosen as the node closest to the robot’s current position xT , and the search continues until ˆvgoal is reached. The resulting path represents a high-level plan that traverses frontiers prioritized by their visual– semantic potential. A short-range local goal glocal  
+
+> t
+
+is then selected along this high-level path at a distance dlocal from the robot. glocal  
+
+> t
+
+is subsequently passed to the local planner, which generates fine-grained control commands for navigation. Algorithm 9provides an overview of the planner. 
+
+Algorithm 9 High-Level Planning on the Scored Navigation Graph 
+
+Require: Gscore  
+
+> t
+
+= ( Vt, E t, St, Dt), xT , ˆpgoal 
+
+Ensure: High-level path Pglobal  
+
+> 1:
+
+Identify start node vstart = argmin vi∈Vt d(xT , v i) 
+
+> 2:
+
+for all vi ∈ F geo  
+
+> t
+
+do  
+
+> 3:
+
+Compute goal heading hgoal (vi) = ˆpgoal −xvi  
+
+> ∥ˆpgoal −xvi∥
+> 4:
+
+Determine heading bin j = BinIndex (hgoal (vi))  
+
+> 5:
+
+Compute safe goal distance ˜d(vi, ˆpgoal ) using coarse grid search  
+
+> 6:
+
+Compute goal edge cost C(egoal (vi)) = 
+
+z(St(vi)(j)) ˜d(vi, ˆpgoal ) 
+
+> 7:
+
+Add edge egoal (vi) connecting vi to ˆvgoal with cost 
+
+C(egoal (vi))  
+
+> 8:
+
+Pglobal ← Dijkstra( Gscore  
+
+> t
+
+, vstart , ˆvgoal ) 
+
+> 9:
+
+Select local goal glocal  
+
+> t
+
+at distance dlocal along Pglobal  
+
+> 10:
+
+return Pglobal 
+
+> V. EXPERIMENTS & DISCUSSION
+
+In this section, we empirically evaluate WildOS - our pro-posed framework for language-conditioned object search and long-range navigation in large unstructured outdoor envi-ronments. Our experiments are designed to systematically answer a set of targeted research questions that evaluate the system holistically and in isolation, across multiple environments and configurations. We first describe the overall experimental setup, including deployment details and ExploRFM training, followed by a series of experiments aimed at answering four key questions: 
+
+• Q1: Does the complete WildOS system enable success-ful end-to-end object search from language queries? (Sec. V-C) 
+
+• Q2: Does integrating vision-based scoring with the navigation graph improve navigation performance com-pared to pure-geometry or pure-vision approaches? (Sec. V-D.2) 
+
+• Q3: Does the navigation graph improve robustness and memory compared to purely vision-based navigation? (Sec. V-D.3) 
+
+• Q4: Does WildOS generalize effectively across diverse outdoor terrains? (Sec. V-D.4) 
+
+> A. System-Level Overview and Deployment Details
+
+WildOS is deployed on a Boston Dynamics Spot quadruped platform. An overview of the full system architecture is illustrated in Fig. 8. Table 1 lists all the key parameters, their descriptions and values used during deployment. 
+
+> Sensing and Localization.
+
+The robot is equipped with an Ouster OS0-128 LiDAR, a VectorNav VN-100 IMU, and three Intel RealSense D455 RGB–D cameras mounted on the left, front, and right sides of the body. All modules communicate through the ROS 2 framework. Robot localization is performed using DLIO [53], a LiDAR–inertial odometry method that fuses LiDAR scans Plidar  
+
+> t
+
+with IMU measurements to produce an odometric pose estimate xT relative to the start frame x0.
+
+> Elevation and Traversability Mapping.
+
+The LiDAR point cloud Plidar  
+
+> t
+
+and the current pose xT are processed by an elevation mapping module using the GPU-accelerated library of Elevation Mapping CuPy [54]. This node constructs a local elevation grid 
+
+Et ∈ RM ×M ,
+
+where each cell represents the estimated ground height relative to the robot. Cells without valid LiDAR returns are marked as NaN. A traversability filter subsequently converts 
+
+Et into a traversability map 
+
+T geo  
+
+> t
+
+∈ [0 , 1] M ×M ,
+
+where 1s indicate safe terrain. This map forms part of the observation Ot = {It, T geo  
+
+> t
+
+, xT } used by WildOS as the geometric input to our navigation graph construction.              
+
+> VOLUME , 15 Author et al.: LiDAR (P tlidar )
+> LiDAR Inertial Odometry
+> IMU
+> Elevation Mapping & Traversability Filter
+> Traversability Map (T tgeo )
+> Localization
+> Elevation Map Traversability Map
+> 3x Intel Realsense [Left, Front, Right]
+> ExploRFM
+> Graph Construction
+> Scoring Function
+> Local Planner (Nav2)
+> Navigation Graph (G tnav )Navigation Graph
+> Ttvis , F tvis
+> Scored Navigation Graph
+> Scored Navigation Graph (G tscore )
+> Triangulator
+> 3 x H x W x 3
+> Planner
+> Goal Triangulation
+> Frontiers (F tvis )
+> 3 x H x W x 1
+> Object-Similarity (S tvis )
+> 3 x H x W x 1
+> Goal Triangulation (p goal )
+> Plan using Scored Graph
+> Nav2
+> High-Level Path & Local Goal
+> Spot
+
+Hardware 
+
+Dependencies 
+
+WildOS   
+
+> Traversability (T tvis )
+> 3 x H x W x 1
+> Robot Pose ( xt)
+
+FIGURE 8: System Overview . Frontiers and Traversability are thresholded and shown in Jet and Inverse Jet colormaps respectively. Edges of the navigation graph are shown in red, free nodes in green, and frontier nodes in blue. Frontier nodes are surrounded with a score ring in the Scored Navigation Graph, indicating the score ( color according to the Jet colormap) in the goal direction. The Triangulated Goal is shown as a cyan sphere, along with projected particles in white. The planned high-level path is shown in green. A similar color scheme is followed in subsequent figures unless stated otherwise. 
+
+Visual Processing and Frontier Scoring. 
+
+The visual processing pipeline operates using images from all three RGB cameras. We batch the synchronized images 
+
+{Ileft  
+
+> t
+
+, I front  
+
+> t
+
+, I right  
+
+> t
+
+} into a tensor of size 3 × H × W × 3 before processing using ExploRFM. Coarse goal localization uses object similarity Svis  
+
+> t
+
+from all views. For cross-modal scoring of frontier nodes, each geometric frontier is projected into all three image planes and scored using Eq. (10). The lateral cameras help to get a baseline for the goal triangulation and cover all candidate exploration directions for the scoring. 
+
+Planning and Control. 
+
+For local motion planning towards the short-range waypoint 
+
+glocal  
+
+> t
+
+given by the planner, we employ the NAV 2 [55] stack within ROS 2, which computes dynamically feasible trajectories and generates low-level velocity commands for the Spot base controller. All goal-heading computations and reachability checks are performed in 2D on the ground-projected frame. 
+
+Onboard Computation. 
+
+All perception and planning modules run fully onboard. Lo-calization (DLIO) and local motion planning (Nav2) execute on an Intel NUC i7, while elevation mapping, traversability estimation, and WildOS (including the neural network Ex-ploRFM) run on an NVIDIA Jetson AGX Orin GPU. 
+
+B. Training ExploRFM 
+
+We employ the C-RADIO-V3-B backbone [48] ( 90 M pa-rameters) as the core feature extractor for ExploRFM. Both the traversability head ( ftrav ) and the frontier head ( ffront ) are lightweight deconvolutional decoder heads - each consisting of four blocks of [DeConv--Conv--ReLU] layers, fol-lowed by a sigmoid activation in the final layer to predict  
+
+> 16 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+TABLE 1: WildOS System Parameters 
+
+Parameter Description Symbol Value A. Geometric Mapping & Navigation Graph 
+
+Local map radius Radius of reliable geometric sensing rmax 10 m Local map resolution Resolution of T geo  
+
+> t
+
+— 0.1 m Max free radius Cap on node free-space radius rf 
+
+> max
+
+4.0 m Node sampling count Node samples per update step Nsamples 1000 Traversability clearance Min obstacle clearance for node rtrav 0.5 m Edge connection radius Max distance for graph edges redge 8.0 m 
+
+B. ExploRFM (Vision-Language Module) 
+
+Image resolution Input RGB resolution H × W 540 × 960 
+
+Backbone patch size RADIO patch size p 16 px Backbone feature dim Dimensionality of RADIO backbone features Db 768 Language feature dim Dimensionality of language aligned features Dl 1152 Model Precision – – fp16 Similarity threshold Object similarity threshold τsim 0.09 Traversability threshold Pixel considered traversable τtrav 0.9 Frontier threshold Pixel considered visual frontier τfront 0.6 Model inference rate ExploRFM inference rate (Jetson AGX Orin) – 1.4 Hz 
+
+F. Training Details (ExploRFM Heads) 
+
+Traversability loss Loss for ftrav head — BCE Frontier loss Loss for ffront head — Weighted BCE Frontier positive class wt Positive class weighting factor in Weighted BCE loss — 4Batch size – — 8Learning rate – — 5 × 10 −5
+
+Training epochs – — 100 Optimizer – — Adam 
+
+C. Goal Triangulation 
+
+Particles per view Samples drawn per valid detection Np 1000 Min ray depth Min sampled triangulation depth dmin 1 m Max ray depth Max sampled triangulation depth dmax 100 m 
+
+D. Visual–Geometric Frontier Scoring 
+
+Default frontier score Score for newly seen frontier (invalid projection) sdef 0.3 Scoring distance limit Max distance to consider scoring dscore  
+
+> max
+
+9 m Heading bins Discrete goal-heading bins Nbins 16 
+
+E. Planning 
+
+Planning horizon (local) Local planner lookahead distance dlocal 5 m Heuristic scaling factor Weight in score-to-cost mapping α 20 Goal acceptance radius Distance threshold for declaring navigation goal reached dreach 0.5 
+
+dense binary maps. The language head ( ϕalign - a MLP) is already pretrained and provided by RADIO [48] authors. 
+
+Traversability Head. 
+
+We supervise the traversability decoder using the RUGD 
+
+dataset [56], a large-scale off-road semantic segmentation dataset comprising 7436 images spanning 24 semantic classes. From the semantic annotations, we generate binary traversability masks by assigning a label of 1 (traversable) to pixels belonging to the categories safe labels =
+
+
+
+dirt, sand, grass, asphalt, gravel, mulch, rock-bed, concrete 
+
+
+
+and 0 (non-traversable) otherwise. We train the head using binary cross-entropy (BCE) loss with an 80 /20 
+
+train/validation split. This setup enables the model to learn a semantic notion of terrain safety from diverse real-world conditions. 
+
+Frontier Head. 
+
+To train the frontier decoder, we manually annotate 350 
+
+images from the GrandTour dataset [57], which covers a wide range of terrains including off-road, urban, industrial, mountain, and forest scenes. For each image, we mark bounding boxes around visually salient exploration candi-dates (trail ends, openings, or turns) and assign all pixels within each box as frontier ( 1), and all others as non-frontier ( 0). Due to the inherent class imbalance between frontier and background pixels, we employ a weighted BCE loss . The decoder shares the same lightweight architecture as the traversability head. Importantly, we train only this  
+
+> VOLUME , 17 Author et al.:
+
+small task-specific head on top of frozen foundation-model features, keeping training efficient and data-light. Training the frontier head takes approximately 1 hour and 26 minutes on a single NVIDIA GeForce RTX 4090 GPU. Despite the small number of samples, the resulting model exhibits strong generalization, highlighting the expressiveness of the RADIO feature space. 
+
+> Qualitative Results.
+
+Figure 9 shows qualitative outputs of ExploRFM from field deployments of WildOS across diverse environments. The visual frontiers accurately capture semantically promising exploration cues, such as openings between trees (Fig. 9a), visible trail ends (Fig. 9b,c), and ramps or junctions (Fig. 9e). The traversability maps reliably highlight safe ground re-gions across both off-road and paved terrains, confirming the robustness of the trained heads and the generalizability of foundation model features. 
+
+> C. Object-Search Experiments
+
+In this section, we address the research question: 
+
+Q1: Does the complete WildOS system enable successful end-to-end object search from language queries? 
+
+This question evaluates the system-level capability of WildOS to interpret a language-based goal, ground it visu-ally in the environment, and autonomously navigate to the corresponding object. 
+
+> Setup and Objective.
+
+To test open-vocabulary grounding and search capabilities, we conduct an experiment with the query “NASA logo” ,where the goal is to reach the large NASA sign located at the JPL campus. The robot is initialized inside an alley with an approximate prior goal g0 placed to the northwest of the sign. An overview of the mission setup is shown in Fig. 10(a)–(b). The robot successfully navigates a total distance of ∼ 150 m, autonomously exiting the alley, turning onto the main road, and stopping directly beneath the NASA sign. During navigation, the system continuously scores fron-tier nodes along the edge of the local costmap using the visual traversability T vis  
+
+> t
+
+and frontier maps Fvis  
+
+> t
+
+predicted by ExploRFM (Fig. 11(c)). Once the target object becomes visible, it is detected through the object-similarity map Svis 
+
+> t
+
+(Fig. 11(a)). Particles are sampled and projected following the coarse triangulation procedure described in Sec. IV-D, producing an initial goal hypothesis (Fig. 11(b)). The active navigation goal is then switched from g0 to the triangulated estimate ˆpgoal .
+
+> Results and Analysis.
+
+A visualization of all projected particles across multiple views of the object is shown in Fig. 11(d). When projecting the estimated goal marker (blue sphere) from the global map (a) 
+
+Visual Frontiers Visual Traversability 
+
+> (b)
+> (c)
+> (d)
+> (e)
+> (f)
+
+FIGURE 9: Examples of Visual Traversability and Fron-tiers from ExploRFM in varied terrains. Visual Frontiers are thresholded and shown in the Jet Colormap (Red indicat-ing higher frontier confidence). Visual Traversability is also thresholded and shown in the inverse Jet Colormap (Blue indicating higher traversability confidence). (a),(b): Offoad environments with a dirt-track (c): Narrow trail amidst rocks, bushes and undergrowth (d),(e): Urban environments with paved terrains (f): Vast and open urban terrain  
+
+> 18 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+into the camera frame (Fig. 11(e)), it aligns accurately with the NASA sign, indicating a precise triangulation. The com-plete scored navigation graph Gscore  
+
+> t
+
+at the end of the run is visualized in Fig. 10(c), preserving traversability information from the local costmap T geo  
+
+> t
+
+over time. Fig. 10(d) further shows the explored radius rei of each graph node, denoted by blue circles, effectively summarizing the explored area during the mission. 
+
+> Zero-Shot Generalization.
+
+To further evaluate the generality of WildOS, we conduct additional zero-shot search runs with the language queries: 
+
+“orange flag” , “garbage container” , and “golf cart” . Fig-ure 12 illustrates qualitative results across these categories. Even for cases with limited viewing baselines (e.g., the golf cart in Fig. 12(c)), the system produces robust coarse localization estimates, demonstrating the effectiveness of the particle-based triangulation. These experiments demonstrate that the system can ground arbitrary language queries into visual similarity maps, es-timate coarse 3D goal locations through triangulation, and autonomously navigate toward them. Together, they highlight the integration of language grounding, vision-based local-ization, and geometric planning operating in real time on a deployed platform. 
+
+> D. Long-Range Navigation Experiments
+
+In this section, we isolate the navigation component of Wil-dOS to evaluate its ability to perform goal-directed traversal 
+
+without object search. Here, the objective is to reach a predefined point goal g0 provided at the start of the mission. Unlike the object-search experiments, we disable the object-similarity head and do not compute Svis  
+
+> t
+
+for these trials. These experiments allow us to analyze how the integration of vision-based reasoning and graph-based memory contributes to robust long-range navigation. 
+
+> 1) Baselines
+> Long Range Navigation (LRN).
+
+LRN [2] is a purely vision-based frontier navigation method. It discretizes the space around the robot into a fixed set of angular bins and uses the visual frontier heatmaps Fvis 
+
+> t
+
+from each camera to assign scores to these bins using the known camera intrinsics. Scores from overlapping views are merged by taking the maximum, and bins below a confidence threshold are suppressed. To ensure goal-directed behavior, LRN computes two other scores: it conditions on the relative heading of the goal and smooths trajectories by also considering the robot’s previous heading. The resulting weighted score vectors are combined multiplicatively, and the bin with the highest final score determines the next navigation heading. The local planner receives a short-range goal at the edge of the costmap in this chosen direction. LRN operates entirely in the image space and does not maintain any spatial memory — it does not record previously explored regions or deferred frontier options. To ensure a fair comparison at the navigation level, we replace LRN’s original frontier detector with ExploRFM and use its visual frontier predictions as input to LRN. 
+
+> Vanilla GraphNav.
+
+This baseline leverages the navigation graph but removes the influence of vision-based scoring on planning. Specif-ically, we modify the scaling function in Eq. 11 to aconstant, z(si) = 2 , resulting in uniform edge weighting. A small penalty is applied for exploring beyond the current graph, making the auxiliary goal node edges twice their Euclidean distance. This setup mirrors traditional geometry-based exploration and planning, relying solely on the graph’s connectivity and geometry for navigation decisions. 
+
+> 2) Evaluating Efficiency of Vision-Based Scoring
+
+We now address the question: 
+
+Q2: Does integrating vision-based scoring with the navigation graph improve navigation perfor-mance compared to pure-geometry or pure-vision approaches? 
+
+> Experiment Setup.
+
+The robot begins approximately 50 m in front of a circular fence, with the goal g0 located behind it as shown in Fig. 13(a),(b). A second circular fence lies adjacent (left) to the first, creating a narrow corridor between them. The surrounding area is a wide open field with no other obstacles. Each method is evaluated over three independent runs, and we report both total trajectory length and traversal time. 
+
+> Qualitative Observations.
+
+Figure 13(a) visualizes the GPS trajectories for all methods. Both vision-guided approaches, LRN and WildOS, imme-diately identify the corridor between the fences and plan paths toward it. As shown in Fig. 13(e), the visual frontier map Fvis  
+
+> 0
+
+assigns high confidence to the pixels corresponding to this opening, indicating a strong frontier likelihood. This allows WildOS to prioritize the opening rather than follow-ing the straight (but blocked) direction toward the goal– effectively reasoning about accessibility rather than mere goal direction. This replicates human-like reasoning that prefers affordable directions over direct ones. In contrast, Vanilla GraphNav proceeds straight toward the fence until it appears in the local map, at which point the front-facing frontier nodes are cleared, forcing it to detour around the obstacle. This illustrates its myopic, locally reactive behavior. 
+
+> Quantitative Results.
+
+The quantitative comparison in Fig. 13(c) confirms that Wil-dOS achieves lower average distance and time across three  
+
+> VOLUME , 19 Author et al.:
+
+FIGURE 10: Overview of the Object Search Experiment for the query - “NASA Logo”. (a) Third-Person view of the robot approaching the NASA sign. (b) Expected trajectory of the robot overlaid on a satellite image showing the environment. (c) Scored Navigation Graph after a successful run. The rings around the frontier nodes denote the scores for each bin according to the Jet Colormap - higher scores being red, and the lower ones being blue. (d) Explored regions of the graph - visualizing the explored radius of each node in blue.  
+
+> 20 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >(a) 
+
+> (c)
+> (d)
+> (e)
+> (b)
+
+FIGURE 11: ExploRFM Outputs and Triangulation of “NASA Logo”. (a) Object Similarity map from ExploRFM (b) Initial triangulation of the NASA sign (c) Visual Frontiers, Traversability and Projected frontier node scores for all three cameras. Frontier and Traversability Confidence is shown using the Jet Colormap. (d) Final Triangulation of the logo (e) RViZ markers projected in the front camera  
+
+> VOLUME , 21 Author et al.:
+
+FIGURE 12: More Object-Search Experiments (a)”Orange Flag” (b)”Garbage Container” (c)”Golf Cart” runs and exhibits notably smaller variance (95% confidence intervals) compared to both baselines. This improvement is directly explained by the reachability confidence term Rconf 
+
+in Eq. 5, which assigns higher scores to frontier nodes whose projected paths in image space are shorter to the nearest visual frontier. In this experiment, nodes pointing toward the opening between the fences received higher scores than those directly facing the fence or the goal, enabling WildOS to plan an efficient route around the obstruction rather than heading straight toward it. 
+
+> Analysis of LRN Behavior.
+
+Interestingly, LRN performs worse than even the geometry-only baseline. As shown in the trajectories of Fig. 13(a), LRN initially selects the right-hand opening between the fences but later switches to the left, demonstrating oscil-latory behavior due to varying frontier activation values -a limitation also noted by its authors [2]. Further, near the exit of the corridor, LRN encounters a tri-fork with three visible frontiers (Fig. 13(f)). Although the rightmost frontier leads directly to the goal, in two out of three runs LRN continues forward before eventually turning right. This can be explained by referencing the method LRN uses to aggregate frontier activations: it sums all pixel scores within an angular bin and normalizes them, favoring frontiers that are larger in image space. In Fig. 13(f), the frontier leading toward the goal appears smaller due to perspective, thus receiving a lower aggregate score and causing suboptimal navigation choices. Another shortcoming of LRN [2] is that it assumes im-plicit reachability for the visual frontiers and the frontier de-tection module does not explicitly account for traversability information. If there were visual frontiers detected beyond non-traversable regions the robot would still score the angu-lar bins in those directions which is inefficient. It would plan around only when the non-traversable region appears within it’s local cost map. Fig 14 showcases potential examples with the visual frontier heatmaps and the traversability heatmaps visualized. In contrast to LRN, WildOS explicitly incorpo-rates visual traversability into frontier scoring, allowing it to suppress visually salient but unreachable regions and avoid pursuing such non-reachable frontiers. 
+
+> 3) Evaluating Efficiency of a Navigation Graph
+
+Q3: Does the navigation graph improve robustness and memory compared to purely vision-based nav-igation?  
+
+> 22 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >- 115m   
+
+> (a) Performance Comparison Average and 95% CI
+> - GOAL
+> - START
+> - WildOS
+> - LRN
+> Vanilla GraphNav
+> (c)
+> Start
+> Goal
+> -
+> (b)
+> (d) (e)
+> (f)
+> (g)
+
+FIGURE 13: Evaluating Vision-Based Scoring for Navigation Efficiency. (a) GPS trajectories for all methods. (b) Third-person view at the start of the experiment with future paths overlaid. Vision-based approaches detect the corridor opening early on and move towards it, whereas Vanilla GraphNav heads straight towards the goal until it reaches the fence and goes around. (c) Quantitative comparison across three runs (mean ± 95% CI). (d), (e) Visual frontier and the confidence map at the start of the experiment Fvis  
+
+> 0
+
+, highlighting the opening between the fences. (f) Tri-fork after exiting the corridor, where LRN [2] hesitates between competing frontiers. (g) Scored Navigation Graph after a successful WildOS run. 
+
+> Experiment Setup.
+
+This experiment isolates the contribution of the navigation graph in handling ambiguous or partially explored environ-ments. We design a scenario involving a dead-end to evaluate the ability of each method to remember explored regions and recover from failure. The robot is initialized in front of an elliptical fence with a fork ahead, offering two possible trails (Fig. 15(b),(c)). The left trail appears shorter and more aligned with the goal direction; however, further down, we block this path using a parked car (Fig. 15(d)), creating a dead-end. Ideally, a robust navigation system should recognize the blockage, turn back, and select the alternate, longer path around the fence to reach the goal. We compare WildOS and LRN over three runs each. 
+
+> Qualitative Observations.
+
+WildOS consistently completes the mission successfully in all runs, while LRN requires human intervention every time. WildOS initially chooses the shorter path, reaches the dead-end, and upon clearing the local frontier nodes, reroutes using the navigation graph. Frontier nodes pointing toward the unexplored longer path were allotted higher scores since they were visually rich directions to explore((Fig. 15(e)), enabling the system to autonomously turn back and reroute around the fence to reach the goal. The complete scored navigation graph after the run is visualized in Fig. 15(a). In contrast, LRN, being purely vision-based and memory-less, fails to recover. Upon reaching the dead-end, it observes no visible frontiers and begins oscillating left and right. Eventually it turns back and attempts to take the longer path. However, it redetects the same visual frontier on the blocked path in its left camera and repeatedly chooses it, leading to  
+
+> VOLUME , 23 Author et al.: RGB Image Visual Frontiers Visual Traversability
+
+FIGURE 14: Potential LRN Failure Cases. We visualize the visual frontier and traversability heatmaps (unthresholded) overlaid on top of the RGB image - both in the Jet Colormap i.e. red indicating a higher probability score. Notice how relying purely on frontier heatmaps (LRN [2]) can lead to high affordance scores for non-reachable frontiers. WildOS tackles this by incorporating visual traversability in frontier scoring. a cyclic behavior. Only after manual intervention-where the robot is repositioned partway down the longer path—does LRN successfully complete the run (Fig. 15(c)). These results demonstrate that persistent spatial memory is essential for long-horizon autonomy. By maintaining a structured representation of previously explored regions and deferred frontiers, WildOS can recover from dead-ends and replan effectively, whereas memoryless vision-only strategies remain prone to oscillation and repeated failure. 
+
+> 4) Generalization across terrains
+
+Q4: Does WildOS generalize effectively across diverse outdoor terrains? 
+
+> Experiment Setup.
+
+This experiment evaluates the ability of WildOS to general-ize to outdoor environments. Importantly, the frontier head of ExploRFM is trained solely on 350 annotated images from the GrandTour [57] dataset, which spans varied envi-ronments. We perform no additional fine-tuning or adaptation on data from the deployment environments. While all prior experiments were conducted in off-road terrains, here we evaluate navigation performance in urban environments. 
+
+> Qualitative Observations.
+
+In the first experiment (Fig. 16(a)), the goal is placed in the middle of a cluster of buildings. The robot initially proceeds along the straight road toward the northernmost building but detects a blockage. It subsequently uses the navigation graph to turn around, and reroute through an alleyway between two buildings to reach the goal successfully. In the second experiment (Fig. 16(b)), the robot starts in front of a building with the goal located directly behind it. Although a direct path leads inside the building, WildOS correctly provides low scores to frontier nodes pointing to the direct path, instead selecting a path that cleanly circumvents the building. These experiments highlight the strong generalization of WildOS, enabled by foundation-model features - allowing it to adapt seamlessly across terrain types without any retraining or environment-specific tuning. 
+
+> E. Discussion
+
+TABLE 2: Comparison of Navigation Capabilities.         
+
+> Method Vision-based Reasoning Graph Memory / History
+> LRN [2] ✓✗
+> Vanilla GraphNav ✗✓
+> WildOS (Ours) ✓✓
+
+The three approaches in Table 2 collectively span the design space of navigation paradigms: pure vision (LRN), pure geometry (Vanilla GraphNav), and our proposed vision + memory (WildOS). The results we showcase in this work consistently show that combining vision-based reasoning with geometric memory yields the most robust and efficient navigation behavior. 
+
+> VI. CONCLUSION, LIMITATIONS & FUTURE WORK
+> A. Conclusion
+
+In this work, we presented WildOS, a unified, real-time system for open-vocabulary object search and long-range navigation in unstructured outdoor environments. Our system combines a navigation graph with foundation-model-based perception to achieve semantic, memory-aware exploration at scale. By integrating the geometric memory of a navigation graph with the semantic and visual priors from ExploRFM, WildOS is able to plan globally while making visually meaningful local decisions. We showcased the strength of foundation-model features in robotics, demonstrating generalization across terrains and robust performance with minimal training data (only 350 an-notated images). Through extensive real-world experiments, WildOS outperformed SOTA long range navigation baselines in complex scenarios such as dead-ends and occluded goal regions. This work highlights a step toward bridging vision-language reasoning and long-horizon autonomy–paving the  
+
+> 24 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >- GOAL      
+
+> - START - WildOS - LRN - Oscillations in LRN - Intervention
+> (a)
+> (b) (c)
+> (e) (d)
+> Start
+> Goal
+> Deadend
+
+- 350m 
+
+FIGURE 15: Evaluating the Role of the Navigation Graph in Handling dead-ends. (a) Final scored navigation graph visualized after a successful WildOS run. (b) GPS trajectory for WildOS showing successful rerouting around the fence. (c) GPS trajectory for LRN, where human intervention was required. (d) Third-person view showing the blocked trail. (e) Visual frontiers at the fork - WildOS initially takes the opening on the left given it’s better alignment with the goal. After encountering a dead-end it turns back and takes the opening on the right. LRN does not store that it has already explored the opening on the left and keeps choosing the opening on the left at this fork and turning back due to a dead-end leading to an oscillatory behaviour.  
+
+> VOLUME , 25 Author et al.:
+
+FIGURE 16: WildOS in Urban Environments. Third-person views of the robot at the start of the run, GPS trajectories, and scored navigation graphs at the end of the runs for two scenarios: (a) Goal located within a cluster of buildings. (b) Goal located behind a building. WildOS plans efficient routes around obstacles and navigates to the goal successfully. way for more general, goal-driven robotic exploration in the wild. 
+
+> B. Limitations
+
+While WildOS demonstrates strong performance, several limitations remain that open directions for further improve-ment: 
+
+• Oscillatory behavior in long-horizon exploration. In environments with multiple high-scoring but spatially distant frontier nodes, the planner can occasionally oscillate between far-apart regions when frontier scores fluctuate slightly. This occurs in large, complex areas such as long trails with multiple narrow exits, some of which may be blocked. A more principled mechanism for balancing exploration and exploitation–allowing the system to commit to a chosen region until it is fully explored–could mitigate such inefficiencies. 
+
+• Lack of visual feature memory for object search. 
+
+Currently, WildOS does not store visual features (e.g., embeddings from ExploRFM) at graph nodes. This lim-its the system’s ability to perform retrospective object search—e.g., identifying that a previously seen object matches a newly issued language query. 
+
+• Approximate explored-region geometry. The cur-rent implementation assumes that each explored region around a node is circular, which simplifies storage but can leave small unmarked regions between overlapping circles. In cluttered environments (e.g., dense vegeta-tion or uneven terrain), this can lead to spurious fron-tier detections near already explored areas eventually making the graph unstable. 
+
+• Uniform threshold for open-vocabulary segmen-tation. We use a single similarity threshold across all object categories during open-vocabulary ground-ing. However, we observe that optimal thresholds vary between categories. A category-adaptive thresh-olding mechanism could enhance detection precision and reduce false positives during language-conditioned search. 
+
+> C. Future Work
+
+Building upon these findings, we outline several promising directions to extend WildOS: 
+
+• Incorporating visual memory for query-driven re-trieval. One may associate CLS embeddings from all camera views (front, left, right) with corresponding graph nodes, enabling query-based retrieval of past vi-sual observations. By reusing these stored embeddings for triangulation–similar in spirit to TagMap [22]–the system could perform efficient open-vocabulary object mapping in large outdoor environments without requir-ing depth sensors. 
+
+• Learning frontier quality for adaptive exploration. 
+
+Frontier labels could be augmented with a quality or uncertainty score to allow the system to distinguish between reliable and risky exploration opportunities.  
+
+> 26 VOLUME ,
+
+<Society logo(s) and publication title will appear here. >
+
+This would enable more informed decision-making in environments with ambiguous paths. 
+
+• Integrating visual and geometric traversability. Cur-rently, visual traversability is used only beyond the local costmap. A tighter integration–projecting visual traversability into the geometric traversability map– could yield a unified local representation that lever-ages both semantic and geometric cues. Such a hybrid map would improve planning in environments where LiDAR-based geometry alone might be insufficient like water hazards. 
+
+REFERENCES 
+
+[1] J. Frey, M. Patel, D. Atha, J. Nubert, D. Fan, A. Agha, C. Padgett, P. Spieler, M. Hutter, and S. Khattak, “Roadrunner-learning traversabil-ity estimation for autonomous off-road driving,” IEEE Transactions on Field Robotics , 2024. [2] M. Schmittle, R. Baijal, N. Hatch, R. Scalise, M. Guaman Castro, S. Talia, K. Khetarpal, S. Srinivasa, and B. Boots, “Long range navigator (lrn) : Extending robot planning horizons beyond metric maps,” arXiv , 2025. [3] A. Elfes, “Using occupancy grids for mobile robot perception and navigation,” Computer , vol. 22, no. 6, pp. 46–57, 2002. [4] B. Yamauchi, “A frontier-based approach for autonomous exploration,” in Proceedings 1997 IEEE International Symposium on Computational Intelligence in Robotics and Automation CIRA’97.’Towards New Com-putational Principles for Robotics and Automation’ . IEEE, 1997, pp. 146–151. [5] P. Fankhauser and M. Hutter, “A universal grid map library: Implemen-tation and use case for rough terrain navigation,” in Robot Operating System (ROS) The Complete Reference (Volume 1) . Springer, 2016, pp. 99–120. [6] D. D. Fan, K. Otsu, Y. Kubo, A. Dixit, J. Burdick, and A.-A. Agha-Mohammadi, “Step: Stochastic traversability evaluation and planning for risk-aware off-road navigation,” arXiv preprint arXiv:2103.02828 ,2021. [7] A. Hornung, K. M. Wurm, M. Bennewitz, C. Stachniss, and W. Bur-gard, “Octomap: An efficient probabilistic 3d mapping framework based on octrees,” Autonomous robots , vol. 34, no. 3, pp. 189–206, 2013. [8] H. Oleynikova, Z. Taylor, M. Fehr, R. Siegwart, and J. Nieto, “Voxblox: Incremental 3d euclidean signed distance fields for on-board mav planning,” in 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2017, pp. 1366–1373. [9] H. H. Gonz´ alez-Banos and J.-C. Latombe, “Navigation strategies for exploring indoor environments,” The International Journal of Robotics Research , vol. 21, no. 10-11, pp. 829–848, 2002. [10] A. Bircher, M. Kamel, K. Alexis, H. Oleynikova, and R. Siegwart, “Receding horizon” next-best-view” planner for 3d exploration,” in 
+
+2016 IEEE international conference on robotics and automation (ICRA) . IEEE, 2016, pp. 1462–1468. [11] S. Isler, R. Sabzevari, J. Delmerico, and D. Scaramuzza, “An informa-tion gain formulation for active volumetric 3d reconstruction,” in 2016 IEEE International Conference on Robotics and Automation (ICRA) .IEEE, 2016, pp. 3477–3484. [12] L. Schmid, M. Pantic, R. Khanna, L. Ott, R. Siegwart, and J. Nieto, “An efficient sampling-based method for online informative path planning in unknown environments,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 1500–1507, 2020. [13] T. Dang, M. Tranzatto, S. Khattak, F. Mascarich, K. Alexis, and M. Hutter, “Graph-based subterranean exploration path planning using aerial and legged robots,” Journal of Field Robotics , vol. 37, no. 8, pp. 1363–1388, 2020. [14] A. Agha, K. Otsu, B. Morrell, D. D. Fan, R. Thakker, A. Santamaria-Navarro, S.-K. Kim, A. Bouman, X. Lei, J. Edlund et al. , “Nebula: Quest for robotic autonomy in challenging environments; team costar at the darpa subterranean challenge,” arXiv preprint arXiv:2103.11470 ,2021. [15] M. Tranzatto, T. Miki, M. Dharmadhikari, L. Bernreiter, M. Kulkarni, F. Mascarich, O. Andersson, S. Khattak, M. Hutter, R. Siegwart et al. ,“Cerberus in the darpa subterranean challenge,” Science Robotics ,vol. 7, no. 66, p. eabp9742, 2022. [16] S. Peng, K. Genova, C. M. Jiang, A. Tagliasacchi, M. Pollefeys, and T. Funkhouser, “Openscene: 3d scene understanding with open vocabularies,” 2023. [17] A. Takmaz, E. Fedele, R. W. Sumner, M. Pollefeys, F. Tombari, and F. Engelmann, “OpenMask3D: Open-Vocabulary 3D Instance Segmentation,” in Advances in Neural Information Processing Systems (NeurIPS) , 2023. [18] J. Zhang, R. Dong, and K. Ma, “Clip-fo3d: Learning free open-world 3d scene representations from 2d dense clip,” in Proceedings of the IEEE/CVF international conference on computer vision , 2023, pp. 2048–2059. [19] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark et al. , “Learning transferable visual models from natural language supervision,” in International conference on machine learning . PmLR, 2021, pp. 8748–8763. [20] Q. Gu, A. Kuwajerwala, S. Morin, K. M. Jatavallabhula, B. Sen, A. Agarwal, C. Rivera, W. Paul, K. Ellis, R. Chellappa et al. ,“Conceptgraphs: Open-vocabulary 3d scene graphs for perception and planning,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 5021–5028. [21] A. Werby, C. Huang, M. B¨ uchner, A. Valada, and W. Burgard, “Hier-archical Open-Vocabulary 3D Scene Graphs for Language-Grounded Robot Navigation,” in Proceedings of Robotics: Science and Systems ,Delft, Netherlands, July 2024. [22] M. Zhang, K. Qu, V. Patil, C. Cadena, and M. Hutter, “Tag map: A text-based map for spatial reasoning and navigation with large language models,” 2024. [23] O. Alama, A. Bhattacharya, H. He, S. Kim, Y. Qiu, W. Wang, C. Ho, N. Keetha, and S. Scherer, “Rayfronts: Open-set semantic ray frontiers for online scene understanding and exploration,” arXiv preprint arXiv:2504.06994 , 2025. [24] P. Anderson, A. Chang, D. S. Chaplot, A. Dosovitskiy, S. Gupta, V. Koltun, J. Kosecka, J. Malik, R. Mottaghi, M. Savva et al. ,“On evaluation of embodied navigation agents,” arXiv preprint arXiv:1807.06757 , 2018. [25] M. Patel, G. Waibel, S. Khattak, and M. Hutter, “Lidar-guided object search and detection in subterranean environments,” in 2022 IEEE International Symposium on Safety, Security, and Rescue Robotics (SSRR) . IEEE, 2022, pp. 41–46. [26] M. Savva, A. Kadian, O. Maksymets, Y. Zhao, E. Wijmans, B. Jain, J. Straub, J. Liu, V. Koltun, J. Malik et al. , “Habitat: A platform for embodied ai research,” in Proceedings of the IEEE/CVF international conference on computer vision , 2019, pp. 9339–9347. [27] F. Xia, A. R. Zamir, Z. He, A. Sax, J. Malik, and S. Savarese, “Gibson env: Real-world perception for embodied agents,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2018, pp. 9068–9079. [28] K. Yadav, J. Krantz, R. Ramrakhya, S. K. Ramakrishnan, J. Yang, A. Wang, J. Turner, A. Gokaslan, V.-P. Berges, R. Mootaghi, O. Maksymets, A. X. Chang, M. Savva, A. Clegg, D. S. Chaplot, and D. Batra, “Habitat challenge 2023,” https://aihabitat.org/challenge/ 2023/, 2023. [29] D. S. Chaplot, D. P. Gandhi, A. Gupta, and R. R. Salakhutdinov, “Object goal navigation using goal-oriented semantic exploration,” 
+
+Advances in Neural Information Processing Systems , vol. 33, pp. 4247–4258, 2020. [30] S. K. Ramakrishnan, D. S. Chaplot, Z. Al-Halah, J. Malik, and K. Grauman, “Poni: Potential functions for objectgoal navigation with interaction-free learning,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 18 890–18 900. [31] H. Shah, J. Xing, N. Messikommer, B. Sun, M. Pollefeys, and D. Scaramuzza, “Foresightnav: Learning scene imagination for effi-cient exploration,” in Proceedings of the Computer Vision and Pattern Recognition Conference , 2025, pp. 5236–5245. [32] J. Zhang, K. Wang, S. Wang, M. Li, H. Liu, S. Wei, Z. Wang, Z. Zhang, and H. Wang, “Uni-navid: A video-based vision-language-action model for unifying embodied navigation tasks,” arXiv preprint arXiv:2412.06224 , 2024.  
+
+> VOLUME , 27 Author et al.:
+
+[33] A.-C. Cheng, Y. Ji, Z. Yang, Z. Gongye, X. Zou, J. Kautz, E. Bıyık, H. Yin, S. Liu, and X. Wang, “Navila: Legged robot vision-language-action model for navigation,” arXiv preprint arXiv:2412.04453 , 2024. [34] K. Rana, J. Haviland, S. Garg, J. Abou-Chakra, I. Reid, and N. Suenderhauf, “Sayplan: Grounding large language models using 3d scene graphs for scalable task planning,” in 7th Annual Conference on Robot Learning , 2023. [Online]. Available: https://openreview.net/forum?id=wMpOMO0Ss7a [35] D. Shah, B. Eysenbach, G. Kahn, N. Rhinehart, and S. Levine, “Ving: Learning open-world navigation with visual goals,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2021, pp. 13 215–13 222. [36] D. Shah, A. Sridhar, A. Bhorkar, N. Hirose, and S. Levine, “Gnm: A general navigation model to drive any robot,” arXiv preprint arXiv:2210.03370 , 2022. [37] D. Shah, A. Sridhar, N. Dashora, K. Stachowicz, K. Black, N. Hirose, and S. Levine, “Vint: A foundation model for visual navigation,” arXiv preprint arXiv:2306.14846 , 2023. [38] A. Sridhar, D. Shah, C. Glossop, and S. Levine, “Nomad: Goal masked diffusion policies for navigation and exploration,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) .IEEE, 2024, pp. 63–70. [39] N. Hirose, C. Glossop, A. Sridhar, D. Shah, O. Mees, and S. Levine, “Lelan: Learning a language-conditioned navigation policy from in-the-wild video,” in Conference on Robot Learning , 2024. [40] L. Milikic, M. Patel, and J. Frey, “Vld: Visual language goal distance for reinforcement learning navigation,” arXiv preprint arXiv:2512.07976 , 2025. [41] J. Frey, M. Mattamala, N. Chebrolu, C. Cadena, M. Fallon, and M. Hutter, “Fast Traversability Estimation for Wild Visual Navigation,” in Proceedings of Robotics: Science and Systems , Daegu, Republic of Korea, July 2023. [42] R. Schmid, D. Atha, F. Sch¨ oller, S. Dey, S. Fakoorian, K. Otsu, B. Ridge, M. Bjelonic, L. Wellhausen, M. Hutter et al. , “Self-supervised traversability prediction by learning to reconstruct safe terrain,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2022, pp. 12 419–12 425. [43] S. Jung, J. Lee, X. Meng, B. Boots, and A. Lambert, “V-strong: Visual self-supervised traversability learning for off-road navigation,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) .IEEE, 2024, pp. 1766–1773. [44] X. Meng, N. Hatch, A. Lambert, A. Li, N. Wagener, M. Schmittle, J. Lee, W. Yuan, Z. Chen, S. Deng et al. , “Terrainnet: Visual modeling of complex terrain for high-speed, off-road navigation,” arXiv preprint arXiv:2303.15771 , 2023. [45] M. Sivaprakasam, S. Triest, C. Ho, S. Aich, J. Lew, I. Adu, W. Wang, and S. Scherer, “Salon: Self-supervised adaptive learning for off-road navigation,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 16 999–17 006. [46] A. Zhang, H. Sikchi, A. Zhang, and J. Biswas, “Creste: Scalable map-less navigation with internet scale priors and counterfactual guidance,” in Robotics: Science and Systems (RSS) , 2025. [47] M. Patel, J. Frey, D. Atha, P. Spieler, M. Hutter, and S. Khattak, “Road-runner m&m-learning multi-range multi-resolution traversability maps for autonomous off-road navigation,” IEEE Robotics and Automation Letters , 2024. [48] G. Heinrich, M. Ranzinger, Hongxu, Yin, Y. Lu, J. Kautz, A. Tao, B. Catanzaro, and P. Molchanov, “Radiov2.5: Improved baselines for agglomerative vision foundation models,” 2024. [Online]. Available: https://arxiv.org/abs/2412.07679 [49] M. Oquab, T. Darcet, T. Moutakanni, H. Vo, M. Szafraniec, V. Khali-dov, P. Fernandez, D. Haziza, F. Massa, A. El-Nouby et al. , “Dinov2: Learning robust visual features without supervision,” arXiv preprint arXiv:2304.07193 , 2023. [50] A. Kirillov, E. Mintun, N. Ravi, H. Mao, C. Rolland, L. Gustafson, T. Xiao, S. Whitehead, A. C. Berg, W.-Y. Lo, P. Doll´ ar, and R. Gir-shick, “Segment anything,” arXiv:2304.02643 , 2023. [51] S. Hajimiri, I. Ben Ayed, and J. Dolz, “Pay attention to your neighbours: Training-free open-vocabulary semantic segmentation,” in 
+
+Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , 2025. [52] M. Tschannen, A. Gritsenko, X. Wang, M. F. Naeem, I. Alabdul-mohsin, N. Parthasarathy, T. Evans, L. Beyer, Y. Xia, B. Mustafa et al. ,“Siglip 2: Multilingual vision-language encoders with improved se-mantic understanding, localization, and dense features,” arXiv preprint arXiv:2502.14786 , 2025. [53] K. Chen, R. Nemiroff, and B. T. Lopez, “Direct lidar-inertial odometry: Lightweight lio with continuous-time motion correction,” 2023 IEEE International Conference on Robotics and Automation (ICRA) , pp. 3983–3989, 2023. [54] T. Miki, L. Wellhausen, R. Grandia, F. Jenelten, T. Homberger, and M. Hutter, “Elevation mapping for locomotion and navigation using gpu,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2022, pp. 2273–2280. [55] S. Macenski, F. Martin, R. White, and J. Gin´ es Clavero, “The marathon 2: A navigation system,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2020. [56] M. Wigness, S. Eum, J. G. Rogers, D. Han, and H. Kwon, “A rugd dataset for autonomous navigation and visual perception in unstructured outdoor environments,” in International Conference on Intelligent Robots and Systems (IROS) , 2019. [57] J. Frey, T. Tuna, L. F. T. Fu, C. Weibel, K. Patterson, B. Krumme-nacher, M. M¨ uller, J. Nubert, M. Fallon, C. Cadena, and M. Hutter, “Boxi: Design Decisions in the Context of Algorithmic Performance for Robotics,” in Proceedings of Robotics: Science and Systems , Los Angeles, United States, July 2025.

@@ -1,0 +1,472 @@
+Title: RoboCritics: Enabling Reliable End-to-End LLM Robot Programming through Expert-Informed Critics
+
+URL Source: https://arxiv.org/pdf/2603.06842v1
+
+Published Time: Tue, 10 Mar 2026 00:13:44 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# RoboCritics: Enabling Reliable End-to-End LLM Robot Programming through Expert-Informed Critics 
+
+## Callie Y. Kim 
+
+Department of Computer Sciences University of Wisconsin–Madison Madison, Wisconsin, USA cykim6@cs.wisc.edu 
+
+## Nathan Thomas White 
+
+Department of Computer Sciences University of Wisconsin–Madison Madison, Wisconsin, USA ntwhite@wisc.edu 
+
+## Evan He 
+
+Department of Computer Sciences University of Wisconsin–Madison Madison, Wisconsin, USA ehe6@wisc.edu 
+
+## Frederic Sala 
+
+Department of Computer Sciences University of Wisconsin–Madison Madison, Wisconsin, USA fredsala@cs.wisc.edu 
+
+## Bilge Mutlu 
+
+Department of Computer Sciences University of Wisconsin–Madison Madison, Wisconsin, USA bilge@cs.wisc.edu           
+
+>  
+>          
+>         
+> # Move above Green Apple move_above_pos(green_apple_pos, height=0.1) # Move down to Green Apple move_down(0.2) # Close gripper to grasp Green Apple close_gripper() # Move up with the Green Apple move_up(0.2) # Move above White Box to avoid collision move_above_pos(white_box_pos, height=0.3)
+
+Figure 1: We introduce RoboCritics , an approach that augments LLM-based robot programming with expert-informed critics, automated fixes, simulation, and physical execution. Critics analyze motion-level execution traces to detect safety and per-formance issues, surfacing transparent feedback and enabling iterative refinement through one-click, automated fixes while keeping end users in the loop. 
+
+Abstract 
+
+End-user robot programming grants users the flexibility to re-task robots in situ, yet it remains challenging for novices due to the need for specialized robotics knowledge. Large Language Models (LLMs) hold the potential to lower the barrier to robot program-ming by enabling task specification through natural language. How-ever, current LLM-based approaches generate opaque, “black-box” code that is difficult to verify or debug, creating tangible safety and reliability risks in physical systems. We present RoboCritics ,an approach that augments LLM-based robot programming with expert-informed motion-level critics. These critics encode robot-ics expertise to analyze motion-level execution traces for issues such as joint speed violations, collisions, and unsafe end-effector poses. When violations are detected, critics surface transparent feedback and offer one-click fixes that forward structured mes-sages back to the LLM, enabling iterative refinement while keeping 
+
+This work is licensed under a Creative Commons Attribution 4.0 International License. 
+
+HRI ’26, Edinburgh, Scotland, UK 
+
+© 2026 Copyright held by the owner/author(s). ACM ISBN 979-8-4007-2128-1/2026/03 https://doi.org/10.1145/3757279.3785550 
+
+users in the loop. We instantiated RoboCritics in a web-based interface connected to a UR3e robot and evaluated it in a between-subjects user study ( 𝑛 = 18 ). Compared to a baseline LLM interface, 
+
+RoboCritics reduced safety violations, improved execution qual-ity, and shaped how participants verified and refined their programs. Our findings demonstrate that RoboCritics enables more reliable and user-centered end-to-end robot programming with LLMs. 
+
+CCS Concepts 
+
+• Human-centered computing → Interaction paradigms ; •
+
+Computer systems organization → External interfaces for robotics .
+
+Keywords 
+
+large language models (LLMs), robot programming, human-robot interaction, user-centered design 
+
+ACM Reference Format: 
+
+Callie Y. Kim, Nathan Thomas White, Evan He, Frederic Sala, and Bilge Mutlu. 2026. RoboCritics: Enabling Reliable End-to-End LLM Robot Program-ming through Expert-Informed Critics. In Proceedings of the 21st ACM/IEEE International Conference on Human-Robot Interaction (HRI ’26), March 16– 19, 2026, Edinburgh, Scotland, UK. ACM, New York, NY, USA, 10 pages. https://doi.org/10.1145/3757279.3785550  
+
+> arXiv:2603.06842v1 [cs.RO] 6 Mar 2026 HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK Callie Y. Kim, Nathan Thomas White, Evan He, Frederic Sala, and Bilge Mutlu
+
+1 Introduction 
+
+Robots are increasingly deployed alongside people in domains such as manufacturing, logistics, healthcare, offices, retail, homes, and transportation [ 9]. Because it is infeasible to pre-program robots for all scenarios, end-user programming enables users to re-task robots in situ, adapting a robot’s behavior or goals to meet new task re-quirements. However, many intended end users ( e.g., IT specialists, lab technicians, healthcare professionals) have domain expertise but lack experience with physical robot control, including motion constraints and safety considerations. This challenge is especially important for collaborative robots, where safety verification and interpretability are critical, motivating the need for support mecha-nisms that help users express intent, interpret robot behavior, and iteratively refine robot behavior. Large Language Models (LLMs) have increasingly been adopted for robotics applications to translate natural-language task descrip-tions into executable robot programs, lowering barriers for end-user robot programming. [ 27 , 58 ]. However, deploying LLMs in robotics introduces unique challenges. Programming robots requires rea-soning about physical interactions within complex and dynamic environments, where erroneous instructions carry tangible safety and reliability risks [ 11 , 15 , 57 ]. LLM generated code is produced through opaque, “black-box” reasoning and are often difficult for users, especially novices, to verify, refine, or anticipate unsafe behav-ior [ 4 , 5 ]. Verification is further complicated by the reliance of LLMs on predefined API calls that link high-level commands to low-level motor skills [ 8, 24 , 36 , 52 ]. Known limitations such as hallucination [ 20 ], compound these challenges, raising concerns about reliability and safety in real-world robotics applications [ 14 , 22 , 53 , 56 ]. Exist-ing approaches often restrict user involvement to providing input to LLMs and observing output execution [ 51 , 65 ], leaving critical gaps in verification and debugging. These outstanding challenges raise the question of how to design mechanisms that allow end users to program robots with LLMs while ensuring safety, transparency, and reliability of their gener-ated programs. While prior work has explored symbolic verification with formal logic or secondary LLMs [ 25 , 37 , 62 ], many safety and performance issues, such as collisions or excessive joint speeds, emerge at the motion level, beyond what code- or symbol-level checks can capture. To address this gap, we investigate the use of 
+
+expert-informed critics : verifiers that encode robotics knowledge and operate directly over execution traces to detect and fix unsafe or inefficient robot behaviors to support end-to-end robot program-ming, generating and validating executable robot programs directly from conceptualization to deployment. Thus, we pose the following research questions: (1) How can expert-informed critics be designed to verify LLM-generated robot programs ; (2) How does integrating expert-informed critics improve the safety and reliability of end-to-end LLM-based robot programming? 
+
+To address these questions, we propose RoboCritics , an ap-proach that augments LLM-based robot programming with robotics-informed verification and automated fixes. RoboCritics adapts the Retrieval-Augmented Generation (RAG)-Modulo framework [ 19 ] to incorporate historical task context and introduces external critics that analyze robot motion trajectories for safety and performance issues based on a model of robotics expertise [ 48 ]. When viola-tions occur, RoboCritics surfaces warnings and provides one-click options for users to give LLMs structured feedback for iterative code refinement. By closing the loop between natural language task specification, verification, and execution, RoboCritics enables end users to maintain both control and confidence in LLM-generated robot behaviors. We instantiated RoboCritics in a web-based interface con-nected to a UR3e robot and evaluated it in a between-subjects-design study. Compared to a baseline LLM interface without critics, 
+
+RoboCritics reduced safety violations, improved task execution quality, and shaped how participants verified and refined their pro-grams. In summary, our main contributions include the following: (1) RoboCritics , an approach that integrates LLM-based task specification with expert-informed motion-level critics and automated fixes, enabling users to inspect, understand, and approve corrections during robot execution, with a prototype instantiation 1.(2) The design of motion-level critics, which formalize robot-ics expertise as constraint checks and provide structured feedback to guide verification and refinement. (3) Empirical evaluation on a physical robot, demonstrating that RoboCritics improves reliability, and supports reliable end-to-end robot programming compared to a baseline LLM interface. (4) Design implications for integrating expert-informed motion-level critics and automated fixes into LLM-based end-user robot programming systems. 
+
+2 Related Work 
+
+End-User Robot Programming. End-user robot programming aims to empower non-experts to adapt and re-task robots without re-quiring extensive robotics expertise. To lower the barrier to entry, researchers have developed paradigms such as block-based or visual programming [ 44 , 46 , 54 , 60 , 66 ], Programming by Demonstration (PbD) [ 2 , 40 , 42 , 49 ], and natural language interfaces [ 7, 13 , 41 , 67 ]. Despite these advances, robot programming remains uniquely difficult compared to general software development. Programs must account for embodiment-specific challenges such as motion constraints, task objects, obstacles, and interactions with humans [17 , 30 , 43 ]. Effective robot programming requires expertise in areas such as kinematics, planning, and control, which are knowledge that cannot reasonably be expected of end users with diverse techni-cal backgrounds [ 50 ]. The central challenge is thus to distill robotics complexity into methods that are both approachable and robust enough for safe real-world deployment. This gap motivates explo-ration of new paradigms for end-user robot programming. 
+
+LLMs for Programming and Robotics. LLMs have recently emerged as a promising paradigm for lowering barriers to program-ming by translating natural language into code (NL2Code). Tools such as Github Copilot 2, Claude 3, and Amazon CodeWhisperer 4
+
+exemplify this trend [ 21 ], and recent evaluations report promising 
+
+> 1Code available at https://github.com/Wisc-HCI/RoboCritics
+> 2https://github.com/features/copilot
+> 3https://claude.ai
+> 4https://aws.amazon.com/codewhisperer
+
+RoboCritics: Enabling Reliable End-to-End LLM Robot Programming through Expert-Informed Critics HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK Pick up the green apple and put it in the white 
+
+box.                  
+
+> [{
+> "table" :{
+> "shape" :"models/Table/Table.stl" ,
+> "name" :"Table" ,
+> "frame" :"table" ,
+> "position" :{"x" :0.0 ,"y" :0.26 ,"z" :0.38 },
+> "rotation" :{"w" :1.0 ,"x" :0.0 ,
+> "y" :0.0 ,"z" :0.0 },
+> "color" :{"r" :10 ,"g" :10 ,"b" :10 ,"a" :1},
+> "scale" :{"x" :1.2 ,"y" :0.6 ,"z" :0.76 },
+> }
+> }, ...]
+
+def move_to (x, y, z): 
+
+def move_down (height ): 
+
+def move_up (height ): 
+
+def reduce_speed (time ): 
+
+def increase_speed (time ): 
+
+def close_gripper (): 
+
+def open_gripper (): 
+
+def avoid_collision (object )
+
+Prompt 
+
+Specification 
+
+Environment 
+
+Robot API Library  # Object positions                                                             
+
+> green_apple_pos ={"x" :0.0 ,"y" :0.25 ,"z" :0.755 }
+> white_box_pos ={"x" :0.35 ,"y" :0.2 ,"z" :0.845 }
+> #Define function to move above pos
+> def move_above_pos (pos ,height =0.1 ):
+> move_to (pos ["x" ], pos ["y" ], pos ["z" ]+height )
+> #Move above Green Apple
+> move_above_pos (green_apple_pos ,height =0.1 )
+> #Move down to Green Apple
+> move_down (0.2 )
+> #Close gripper to grasp Green Apple
+> close_gripper ()
+> #Move up with the Green Apple
+> move_up (0.2 )
+> #Move above White Box to avoid collision
+> move_above_pos (white_box_pos ,height =0.3 )
+> ...
+> #Execute the complete trajectory
+> execute_trajectory ()
+
+Generated Program 
+
+> [Joint Speed]
+> "maxVelocity": 1.001262995339027,
+> "feedback": "Warning: Joint speed is higher than the
+> recommended value of 1 m/s. To minimize joint speed, you can
+> consider reducing the speed of the robot during [move _to]
+> actions. This potentially increases the cycle time of the
+> program."
+
+Feedback from Selected Critics 
+
+Simulation                                                                                  
+
+> #Object positions
+> green_apple_pos ={"x" :0.0 ,"y" :0.25 ,"z" :0.755 }
+> white_box_pos ={"x" :0.35 ,"y" :0.2 ,"z" :0.845 }
+> #Define function to move above pos
+> def move_above_pos (pos ,height =0.1 ):
+> move_to (pos ["x" ], pos ["y" ], pos ["z" ]+height )
+> #Reduce the speed of the robot arm to avoid high joint speed
+> reduce_speed (20 )
+> #Move above Green Apple
+> move_above_pos (green_apple_pos ,height =0.1 )
+> #Move down to Green Apple
+> move_down (0.2 )
+> #Close gripper to grasp Green Apple
+> close_gripper ()
+> #Move up with the Green Apple
+> move_up (0.2 )
+> #Move above White Box to avoid collision
+> move_above_pos (white_box_pos ,height =0.3 )
+> ...
+> #Move up after releasing the Green Apple
+> move_up (0.5 )
+> #Execute the complete trajectory
+> execute_trajectory ()
+
+Improved Program 
+
+> Integrated Feedback
+
+LLM (gpt 4-o) 
+
+1
+
+RAG 
+
+History 
+
+Iterative Process 
+
+2
+
+6
+
+3
+
+5
+
+4
+
+Specification 
+
+Generated Program 
+
+Selected Critics 
+
+Verification  4
+
+7
+
+Validation 
+
+Remember Solution 8
+
+Retry 
+
+Deployment 
+
+9
+
+Figure 2: RoboCritics workflow: (1) The user begins by providing a high-level task description. (2) The LLM generates a corresponding robot program. (3) The program is executed and evaluated against user-selected critics based on the resulting trajectory. (4) Feedback and results are stored in the interaction memory. (5) The LLM uses RAG to refine the program. (6) The refined program incorporates critic feedback. (7) The user validates the improved program via simulation. (8) Once verified, the final program is stored for future reference. (9) The validated program is deployed to the physical robot. 
+
+accuracy rates across platforms [ 3, 64 ]. Despite these gains, chal-lenges persist: LLMs frequently hallucinate, lack domain-specific depth, and cannot reliably self-correct [ 22 , 55 , 59 , 61 ]. Collectively, this body of work suggests that LLMs, when used in isolation, are insufficient for reliable deployment. Robotics has emerged as a key application area where natural language interfaces promise to lower barriers for non-experts. LLMs have been applied to task planning [ 1, 12 , 23 ], human-robot collab-oration [ 26 , 28 , 31 , 33 , 63 ], and multimodal interaction [ 18 ]. Their ability to sustain dialog and maintain context allows iterative task refinement [ 58 ], making robot programming more conversational and accessible. Yet, translating free-form language into executable robot code carries significant risks: errors in generated programs manifest physically, and the opaque reasoning of LLMs leaves safety and correctness difficult to assess. To address these risks, researchers have explored formal meth-ods such as linear temporal logic (LTL) for correctness [ 45 , 62 ], as well as frameworks like RAG-Modulo that introduce external verifiers (“critics”) to check syntax and semantics [ 19 ]. However, most of these efforts focus on evaluation benchmarks or planning-level correctness, leaving open questions about how verification mechanisms can be designed for interactive, end-to-end robot pro-gramming with end users in the loop. Recent user-centered systems highlight this gap, illustrating the difficulty with ambiguity in nat-ural language input [34] and demonstrating the need for program verification [ 24 ]. Building on this work, we extend critic-based ap-proaches to the motion level, where issues like collisions or joint speed limits arise, by integrating structured feedback and automated fixes directly into an interactive LLM programming workflow. 
+
+3 Technical Approach 
+
+Our approach is based on the premise that LLMs alone cannot en-sure safe or reliable robot programs due to their lack of grounded physical understanding. We introduce a general framework that augments LLM-based programming with expert-informed critics as modular verifiers that analyze executed trajectories and provide structured feedback. In RoboCritics , we focus on external, motion-level critics adapted from expert-encoded frames [ 48 ], enabling detection and correction of safety-critical errors while remaining extensible to additional constraints and domains. To support trans-parency and alignment, we incorporate a human-in-the-loop (HITL) review for critic-proposed fixes. This allows users to inspect and approve corrections, ensuring updated robot behaviors remain con-sistent with their task intent. 
+
+3.1 Workflow Overview 
+
+Figure 2 illustrates the system workflow through a representative scenario. The user initiates the process by providing a high-level task description to the LLM, for example, putting a green apple in HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK Callie Y. Kim, Nathan Thomas White, Evan He, Frederic Sala, and Bilge Mutlu 
+
+the white box (Step 1 ). The LLM (gpt-4o) generates a correspond-ing robot program using environment information and a library of predefined robot action APIs (Step 2 ). This program is then executed, during which user-selected critics assess the resulting trajectory for issues such as collision risks, unsafe gripper poses, or excessive joint speed (Step 3 ). The verification output, along with the user request and program, is stored in an interaction memory (Step 4 ). Using RAG, the LLM accesses this memory to refine the program in response to critic feedback (Step 5 ). For instance, if a joint speed warning was issued, the updated program may include a reduce_speed function (Step 6 ). Users can then simulate the refined program to validate whether it aligns with their intent (Step 
+
+7 ). Once validated, the final version of the program is stored for future reference (Step 8 ) and can be deployed to the physical robot (Step 9 ). This loop allows users to iteratively interpret, validate, and improve LLM-generated robot code, enhancing performance, safety, and alignment with task goals. 
+
+3.1.1 From Execution Trace to Flags. When a user runs the gener-ated program (Figure 2 Step 3 ), it produces a trajectory composed of robot states, capturing the robot’s configuration at each timestep. Using Lively [ 47 ], each state includes joint angles, Cartesian frames of links, pairwise link proximity, and a timestamp. Formally, the robot state at timestep 𝑡 is represented as 𝑠 𝑡 = {𝐽 𝑡 , 𝐹 𝑡 , 𝑃 𝑡 , 𝜏 𝑡 }, where 
+
+𝐽 𝑡 denotes the joint angles, 𝐹 𝑡 the link frames, 𝑃 𝑡 the pairwise link proximity, and 𝜏 𝑡 the timestamp. Each critic C𝑖 operates on the trajectory, which is a sequence {𝑠 1, . . . , 𝑠 𝑇 } and outputs a flag, OK ,
+
+Warning , or Error , with a natural language explanation and hints for addressing the concern. 
+
+3.1.2 Expert-Informed Critics. RoboCritics includes five critics acting as analytic functions that examine motion traces: The space-usage critic evaluates the convex hull of link positions across the trajectory; if the occupied volume exceeds 50% of the workspace 
+
+Wallowed , it returns Warning , and if it exceeds the boundary, Error .The collision critic evaluates the proximity between the gripper geometry and environment objects using an axis-aligned bounding box (AABB) distance check. It returns Error on penetration, Warning 
+
+when the distance is less than threshold 𝑑 warn , and OK otherwise. The joint speed critic estimates joint speed 𝑣 𝑗 using the Cartesian (linear) speed of a reference point on the corresponding link in the world frame, as a proxy for angular joint velocity. It issues a 
+
+Warning if 𝑣 𝑗 > 𝑣 warn , and an Error if 𝑣 𝑗 > 𝑣 max , where 𝑣 warn is the recommended safe threshold and 𝑣 max is the robot’s maximum allowable speed (see Algorithm 1). The end-effector pose critic quantifies the risk of “spearing” (the gripper moves quickly in the direction of its fingers) by computing a pose score 𝑝𝑠 𝑖 for each step 𝑖 .This score is derived from the angle 𝜃 𝑖 between the gripper’s motion vector Δp𝑖 and its finger direction d𝑖 , alongside the motion speed. Rapid, highly aligned motions yield high scores. Thus it issues a 
+
+Warning if the maximum score 𝑝𝑠 max ≥ score warn or an Error if 
+
+𝑝𝑠 max ≥ score err . The pinch-point critic monitors the pairwise link proximity ( 𝑃 𝑡 ) derived from the robot state 𝑠 𝑡 . If proximity value 𝑑 < 𝑑 min , it issues an Error , indicating a dangerous pinch region. If 𝑑 min ≤ 𝑑 < 𝑑 max , it returns a Warning , while 𝑑 ≥ 𝑑 max is considered OK .
+
+Algorithm 1 Example critic: Joint Speed Critic . 
+
+> 1:
+
+procedure Evaluate ({𝐽 𝑡 }𝑇 𝑡 =1, 𝑣 warn , 𝑣 max ) ⊲ {𝐽 𝑡 }𝑇 𝑡 =1 denotes the sequence of joint angles from the trajectory  
+
+> 2:
+
+flag ← OK  
+
+> 3:
+
+for 𝑡 ← 2 to 𝑇 do  
+
+> 4:
+
+Δ𝑡 ← ( 𝜏 𝑡 − 𝜏 𝑡 −1)/ 1000  
+
+> 5:
+
+𝐹 𝑡 ← Frames (𝐽 𝑡 ) 
+
+> 6:
+
+for all 𝑙 ∈ keys (𝐹 𝑡 ) do  
+
+> 7:
+
+𝑝 𝑡 −1 ← WorldPos (𝐹 𝑙 𝑡 −1) 
+
+> 8:
+
+𝑝 𝑡 ← WorldPos (𝐹 𝑙 𝑡 ) 
+
+> 9:
+
+𝑣 𝑗 ← ∥ 𝑝 𝑡 − 𝑝 𝑡 −1 ∥/ Δ𝑡  
+
+> 10:
+
+if 𝑣 𝑗 > 𝑣 max then  
+
+> 11:
+
+return Error  
+
+> 12:
+
+else if 𝑣 𝑗 > 𝑣 warn then  
+
+> 13:
+
+flag ← Warning  
+
+> 14:
+
+end if  
+
+> 15:
+
+end for  
+
+> 16:
+
+end for  
+
+> 17:
+
+return flag ⊲ OK if no threshold is exceeded  
+
+> 18:
+
+end procedure 
+
+3.1.3 Extensible and modular. A key strength of the RoboCritics 
+
+architecture is its extensibility and modularity. The implementa-tion of critics as independent, modular verifiers that operate solely on execution traces decouples the safety verification layer from the LLM’s program generation step. This technical distinction is fundamental: it allows new safety and performance constraints, for-malized as critics, to be introduced or updated without altering the underlying language model or the robot’s core skill library. Critics are designed to be verifiable against robotics domain constraints and to generate actionable feedback that supports program revision. This design enables accommodation of domain- and abstraction-specific critics ( e.g., force limits in industrial settings or routine adherence in healthcare), and supports continuous adaptation to evolving tasks and safety requirements. 
+
+3.1.4 Automated Fixes. When an execution trace is flagged by a critic, the violation is surfaced in the terminal (Figure 3h) to-gether with a structured feedback message describing the issue and a candidate revision ( e.g. , “Warning: Joint speed is higher than the recommended value of 1 m/s. To minimize joint speed, you can consider reducing the speed of the robot during [move_to] actions. This potentially increases the cycle time of the program.” ). If the user presses the Fix button (Figure 3f), this structured message is for-warded to the LLM, which produces a revised program (Figure 2 Step 6 ). The updated code is then displayed in the chat interface (Figure 3a) for inspection and optional re-execution. This design maintains user oversight while reducing manual editing effort. By exposing both the critic’s rationale and the automated patch, the in-terface supports an interpretable verification-fix loop: critics detect violations from motion-level traces, and the LLM translates their guidance into executable revisions. This loop ensures that fixes are grounded in actual robot behavior rather than relying solely on abstract program representations, addressing safety-critical errors that prompt-only verification may miss. RoboCritics: Enabling Reliable End-to-End LLM Robot Programming through Expert-Informed Critics HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK 
+
+Table 1: Comparison of embedded (prompt-only) versus ex-ternal (motion-level) critics across three tasks. The Attempt 
+
+indicates the number of LLM program generation attempts until completion (max 5). The Score reports program quality on a 0-10 scale, where higher scores indicate better program quality. 
+
+Embedded External Attempt Score Attempt Score Recycling 2 5 5 8Sorting 3 8 5 8Preparing Breakfast 2 6 5 7
+
+Average 2.3 6.3 5.0 7.7 
+
+3.1.5 Integration with RAG. RoboCritics utilizes RAG, maintain-ing historical context across interactions, allowing the LLM to refine code iteratively rather than generating entirely new solutions at each turn (Figure 2 Step 5 ). Specifically, the system stores the user’s request, the generated program, and the feedback produced by critics as tuples, ensuring consistent context reuse. 
+
+3.2 Implementation 
+
+RoboCritics is instantiated as a web-based interface that inte-grates LLM-based program generation, motion-level critics, and interactive debugging in a one workflow (Figure 3). The backend employs gpt-4o [ 38 ] for program generation and text-embedding-ada-002 [ 39 ] for RAG using LangChain 5.Programs are expressed using a predefined API of high-level commands, such as move_to(x,y,z) , open_gripper() ,
+
+reduce_speed(time) , and avoid_collision(object) . These ab-stractions wrap low-level instructions, allowing the LLM to com-pose complex behaviors while remaining compatible with the target robot. The backend is built using Python (Flask) to manage program generation, verification, and robot communication. The system’s frontend is implemented in React and renders sim-ulations using Three.js. The task environment is initialized through from a JSON file that specifies the objects’ positions, scales, orien-tations, and identifiers. This structured representation is used to render the simulation scene and support critics in detecting spatial and safety-related violations during execution. Critics operate on execution traces derived from the robot’s URDF model, generated using the Lively inverse kinematics (IK) solver [ 47 ], which provides a Python interface for computing feasible trajectories for the UR3e robotic arm 6. For physical execution on the UR3e, verified joint states are transmitted via a dedicated TCP/IP socket connection. This robust setup ensures a smooth transition from the verified simulation to the real-world operation. 
+
+3.3 Validation of the Critics-based Approach 
+
+We performed ablations to evaluate the design choice of implement-ing critics as external, motion-level verifiers rather than embedding their descriptions directly into the LLM prompt. In the embedded 
+
+> 5https://github.com/langchain-ai/langchain
+> 6https://www.universal-robots.com/products/ur3e/
+
+condition, critic rules were injected into the system prompt with the instruction to review and revise code if any violations were detected (e.g., “Task: Review the program. If any part might violate these rules, revise the code to fix it.” ). In the external condition, critics operated after program generation, analyzing execution traces and surfacing violations with structured feedback for iterative fixes. Both conditions used the same tasks, APIs, and underlying LLM. Prompt details for the embedded condition are provided in the supplementary materials. 7
+
+Each task (recycling, sorting, preparing breakfast) was tested by repeatedly generating programs up to five attempts, following the rule: if the LLM self-reported that a program was complete and no further code changes were made, attempts were terminated early. Programs were executed in simulation and scored on a 0-10 
+
+index derived from expert-informed critics evaluating safety ( e.g. ,collisions, joint speeds, pinch points) and performance ( e.g. , space usage, end-effector pose). In addition, an experimenter qualitatively examined the generated code to assess whether the embedded LLM demonstrated reasoning consistent with critic rules. Table 1 reports the results. Embedded critics often converged in fewer attempts but produced lower-quality programs, with vi-olations that went undetected. Embedded critics often “believed” their programs were safe despite violations such as collisions, high joint speeds, or unsafe end-effector orientations, which were is-sues that only external critics detected through execution traces. External critics, by contrast, consistently required the full five iter-ations but achieved higher program quality scores across all tasks. Qualitative inspection revealed that embedded LLMs frequently described rule compliance in text ( e.g. , “Speed was reduced using 
+
+lib.reduce_speed(25) to enhance safety.” ) but still failed to pro-duce safe motions. This underscores the limitation of prompt-only verification and highlights how external critics, grounded in motion-level execution traces, enable detection and correction of safety-critical errors. The findings also suggest that providing richer, more structured feedback to the LLM beyond high-level prompt rules can lead to more reliable program revisions. However, both conditions struggled to resolve pinch point issues, where the robot’s motion created unsafe regions that could trap a human hand. This highlights a case where even external critics, despite providing motion-level feedback, could not guarantee cor-rection. This is partially due to the limited number of attempts, the constrained robot API library, and the starting robot configuration. 
+
+4 User Study 
+
+Study Design. The study employed a between-subjects design with two conditions: (1) no-critic , where participants received no feedback from domain-specific critics, and (2) with-critic , where participants received domain-specific feedback from critics and could refine their program using automated fix buttons. All partici-pants interacted with the same implementation of RoboCritics ,described in Section 3.2. However, those in the no-critic condition did not have access to the Critics panel (Figure 3b). Within each condition, the tasks were assigned in random order.  
+
+> 7https://osf.io/vdnw7/?view_only=3525789a1462443a884f9c895272ac11 HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK Callie Y. Kim, Nathan Thomas White, Evan He, Frederic Sala, and Bilge Mutlu
+
+##    
+
+##   
+
+Figure 3: User interface of RoboCritics : The panel on the left hosts a chat interface (a) for natural language interaction with the LLM agent. Users can chat by sending a message (i). The center panel exposes critics (b) allowing users to inspect and verify the generated program before execution. Users can activate critics by selecting them (g) and also fix the issues raised by critics by pressing the fix button (f). After selecting critics, users can execute the generated code by pressing “Run Code” button (d). The terminal shows the feedback from the selected critics (h). The panel on the right displays a simulation (c) of the generated robot program, allowing users to play and replay the execution as needed (e). 
+
+Figure 4: Initial task state for each tasks performed in the user study. From left to right: recycling, sorting, and preparing breakfast. 
+
+Tasks. Participants completed three sequential tasks of increas-ing complexity: Recycling , Sorting , and Preparing Breakfast . Recy-cling (easy) involved discarding multiple objects while avoiding collisions. Sorting (medium), framed as apple jam preparation, re-quired attribute-based sorting by ripeness. Preparing Breakfast (hard) chained multiple subgoals and required fine-grained control, state tracking, and debugging of LLM-generated programs under higher task complexity. 
+
+Procedure. After obtaining informed consent, the experimenter introduced the purpose of the study and outlined the planned activ-ities. This was followed by a 10-minute tutorial where participants were introduced to RoboCritics and engaged in a brief hands-on walkthrough. Participants were then assigned to one of two conditions, no-critic or with-critic , and completed three tasks each with a 10 minute time limit. Upon completing all tasks, partici-pants filled out a post-survey evaluating system usability, cognitive workload, and overall experience. The session concluded with a semi-structured interview asking how participants interacted with 
+
+RoboCritics during the tasks. Each study session lasted approxi-mately 60 minutes, and participants were compensated $ 12 .50 per hour. Questionnaires used during the study can be found in the supplementary materials. 
+
+Participants. We recruited 18 participants (9 male, 9 female) through a university mailing list between the ages of 19 and 68 (𝑀 = 39 .28 , 𝑆𝑇 𝐷 = 16 .34 ). Participants were required to be in the United States, fluent in English, and at least 18 years old. All par-ticipants agreed to participate in our study via our institution’s IRB-approved consent form. 
+
+Measures & Analysis. We combined quantitative metrics with qualitative inquiry to assess performance, interaction behavior, and RoboCritics: Enabling Reliable End-to-End LLM Robot Programming through Expert-Informed Critics HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK       
+
+> **
+>              
+
+Figure 5: (left) Program quality scores across tasks for both 
+
+with-critic (dark blue) and no-critic (light blue) conditions. Scores were computed using domain-specific critics, with higher scores indicating better program quality. Horizontal lines indicate statistically significant differences based on the Student’s t-test ( 𝑝 < .05 ∗). Vertical lines in each bar graph indicate standard deviation. (right) Total number of critic activations across categories. 
+
+user perception. To evaluate program quality, each participant-generated program was assessed by five expert-informed critics: joint speed, space usage, end effector pose, collision, and pinch points. Each critic returned a score of 0 (error), 1 (warning), or 2 (no issue), which were summed into a 0-10 program quality in-dex. We used Student’s t-tests to compare program scores between the no - critic and with-critic conditions. Interaction logs were ana-lyzed to characterize user behavior. Subjective measures included NASA-TLX [ 16 ], System Usability Scale (SUS) [ 6 ], and USE ques-tionnaires [ 32 ]. The USE subscales demonstrated high reliability, with Cronbach’s 𝛼 scores of 0.9522 (usefulness), 0.9074 (ease of use), 0.8626 (learning), and 0.9402 (satisfaction). Student’s t-tests and Mann-Whitney U tests were applied based on normality with Shapiro-Wilk tests. Finally, thematic analysis (TA) [ 10 , 35 ] of inter-view data contextualized the quantitative findings. 
+
+5 Findings 
+
+Having critics had a positive impact on program quality, with participants in critic-assisted conditions consistently achieving higher performance scores (Figure 5(left)). In Task 1, critic-assisted participants produced significantly better programs ( 𝑀 = 6.78 ,
+
+𝑆𝐷 = 0.97 ) compared to those without critics ( 𝑀 = 5.56 , 𝑆𝐷 = 1.13 ), 
+
+𝑡 (16 ) = 2.46 , 𝑝 = .026 , 95% 𝐶𝐼 = [0.17 , 2.28 ], 𝑑 = 1.16 . A similar effect was observed in Task 2, where critic-assisted participants again outperformed those in the non-assisted condition ( 𝑀 = 6.67 ,
+
+𝑆𝐷 = 0.87 vs. 𝑀 = 5.44 , 𝑆𝐷 = 1.24 ), 𝑡 (16 ) = 2.43 , 𝑝 = .027 , 95% 
+
+𝐶𝐼 = [0.16 , 2.29 ], 𝑑 = 1.15 . In Task 3, although critic-assisted par-ticipants showed higher average scores ( 𝑀 = 5.56 , 𝑆𝐷 = 2.51 ) than their counterparts ( 𝑀 = 3.89 , 𝑆𝐷 = 3.02 ), this difference was not sta-tistically significant, 𝑡 (16 ) = 1.27 , 𝑝 = .221 , 95% 𝐶𝐼 = [− 1.10 , 4.44 ],
+
+𝑑 = 0.60 . The gains in objective program quality were achieved without significantly impacting participants’ subjective experience, showing no significant changes in USE, SUS, or NASA-TLX (see supplementary materials). 
+
+Perceived Usefulness of Critics. Participants primarily prioritized critics related to collision risks, joint speed, and space usage (Fig-ure 5(right)). Collision detection was ranked higher due to clear safety implications in human-robot interactions. As one participant emphasized, P8: “I think the biggest thing I focused on was collisions, because that was the most notable issue, and that [critic description] was just saying, like, hey, make sure you’re looking at the collisions.” 
+
+However, the relevance of certain critics, such as joint speed, was perceived differently among participants. For instance, one partic-ipant found joint speed less relevant, assuming the robot would typically operate behind protective barriers, P12: “I didn’t got both-ered by joint speed.” Overall, the descriptive feedback provided by critics was considered helpful (P11, P19), especially for participants with limited programming experience. One participant noted how it clarified common issues and suggested actionable improvements, 
+
+P11: “I think it will be more difficult because maybe I didn’t know how to make sure it correctly.” .Participants appreciated the ease of applying automatic fixes provided by the critics through the buttons, P18: “Yeah, the checkers were easy. You can just turn them on or off with a click of a button.” 
+
+This ease of use reduced barriers to improving programs, even encouraging some participants to trust automatic solutions without detailed scrutiny, P19 “I didn’t really analyze it or take it in. Like, I was just being kind of lazy and just thinking like, well, if it fixed the code, it’ll work, and if it didn’t, I’ll click these buttons and try and fix them again.” Furthermore, some participants noted that reviewing automated fixes from critics helped them gain insights into program improvement and robot control P11: “I think maybe I have a little idea that I can change their number or something else to change the move of the robot arm.” Tension Between Automation and Control. Despite the conve-nience of automatic fixes, participants (P11, P14, P16) expressed a strong preference for greater control over the degree of correc-tion, and often preferred manual text-based input for specific or detailed modifications. They saw manual input as offering precision and flexibility that automatic fixes sometimes lacked, P11: “Maybe writing is more easier for me. And because I use this, maybe it will make the robot move quickly or slowly, but if I write... I can do what I want to do.” Occasionally, automatic fixes generated by critics were perceived as overly conservative, leading to user frustration. Some automatic solutions prioritized strict safety constraints at the expense of task completion, leading to confusion or unintended robot behavior, P16: “It was more like being stuck trying not to hit the object, but your logical sense is to move above. So somehow the fix was too low level of, it doesn’t hit.” Our results suggest that while expert-informed critics significantly enhanced program quality, users’ preferences varied considerably, highlighting the importance of balancing automated solutions with user control and clarity in the verification process. 
+
+Critic Engagement Patterns. Critics were sometimes considered secondary to completing the tasks. One participant prioritized ini-tial task completion and saw critics primarily as a tool for subse-quent fine-tuning rather than immediate verification, P14: “I didn’t really use it [critic] too much, because I was trying to get the box in first, and then I thought the end was like, sort of fine tuning, putting restrictions after doing whatever to complete the task, and then just trying to narrow it down.” HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK Callie Y. Kim, Nathan Thomas White, Evan He, Frederic Sala, and Bilge Mutlu 
+
+6 Discussion 
+
+Our findings demonstrate that expert-informed critics substantially improved the reliability of LLM-based robot programming. The val-idation experiment showed that prompt-only embedded critics are insufficient. While embedded in LLM prompts, critics often missed safety-critical violations. External critics, grounded in execution traces, were able to detect and repair these errors, leading to con-sistently higher program quality. This suggests that critics must operate beyond symbolic code analysis, at the motion level where physical consequences can be directly evaluated. At the same time, persistent challenges such as unresolved pinch points highlight that critics must be complemented with richer robot APIs and better handling of embodied constraints. The user study showed that external critics improve program reliability without degrading usability, satisfaction, or workload. Critics were especially helpful for novice users by surfacing safety issues and suggesting corrections. However, participants cautioned against over-reliance on automated fixes, preferring to retain con-trol through manual refinement and selectively engaging with crit-ics they thought most relevant. This selective use suggests that critics serve not only as verification tools but also as guidance for developing safety awareness in robot programming. 
+
+6.1 Design Implications for Integrating Critics 
+
+Together, our results point to three design implications for integrat-ing critics into end-user robot programming systems. 
+
+External Verifiers Across Levels of Abstraction. Our results high-light the capability of external critics to detect safety violations that LLMs, even when prompted with explicit rules, could not reli-ably identify. This suggests that critics should not be confined to static code inspection but instead operate across different lay-ers of abstraction . Future work should explore designing external critics that span these levels: at the planning level, critics can check task logic, sequencing, and goal satisfaction; at the motion level (as demonstrated by RoboCritics ), they can verify execution traces for collisions and unsafe speeds; and at the runtime level, they can verify code executability. Designing verifiers that span these layers ensures both semantic correctness and embodied safety. Also, while some terminology in the current system remains technical, feed-back from critics should be adaptive to user expertise by offering progressively detailed explanations or configurable presentation modes as users gain experience. 
+
+Critics and the Automation-Control Tradeoff. Participants appre-ciated expert-informed critics that automatically identified and resolved performance or safety issues. Automatic fix buttons sim-plified program refinement however, some users found these auto-mated fixes overly conservative, highlighting a tension between au-tomation and user control. This trade-off between automation and control underscores the need for careful calibration of automated fixes. Future systems should offer flexible levels of automa-tion that adapt to user preferences and experience . Adjustable automation settings can let users balance auto-correction, guided edits, and manual refinement, while transparent explanations of critic-generated fixes help users selectively adopt suggestions. Sup-porting user-customizable feedback further maintains user control, as demonstrated by prior work that allows users to modulate strict-ness of constraints in LLM-generated plans [29]. 
+
+Expanding Skill Libraries for Effective Critic Integration. The effec-tiveness of iterative refinement is constrained by the expressiveness of the available APIs. While critics can flag unsafe or suboptimal behaviors, the LLM’s ability to respond is limited to the existing skill set. For example, to address a joint-speed violation, the model repeatedly adjusted the parameter of reduce_speed until no warn-ings remained, rather than reasoning about alternative motion strategies. This highlights a gap: critics alone cannot resolve em-bodied issues without sufficient action primitives. Future work should focus on expanding robot skill libraries and exposing richer APIs that critics can leverage . By providing more expres-sive motion primitives and domain-specific functions, critics can move beyond flagging errors to guiding meaningful fixes, thereby bridging detection with actionable resolution. 
+
+6.2 Limitations and Future Work 
+
+Our system has several limitations that point to potential areas for improvement. First, the simulation environment was hard-coded, with static environmental information provided to the LLM. Fu-ture work could incorporate real-time, dynamic environments that better reflect real-world conditions and synchronization between simulation and sensing. Second, robot API skills for grasping are hard-coded to simple grip actions, which underscores a reliance on predefined object-centric methods that do not account for grasped geometries. Future work should explore richer manipulation repre-sentations, including critics that reason about object meshes and ge-ometries, as well as the integration Vision-Language Models (VLMs) and computer vision to support more flexible object manipulation. The critic library could further be extended with perception-aware critics that verify scene consistency and object-state alignment between sensed and simulated environments. Third, during de-ployment, issues with the robot’s gripper prevented participants from fully observing task execution, even though overall robot movements were evident. Future work should explore the complete pipeline from conceptualization to deployment. Third, we did not conduct cross-validation of the expert-informed critics with robotic experts. Future work could address this limitation by evaluating critic outputs against expert judgments. Finally, as an initial ex-ploratory study, our current findings are based on a sample size of 18 participants. While indicative, future work should validate the efficacy of the critic-based integration approach in larger and more diverse populations. 
+
+7 Conclusion 
+
+In this paper, we introduced RoboCritics , an approach that aug-ments LLM-based robot programming with expert-informed critics, automated fixes, and execution-grounded feedback. Our evaluation shows that external critics outperform prompt-only verification in detecting safety-critical errors, while a user study reveals that critics improve program quality but are engaged in diverse ways, highlighting tensions between automation and user control. We provide design insights for integrating critics into LLM-based robot programming. RoboCritics: Enabling Reliable End-to-End LLM Robot Programming through Expert-Informed Critics HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK 
+
+Acknowledgments 
+
+This work was supported in part by the National Science Foundation awards 1925043 and 2330040. 
+
+References 
+
+[1] Michael Ahn, Anthony Brohan, Noah Brown, Yevgen Chebotar, Omar Cortes, Byron David, Chelsea Finn, Chuyuan Fu, Keerthana Gopalakrishnan, Karol Haus-man, Alex Herzog, Daniel Ho, Jasmine Hsu, Julian Ibarz, Brian Ichter, Alex Irpan, Eric Jang, Rosario Jauregui Ruano, Kyle Jeffrey, Sally Jesmonth, Nikhil J Joshi, Ryan Julian, Dmitry Kalashnikov, Yuheng Kuang, Kuang-Huei Lee, Sergey Levine, Yao Lu, Linda Luu, Carolina Parada, Peter Pastor, Jornell Quiambao, Kan-ishka Rao, Jarek Rettinghouse, Diego Reyes, Pierre Sermanet, Nicolas Sievers, Clayton Tan, Alexander Toshev, Vincent Vanhoucke, Fei Xia, Ted Xiao, Peng Xu, Sichun Xu, Mengyuan Yan, and Andy Zeng. 2022. Do As I Can, Not As I Say: Grounding Language in Robotic Affordances. arXiv:2204.01691 [cs.RO] https://arxiv.org/abs/2204.01691 [2] Gopika Ajaykumar and Chien-Ming Huang. 2020. User Needs and Design Oppor-tunities in End-User Robot Programming. In Companion of the 2020 ACM/IEEE International Conference on Human-Robot Interaction (Cambridge, United King-dom) (HRI ’20) . Association for Computing Machinery, New York, NY, USA, 93–95. doi:10.1145/3371382.3378300 [3] Ben Athiwaratkun, Sanjay Krishna Gouda, Zijian Wang, Xiaopeng Li, Yuchen Tian, Ming Tan, Wasi Uddin Ahmad, Shiqi Wang, Qing Sun, Mingyue Shang, Sujan Kumar Gonugondla, Hantian Ding, Varun Kumar, Nathan Fulton, Arash Farahani, Siddhartha Jain, Robert Giaquinto, Haifeng Qian, Murali Krishna Ra-manathan, Ramesh Nallapati, Baishakhi Ray, Parminder Bhatia, Sudipta Sengupta, Dan Roth, and Bing Xiang. 2023. Multi-lingual Evaluation of Code Generation Models. arXiv:2210.14868 [cs.LG] https://arxiv.org/abs/2210.14868 [4] Shraddha Barke, Michael B. James, and Nadia Polikarpova. 2023. Grounded Copilot: How Programmers Interact with Code-Generating Models. Proc. ACM Program. Lang. 7, OOPSLA1, Article 78 (April 2023), 27 pages. doi:10.1145/3586030 [5] Christian Bird, Denae Ford, Thomas Zimmermann, Nicole Forsgren, Eirini Kalliamvakou, Travis Lowdermilk, and Idan Gazit. 2023. Taking Flight with Copilot. Commun. ACM 66, 6 (May 2023), 56–62. doi:10.1145/3589996 [6] John Brooke et al . 1996. SUS-A quick and dirty usability scale. Usability evaluation in industry 189, 194 (1996), 4–7. [7] Guido Bugmann and J. Norberto Pires. 2005. Robot-by-voice: experi-ments on commanding an industrial robot using the human voice. In-dustrial Robot: the international journal of robotics research and applica-tion 32, 6 (12 2005), 505–511. arXiv:https://www.emerald.com/ir/article-pdf/32/6/505/1250259/01439910510629244.pdf doi:10.1108/01439910510629244 [8] Juo-Tung Chen and Chien-Ming Huang. 2024. Forgetful Large Language Models: Lessons Learned from Using LLMs in Robot Programming. Proceedings of the AAAI Symposium Series 2, 1 (Jan. 2024), 508–513. doi:10.1609/aaaiss.v2i1.27721 [9] Henrik Christensen, Nancy Amato, Holly Yanco, Maja Mataric, Howie Choset, Ann Drobnis, Ken Goldberg, Jessy Grizzle, Gregory Hager, John Holler-bach, Seth Hutchinson, Venkat Krovi, Daniel Lee, Bill Smart, Jeff Trin-kle, and Gaurav Sukhatme. 2021. A Roadmap for US Robotics – From Internet to Robotics 2020 Edition. Foundations and Trends in Robot-ics 8, 4 (07 2021), 307–424. arXiv:https://www.emerald.com/ftrob/article-pdf/8/4/307/10906215/2300000066en.pdf doi:10.1561/2300000066 [10] Victoria Clarke and Virginia Braun. 2014. Thematic analysis. In Encyclopedia of critical psychology . Springer, 1947–1952. [11] Ed Colgate, Antonio Bicchi, Michael Aaron Peshkin, and James Edward Colgate. 2008. Safety for physical human-robot interaction. In Springer handbook of robotics . Springer, 1335–1348. [12] Danny Driess, Fei Xia, Mehdi S. M. Sajjadi, Corey Lynch, Aakanksha Chowdh-ery, Brian Ichter, Ayzaan Wahid, Jonathan Tompson, Quan Vuong, Tianhe Yu, Wenlong Huang, Yevgen Chebotar, Pierre Sermanet, Daniel Duckworth, Sergey Levine, Vincent Vanhoucke, Karol Hausman, Marc Toussaint, Klaus Greff, Andy Zeng, Igor Mordatch, and Pete Florence. 2023. PaLM-E: An Embodied Multimodal Language Model. arXiv:2303.03378 [cs.LG] [13] Luigi Gargioni and Daniela Fogli. 2024. Integrating ChatGPT with Blockly for End-User Development of Robot Tasks. In Companion of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 478–482. doi:10. 1145/3610978.3640653 [14] Zhibin Gou, Zhihong Shao, Yeyun Gong, Yelong Shen, Yujiu Yang, Nan Duan, and Weizhu Chen. 2024. CRITIC: Large Language Models Can Self-Correct with Tool-Interactive Critiquing. arXiv:2305.11738 [cs.CL] https://arxiv.org/abs/2305.11738 [15] Jérémie Guiochet, Mathilde Machin, and Hélène Waeselynck. 2017. Safety-critical advanced robots: A survey. Robotics and Autonomous Systems 94 (2017), 43–52. doi:10.1016/j.robot.2017.04.004 [16] Sandra G Hart and Lowell E Staveland. 1988. Development of NASA-TLX (Task Load Index): Results of empirical and theoretical research. In Advances in psy-chology . Vol. 52. Elsevier, 139–183. [17] Justin Huang and Maya Cakmak. 2017. Code3: A System for End-to-End Program-ming of Mobile Manipulator Robots for Novices and Experts. In Proceedings of the 2017 ACM/IEEE International Conference on Human-Robot Interaction (Vienna, Austria) (HRI ’17) . Association for Computing Machinery, New York, NY, USA, 453–462. doi:10.1145/2909824.3020215 [18] Bryce Ikeda, Maitrey Gramopadhye, LillyAnn Nekervis, and Daniel Szafir. 2025. MARCER: Multimodal Augmented Reality for Composing and Executing Robot Tasks. In 2025 20th ACM/IEEE International Conference on Human-Robot Interaction (HRI) . 529–539. doi:10.1109/HRI61500.2025.10974232 [19] Abhinav Jain, Chris Jermaine, and Vaibhav Unhelkar. 2024. RAG-Modulo: Solving Sequential Tasks using Experience, Critics, and Language Models. arXiv:2409.12294 [cs.AI] https://arxiv.org/abs/2409.12294 [20] Ziwei Ji, Nayeon Lee, Rita Frieske, Tiezheng Yu, Dan Su, Yan Xu, Etsuko Ishii, Ye Jin Bang, Andrea Madotto, and Pascale Fung. 2023. Survey of Hallucination in Natural Language Generation. ACM Comput. Surv. 55, 12, Article 248 (March 2023), 38 pages. doi:10.1145/3571730 [21] Juyong Jiang, Fan Wang, Jiasi Shen, Sungju Kim, and Sunghun Kim. 2024. A Survey on Large Language Models for Code Generation. arXiv preprint arXiv:2406.00515 (2024). [22] Subbarao Kambhampati, Karthik Valmeekam, Lin Guan, Mudit Verma, Kaya Stechly, Siddhant Bhambri, Lucas Saldyt, and Anil Murthy. 2024. LLMs Can’t Plan, But Can Help Planning in LLM-Modulo Frameworks. arXiv:2402.01817 [cs.AI] https://arxiv.org/abs/2402.01817 [23] Shyam Sundar Kannan, Vishnunandan L. N. Venkatesh, and Byung-Cheol Min. 2024. SMART-LLM: Smart Multi-Agent Robot Task Planning using Large Lan-guage Models. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . 12140–12147. doi:10.1109/IROS58592.2024.10802322 [24] Ulas Berk Karli, Juo-Tung Chen, Victor Nikhil Antony, and Chien-Ming Huang. 2024. Alchemist: LLM-Aided End-User Development of Robot Applications. In Proceedings of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 361–370. doi:10.1145/3610977.3634969 [25] Azal Ahmad Khan, Michael Andrev, Muhammad Ali Murtaza, Sergio Aguilera, Rui Zhang, Jie Ding, Seth Hutchinson, and Ali Anwar. 2025. Safety Aware Task Planning via Large Language Models in Robotics. arXiv:2503.15707 [cs.RO] https://arxiv.org/abs/2503.15707 [26] Callie Y. Kim, Christine P. Lee, and Bilge Mutlu. 2024. Understanding Large-Language Model (LLM)-powered Human-Robot Interaction. In Proceedings of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 371–380. doi:10.1145/3610977.3634966 [27] Yeseung Kim, Dohyun Kim, Jieun Choi, Jisang Park, Nayoung Oh, and Daehyung Park. 2024. A survey on integration of large language models with intelligent robots. Intelligent Service Robotics 17, 5 (Aug. 2024), 1091–1107. doi:10.1007/ s11370-024-00550-5 [28] Krishna Kodur, Manizheh Zand, Matthew Tognotti, Cinthya Jauregui, and Maria Kyrarini. 2023. Structured and Unstructured Speech2Action Frameworks for Human-Robot Collaboration: A User Study. (Aug. 2023). doi:10.36227/techrxiv. 24022452.v1 [29] Christine P. Lee, David Porfirio, Xinyu Jessica Wang, Kevin Chenkai Zhao, and Bilge Mutlu. 2025. VeriPlan: Integrating Formal Verification and LLMs into End-User Planning. In Proceedings of the 2025 CHI Conference on Human Factors in Computing Systems (CHI ’25) . Association for Computing Machinery, New York, NY, USA, Article 247, 19 pages. doi:10.1145/3706598.3714113 [30] Ying Siu Liang, Damien Pellier, Humbert Fiorino, and Sylvie Pesty. 2019. End-User Programming of Low-and High-Level Actions for Robotic Task Planning. In 2019 28th IEEE International Conference on Robot and Human Interactive Communication (RO-MAN) . 1–8. doi:10.1109/RO-MAN46459.2019.8956327 [31] Haokun Liu, Yaonan Zhu, Kenji Kato, Atsushi Tsukahara, Izumi Kondo, Tadayoshi Aoyama, and Yasuhisa Hasegawa. 2024. Enhancing the LLM-Based Robot Ma-nipulation Through Human-Robot Collaboration. IEEE Robotics and Automation Letters 9, 8 (2024), 6904–6911. doi:10.1109/LRA.2024.3415931 [32] Arnold M Lund. 2001. Measuring usability with the use questionnaire12. Usability interface 8, 2 (2001), 3–6. [33] Karthik Mahadevan, Jonathan Chien, Noah Brown, Zhuo Xu, Carolina Parada, Fei Xia, Andy Zeng, Leila Takayama, and Dorsa Sadigh. 2024. Generative Ex-pressive Robot Behaviors using Large Language Models. In Proceedings of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 482–491. doi:10.1145/3610977.3634999 [34] Karthik Mahadevan, Blaine Lewis, Jiannan Li, Bilge Mutlu, Anthony Tang, and Tovi Grossman. 2025. ImageInThat: Manipulating Images to Convey User Instruc-tions to Robots. In 2025 20th ACM/IEEE International Conference on Human-Robot Interaction (HRI) . 757–766. doi:10.1109/HRI61500.2025.10974179 [35] Nora McDonald, Sarita Schoenebeck, and Andrea Forte. 2019. Reliability and Inter-rater Reliability in Qualitative Research: Norms and Guidelines for CSCW and HCI Practice. Proceedings of the ACM on Human-Computer Interaction 3 (11 2019), 1–23. doi:10.1145/3359174 HRI ’26, March 16–19, 2026, Edinburgh, Scotland, UK Callie Y. Kim, Nathan Thomas White, Evan He, Frederic Sala, and Bilge Mutlu 
+
+[36] Christopher E. Mower, Yuhui Wan, Hongzhan Yu, Antoine Grosnit, Jonas Gonzalez-Billandon, Matthieu Zimmer, Jinlong Wang, Xinyu Zhang, Yao Zhao, Anbang Zhai, Puze Liu, Daniel Palenicek, Davide Tateo, Cesar Cadena, Marco Hutter, Jan Peters, Guangjian Tian, Yuzheng Zhuang, Kun Shao, Xingyue Quan, Jianye Hao, Jun Wang, and Haitham Bou-Ammar. 2024. ROS-LLM: A ROS framework for embodied AI with task feedback and structured reasoning. arXiv:2406.19741 [cs.RO] https://arxiv.org/abs/2406.19741 [37] Ike Obi, Vishnunandan L. N. Venkatesh, Weizheng Wang, Ruiqi Wang, Day-oon Suh, Temitope I. Amosa, Wonse Jo, and Byung-Cheol Min. 2025. Safe-Plan: Leveraging Formal Logic and Chain-of-Thought Reasoning for Enhanced Safety in LLM-based Robotic Task Planning. arXiv:2503.06892 [cs.RO] https: //arxiv.org/abs/2503.06892 [38] OpenAI. 2024. Hello GPT-4 Turbo. https://openai.com/index/hello-gpt-4o/. Accessed: 2024-12-18. [39] OpenAI. 2024. New and Improved Embedding Model. https://openai.com/index/ new-and-improved-embedding-model/. Accessed: 2024-12-18. [40] Eric M. Orendt, Myriel Fichtner, and Dominik Henrich. 2016. Robot programming by non-experts: Intuitiveness and robustness of One-Shot robot programming. In 2016 25th IEEE International Symposium on Robot and Human Interactive Com-munication (RO-MAN) . 192–199. doi:10.1109/ROMAN.2016.7745110 [41] Akhil Padmanabha, Jessie Yuan, Janavi Gupta, Zulekha Karachiwalla, Carmel Majidi, Henny Admoni, and Zackory Erickson. 2024. VoicePilot: Harnessing LLMs as Speech Interfaces for Physically Assistive Robots. In Proceedings of the 37th Annual ACM Symposium on User Interface Software and Technology (Pittsburgh, PA, USA) (UIST ’24) . Association for Computing Machinery, New York, NY, USA, Article 116, 18 pages. doi:10.1145/3654777.3676401 [42] Ana-Lucia Pais Ureche and Aude Billard. 2015. Learning Bimanual Coordinated Tasks From Human Demonstrations. In Proceedings of the Tenth Annual ACM/IEEE International Conference on Human-Robot Interaction Extended Abstracts (Portland, Oregon, USA) (HRI’15 Extended Abstracts) . Association for Computing Machinery, New York, NY, USA, 141–142. doi:10.1145/2701973.2702007 [43] David Porfirio, Evan Fisher, Allison Sauppé, Aws Albarghouthi, and Bilge Mutlu. 2019. Bodystorming Human-Robot Interactions. In Proceedings of the 32nd Annual ACM Symposium on User Interface Software and Technology (New Orleans, LA, USA) (UIST ’19) . Association for Computing Machinery, New York, NY, USA, 479–491. doi:10.1145/3332165.3347957 [44] David Porfirio, Mark Roberts, and Laura M. Hiatt. 2024. Goal-Oriented End-User Programming of Robots. In Proceedings of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 582–591. doi:10.1145/3610977. 3634974 [45] Behrad Rabiei, Mahesh Kumar A. R., Zhirui Dai, Surya L. S. R. Pilla, Qiyue Dong, and Nikolay Atanasov. 2025. LTLCodeGen: Code Generation of Syntactically Correct Temporal Logic for Robot Task Planning. arXiv:2503.07902 [cs.RO] https://arxiv.org/abs/2503.07902 [46] Andrew Schoen and Bilge Mutlu. 2024. OpenVP: A Customizable Visual Pro-gramming Environment for Robotics Applications. In Proceedings of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 944–948. doi:10.1145/3610977.3637477 [47] Andrew Schoen, Dakota Sullivan, Ze Dong Zhang, Daniel Rakita, and Bilge Mutlu. 2023. Lively: Enabling Multimodal, Lifelike, and Extensible Real-time Robot Motion. In Proceedings of the 2023 ACM/IEEE International Conference on Human-Robot Interaction (Stockholm, Sweden) (HRI ’23) . Association for Computing Machinery, New York, NY, USA, 594–602. doi:10.1145/3568162.3576982 [48] Andrew Schoen, Nathan White, Curt Henrichs, Amanda Siebert-Evenstone, David Shaffer, and Bilge Mutlu. 2022. CoFrame: A System for Training Novice Cobot Programmers. In 2022 17th ACM/IEEE International Conference on Human-Robot Interaction (HRI) . 185–194. doi:10.1109/HRI53351.2022.9889345 [49] Aran Sena and Matthew Howard. 2020. Quantifying teaching behavior in robot learning from demonstration. The International Journal of Robotics Research 
+
+39, 1 (2020), 54–72. arXiv:https://doi.org/10.1177/0278364919884623 doi:10.1177/ 0278364919884623 [50] Natalia Shmatko and Galina Volkova. 2020. Bridging the Skill Gap in Robotics: Global and National Environment. Sage Open 10, 3 (2020), 2158244020958736. arXiv:https://doi.org/10.1177/2158244020958736 doi:10.1177/2158244020958736 [51] Ishika Singh, Valts Blukis, Arsalan Mousavian, Ankit Goyal, Danfei Xu, Jonathan Tremblay, Dieter Fox, Jesse Thomason, and Animesh Garg. 2022. Prog-Prompt: Generating Situated Robot Task Plans using Large Language Models. arXiv:2209.11302 [cs.RO] https://arxiv.org/abs/2209.11302 [52] Chan Hee Song, Jiaman Wu, Clayton Washington, Brian M Sadler, Wei-Lun Chao, and Yu Su. 2023. LLM-Planner: Few-Shot Grounded Planning for Embodied Agents with Large Language Models. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) . 2998–3009. [53] Kaya Stechly, Matthew Marquez, and Subbarao Kambhampati. 2023. GPT-4 Doesn’t Know It’s Wrong: An Analysis of Iterative Prompting for Reasoning Problems. arXiv:2310.12397 [cs.AI] https://arxiv.org/abs/2310.12397 [54] Manasi Swaminathan, Long-Jing Hsu, Min Min Thant, Kyrie Jig Amon, Anna S. Kim, Katherine M. Tsui, Selma Sabanović, David J. Crandall, and Weslie Khoo. 2024. If [YourName] Can Code, So Can You! End-User Robot Programming For Non-Experts. In Companion of the 2024 ACM/IEEE International Conference on Human-Robot Interaction (Boulder, CO, USA) (HRI ’24) . Association for Computing Machinery, New York, NY, USA, 1033–1037. doi:10.1145/3610978.3640644 [55] Annalisa Szymanski, Noah Ziems, Heather A. Eicher-Miller, Toby Jia-Jun Li, Meng Jiang, and Ronald A. Metoyer. 2025. Limitations of the LLM-as-a-Judge Approach for Evaluating LLM Outputs in Expert Knowledge Tasks. In Proceedings of the 30th International Conference on Intelligent User Interfaces (IUI ’25) . Association for Computing Machinery, New York, NY, USA, 952–966. doi:10.1145/3708359. 3712091 [56] Karthik Valmeekam, Matthew Marquez, Sarath Sreedharan, and Subbarao Kamb-hampati. 2023. On the Planning Abilities of Large Language Models - A Critical Investigation. In Advances in Neural Information Processing Systems , A. Oh, T. Nau-mann, A. Globerson, K. Saenko, M. Hardt, and S. Levine (Eds.), Vol. 36. Curran Associates, Inc., 75993–76005. https://proceedings.neurips.cc/paper_files/paper/ 2023/file/efb2072a358cefb75886a315a6fcf880-Paper-Conference.pdf [57] Milos Vasic and Aude Billard. 2013. Safety issues in human-robot interactions. In 
+
+2013 IEEE International Conference on Robotics and Automation . 197–204. doi:10. 1109/ICRA.2013.6630576 [58] Sai H. Vemprala, Rogerio Bonatti, Arthur Bucker, and Ashish Kapoor. 2024. Chat-GPT for Robotics: Design Principles and Model Abilities. IEEE Access 12 (2024), 55682–55696. doi:10.1109/ACCESS.2024.3387941 [59] Koki Wataoka, Tsubasa Takahashi, and Ryokan Ri. 2025. Self-Preference Bias in LLM-as-a-Judge. arXiv:2410.21819 [cs.CL] https://arxiv.org/abs/2410.21819 [60] Mario Winterer, Christian Salomon, Jessica Köberle, Rudolf Ramler, and Markus Schittengruber. 2020. An Expert Review on the Applicability of Blockly for Industrial Robot Programming. In 2020 25th IEEE International Conference on Emerging Technologies and Factory Automation (ETFA) , Vol. 1. 1231–1234. doi:10. 1109/ETFA46521.2020.9212036 [61] Wenda Xu, Guanglei Zhu, Xuandong Zhao, Liangming Pan, Lei Li, and William Wang. 2024. Pride and Prejudice: LLM Amplifies Self-Bias in Self-Refinement. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , Lun-Wei Ku, Andre Martins, and Vivek Srikumar (Eds.). Association for Computational Linguistics, Bangkok, Thailand, 15474–15492. doi:10.18653/v1/2024.acl-long.826 [62] Ziyi Yang, Shreyas S. Raman, Ankit Shah, and Stefanie Tellex. 2024. Plug in the Safety Chip: Enforcing Constraints for LLM-driven Robot Agents. In 2024 IEEE International Conference on Robotics and Automation (ICRA) . 14435–14442. doi:10.1109/ICRA57147.2024.10611447 [63] Yang Ye, Hengxu You, and Jing Du. 2023. Improved Trust in Human-Robot Collaboration With ChatGPT. IEEE Access 11 (2023), 55748–55754. doi:10.1109/ ACCESS.2023.3282111 [64] Burak Yetiştiren, Işık Özsoy, Miray Ayerdem, and Eray Tüzün. 2023. Evaluating the Code Quality of AI-Assisted Code Generation Tools: An Empirical Study on GitHub Copilot, Amazon CodeWhisperer, and ChatGPT. arXiv:2304.10778 [cs.SE] https://arxiv.org/abs/2304.10778 [65] Wenhao Yu, Nimrod Gileadi, Chuyuan Fu, Sean Kirmani, Kuang-Huei Lee, Montse Gonzalez Arenas, Hao-Tien Lewis Chiang, Tom Erez, Leonard Hasen-clever, Jan Humplik, Brian Ichter, Ted Xiao, Peng Xu, Andy Zeng, Tingnan Zhang, Nicolas Heess, Dorsa Sadigh, Jie Tan, Yuval Tassa, and Fei Xia. 2023. Language to Rewards for Robotic Skill Synthesis. arXiv:2306.08647 [cs.RO] https://arxiv.org/abs/2306.08647 [66] Alex Wuqi Zhang, Rafael Queiroz, and Sarah Sebo. 2025. Balancing User Control and Perceived Robot Social Agency Through the Design of End-User Robot Programming Interfaces. In 2025 20th ACM/IEEE International Conference on Human-Robot Interaction (HRI) . 899–908. doi:10.1109/HRI61500.2025.10974063 [67] Kateryna Zinchenko, Chien-Yu Wu, and Kai-Tai Song. 2017. A Study on Speech Recognition Control for a Surgical Robot. IEEE Transactions on Industrial Infor-matics 13, 2 (2017), 607–615. doi:10.1109/TII.2016.2625818 
+
+Received 2025-09-30; accepted 2025-12-01
